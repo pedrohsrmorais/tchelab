@@ -1,0 +1,818 @@
+[33mcommit 45a4025657c5b8cb25226e84a0665d62373a132f[m
+Author: root <root@veritas.vps-kinghost.net>
+Date:   Thu Jun 11 21:30:05 2026 -0300
+
+    v1
+
+ .gitignore                                                              |     5 [32m+[m
+ .venv/bin/Activate.ps1                                                  |   247 [32m+[m
+ .venv/bin/activate                                                      |    63 [32m+[m
+ .venv/bin/activate.csh                                                  |    26 [32m+[m
+ .venv/bin/activate.fish                                                 |    69 [32m+[m
+ .venv/bin/dotenv                                                        |     8 [32m+[m
+ .venv/bin/f2py                                                          |     8 [32m+[m
+ .venv/bin/fastapi                                                       |     8 [32m+[m
+ .venv/bin/httpx                                                         |     8 [32m+[m
+ .venv/bin/idna                                                          |     8 [32m+[m
+ .venv/bin/numpy-config                                                  |     8 [32m+[m
+ .venv/bin/pip                                                           |     8 [32m+[m
+ .venv/bin/pip3                                                          |     8 [32m+[m
+ .venv/bin/pip3.11                                                       |     8 [32m+[m
+ .venv/bin/pysemver                                                      |     8 [32m+[m
+ .venv/bin/python                                                        |     1 [32m+[m
+ .venv/bin/python3                                                       |     1 [32m+[m
+ .venv/bin/python3.11                                                    |     1 [32m+[m
+ .venv/bin/uvicorn                                                       |     8 [32m+[m
+ .venv/lib/python3.11/site-packages/__pycache__/six.cpython-311.pyc      |   Bin [31m0[m -> [32m46562[m bytes
+ .../python3.11/site-packages/__pycache__/threadpoolctl.cpython-311.pyc  |   Bin [31m0[m -> [32m64723[m bytes
+ .../site-packages/__pycache__/typing_extensions.cpython-311.pyc         |   Bin [31m0[m -> [32m179459[m bytes
+ .venv/lib/python3.11/site-packages/_distutils_hack/__init__.py          |   222 [32m+[m
+ .../site-packages/_distutils_hack/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m11157[m bytes
+ .../site-packages/_distutils_hack/__pycache__/override.cpython-311.pyc  |   Bin [31m0[m -> [32m314[m bytes
+ .venv/lib/python3.11/site-packages/_distutils_hack/override.py          |     1 [32m+[m
+ .../site-packages/_mysql_connector.cpython-311-x86_64-linux-gnu.so      |   Bin [31m0[m -> [32m26730264[m bytes
+ .../python3.11/site-packages/annotated_doc-0.0.4.dist-info/INSTALLER    |     1 [32m+[m
+ .../lib/python3.11/site-packages/annotated_doc-0.0.4.dist-info/METADATA |   145 [32m+[m
+ .venv/lib/python3.11/site-packages/annotated_doc-0.0.4.dist-info/RECORD |    11 [32m+[m
+ .venv/lib/python3.11/site-packages/annotated_doc-0.0.4.dist-info/WHEEL  |     4 [32m+[m
+ .../site-packages/annotated_doc-0.0.4.dist-info/entry_points.txt        |     4 [32m+[m
+ .../site-packages/annotated_doc-0.0.4.dist-info/licenses/LICENSE        |    21 [32m+[m
+ .venv/lib/python3.11/site-packages/annotated_doc/__init__.py            |     3 [32m+[m
+ .../site-packages/annotated_doc/__pycache__/__init__.cpython-311.pyc    |   Bin [31m0[m -> [32m263[m bytes
+ .../site-packages/annotated_doc/__pycache__/main.cpython-311.pyc        |   Bin [31m0[m -> [32m2013[m bytes
+ .venv/lib/python3.11/site-packages/annotated_doc/main.py                |    36 [32m+[m
+ .venv/lib/python3.11/site-packages/annotated_doc/py.typed               |     0
+ .../python3.11/site-packages/annotated_types-0.7.0.dist-info/INSTALLER  |     1 [32m+[m
+ .../python3.11/site-packages/annotated_types-0.7.0.dist-info/METADATA   |   295 [32m+[m
+ .../lib/python3.11/site-packages/annotated_types-0.7.0.dist-info/RECORD |    10 [32m+[m
+ .../lib/python3.11/site-packages/annotated_types-0.7.0.dist-info/WHEEL  |     4 [32m+[m
+ .../site-packages/annotated_types-0.7.0.dist-info/licenses/LICENSE      |    21 [32m+[m
+ .venv/lib/python3.11/site-packages/annotated_types/__init__.py          |   432 [32m+[m
+ .../site-packages/annotated_types/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m20559[m bytes
+ .../annotated_types/__pycache__/test_cases.cpython-311.pyc              |   Bin [31m0[m -> [32m15450[m bytes
+ .venv/lib/python3.11/site-packages/annotated_types/py.typed             |     0
+ .venv/lib/python3.11/site-packages/annotated_types/test_cases.py        |   151 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio-4.13.0.dist-info/INSTALLER     |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio-4.13.0.dist-info/METADATA      |   105 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio-4.13.0.dist-info/RECORD        |    92 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio-4.13.0.dist-info/WHEEL         |     5 [32m+[m
+ .../python3.11/site-packages/anyio-4.13.0.dist-info/entry_points.txt    |     2 [32m+[m
+ .../python3.11/site-packages/anyio-4.13.0.dist-info/licenses/LICENSE    |    20 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio-4.13.0.dist-info/top_level.txt |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/__init__.py                    |   111 [32m+[m
+ .../python3.11/site-packages/anyio/__pycache__/__init__.cpython-311.pyc |   Bin [31m0[m -> [32m6039[m bytes
+ .../site-packages/anyio/__pycache__/from_thread.cpython-311.pyc         |   Bin [31m0[m -> [32m27953[m bytes
+ .../site-packages/anyio/__pycache__/functools.cpython-311.pyc           |   Bin [31m0[m -> [32m18013[m bytes
+ .../python3.11/site-packages/anyio/__pycache__/lowlevel.cpython-311.pyc |   Bin [31m0[m -> [32m8793[m bytes
+ .../site-packages/anyio/__pycache__/pytest_plugin.cpython-311.pyc       |   Bin [31m0[m -> [32m19051[m bytes
+ .../site-packages/anyio/__pycache__/to_interpreter.cpython-311.pyc      |   Bin [31m0[m -> [32m11433[m bytes
+ .../site-packages/anyio/__pycache__/to_process.cpython-311.pyc          |   Bin [31m0[m -> [32m13812[m bytes
+ .../site-packages/anyio/__pycache__/to_thread.cpython-311.pyc           |   Bin [31m0[m -> [32m3450[m bytes
+ .venv/lib/python3.11/site-packages/anyio/_backends/__init__.py          |     0
+ .../site-packages/anyio/_backends/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m192[m bytes
+ .../site-packages/anyio/_backends/__pycache__/_asyncio.cpython-311.pyc  |   Bin [31m0[m -> [32m153278[m bytes
+ .../site-packages/anyio/_backends/__pycache__/_trio.cpython-311.pyc     |   Bin [31m0[m -> [32m79130[m bytes
+ .venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py          |  2996 [32m+++++[m
+ .venv/lib/python3.11/site-packages/anyio/_backends/_trio.py             |  1343 [32m+++[m
+ .venv/lib/python3.11/site-packages/anyio/_core/__init__.py              |     0
+ .../site-packages/anyio/_core/__pycache__/__init__.cpython-311.pyc      |   Bin [31m0[m -> [32m188[m bytes
+ .../anyio/_core/__pycache__/_asyncio_selector_thread.cpython-311.pyc    |   Bin [31m0[m -> [32m9084[m bytes
+ .../anyio/_core/__pycache__/_contextmanagers.cpython-311.pyc            |   Bin [31m0[m -> [32m9672[m bytes
+ .../site-packages/anyio/_core/__pycache__/_eventloop.cpython-311.pyc    |   Bin [31m0[m -> [32m9123[m bytes
+ .../site-packages/anyio/_core/__pycache__/_exceptions.cpython-311.pyc   |   Bin [31m0[m -> [32m8847[m bytes
+ .../site-packages/anyio/_core/__pycache__/_fileio.cpython-311.pyc       |   Bin [31m0[m -> [32m43805[m bytes
+ .../site-packages/anyio/_core/__pycache__/_resources.cpython-311.pyc    |   Bin [31m0[m -> [32m1112[m bytes
+ .../site-packages/anyio/_core/__pycache__/_signals.cpython-311.pyc      |   Bin [31m0[m -> [32m1468[m bytes
+ .../site-packages/anyio/_core/__pycache__/_sockets.cpython-311.pyc      |   Bin [31m0[m -> [32m42653[m bytes
+ .../site-packages/anyio/_core/__pycache__/_streams.cpython-311.pyc      |   Bin [31m0[m -> [32m2654[m bytes
+ .../site-packages/anyio/_core/__pycache__/_subprocesses.cpython-311.pyc |   Bin [31m0[m -> [32m9634[m bytes
+ .../anyio/_core/__pycache__/_synchronization.cpython-311.pyc            |   Bin [31m0[m -> [32m36729[m bytes
+ .../site-packages/anyio/_core/__pycache__/_tasks.cpython-311.pyc        |   Bin [31m0[m -> [32m8412[m bytes
+ .../site-packages/anyio/_core/__pycache__/_tempfile.cpython-311.pyc     |   Bin [31m0[m -> [32m28507[m bytes
+ .../site-packages/anyio/_core/__pycache__/_testing.cpython-311.pyc      |   Bin [31m0[m -> [32m4090[m bytes
+ .../site-packages/anyio/_core/__pycache__/_typedattr.cpython-311.pyc    |   Bin [31m0[m -> [32m4410[m bytes
+ .../python3.11/site-packages/anyio/_core/_asyncio_selector_thread.py    |   167 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_contextmanagers.py      |   200 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_eventloop.py            |   234 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_exceptions.py           |   156 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_fileio.py               |   799 [32m++[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_resources.py            |    18 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_signals.py              |    29 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_sockets.py              |  1003 [32m++[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_streams.py              |    52 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_subprocesses.py         |   196 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_synchronization.py      |   757 [32m++[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_tasks.py                |   173 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_tempfile.py             |   613 [32m++[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_testing.py              |    82 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/_core/_typedattr.py            |    81 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/abc/__init__.py                |    58 [32m+[m
+ .../site-packages/anyio/abc/__pycache__/__init__.cpython-311.pyc        |   Bin [31m0[m -> [32m3074[m bytes
+ .../site-packages/anyio/abc/__pycache__/_eventloop.cpython-311.pyc      |   Bin [31m0[m -> [32m18114[m bytes
+ .../site-packages/anyio/abc/__pycache__/_resources.cpython-311.pyc      |   Bin [31m0[m -> [32m1820[m bytes
+ .../site-packages/anyio/abc/__pycache__/_sockets.cpython-311.pyc        |   Bin [31m0[m -> [32m20066[m bytes
+ .../site-packages/anyio/abc/__pycache__/_streams.cpython-311.pyc        |   Bin [31m0[m -> [32m11033[m bytes
+ .../site-packages/anyio/abc/__pycache__/_subprocesses.cpython-311.pyc   |   Bin [31m0[m -> [32m3667[m bytes
+ .../site-packages/anyio/abc/__pycache__/_tasks.cpython-311.pyc          |   Bin [31m0[m -> [32m5633[m bytes
+ .../site-packages/anyio/abc/__pycache__/_testing.cpython-311.pyc        |   Bin [31m0[m -> [32m3028[m bytes
+ .venv/lib/python3.11/site-packages/anyio/abc/_eventloop.py              |   409 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/abc/_resources.py              |    33 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/abc/_sockets.py                |   399 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/abc/_streams.py                |   233 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/abc/_subprocesses.py           |    79 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/abc/_tasks.py                  |   117 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/abc/_testing.py                |    65 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/from_thread.py                 |   578 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/functools.py                   |   409 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/lowlevel.py                    |   196 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/py.typed                       |     0
+ .venv/lib/python3.11/site-packages/anyio/pytest_plugin.py               |   363 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/streams/__init__.py            |     0
+ .../site-packages/anyio/streams/__pycache__/__init__.cpython-311.pyc    |   Bin [31m0[m -> [32m190[m bytes
+ .../site-packages/anyio/streams/__pycache__/buffered.cpython-311.pyc    |   Bin [31m0[m -> [32m9883[m bytes
+ .../site-packages/anyio/streams/__pycache__/file.cpython-311.pyc        |   Bin [31m0[m -> [32m8039[m bytes
+ .../site-packages/anyio/streams/__pycache__/memory.cpython-311.pyc      |   Bin [31m0[m -> [32m16038[m bytes
+ .../site-packages/anyio/streams/__pycache__/stapled.cpython-311.pyc     |   Bin [31m0[m -> [32m8296[m bytes
+ .../site-packages/anyio/streams/__pycache__/text.cpython-311.pyc        |   Bin [31m0[m -> [32m10217[m bytes
+ .../site-packages/anyio/streams/__pycache__/tls.cpython-311.pyc         |   Bin [31m0[m -> [32m21119[m bytes
+ .venv/lib/python3.11/site-packages/anyio/streams/buffered.py            |   188 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/streams/file.py                |   154 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/streams/memory.py              |   325 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/streams/stapled.py             |   147 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/streams/text.py                |   176 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/streams/tls.py                 |   421 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/to_interpreter.py              |   246 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/to_process.py                  |   266 [32m+[m
+ .venv/lib/python3.11/site-packages/anyio/to_thread.py                   |    78 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq-2.25.2.dist-info/INSTALLER    |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq-2.25.2.dist-info/METADATA     |   116 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq-2.25.2.dist-info/RECORD       |   345 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq-2.25.2.dist-info/REQUESTED    |     0
+ .venv/lib/python3.11/site-packages/bullmq-2.25.2.dist-info/WHEEL        |     5 [32m+[m
+ .../lib/python3.11/site-packages/bullmq-2.25.2.dist-info/top_level.txt  |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/__init__.py                   |    14 [32m+[m
+ .../site-packages/bullmq/__pycache__/__init__.cpython-311.pyc           |   Bin [31m0[m -> [32m742[m bytes
+ .../site-packages/bullmq/__pycache__/backoffs.cpython-311.pyc           |   Bin [31m0[m -> [32m2893[m bytes
+ .../site-packages/bullmq/__pycache__/error_code.cpython-311.pyc         |   Bin [31m0[m -> [32m733[m bytes
+ .../site-packages/bullmq/__pycache__/event_emitter.cpython-311.pyc      |   Bin [31m0[m -> [32m1794[m bytes
+ .../site-packages/bullmq/__pycache__/flow_producer.cpython-311.pyc      |   Bin [31m0[m -> [32m8711[m bytes
+ .../lib/python3.11/site-packages/bullmq/__pycache__/job.cpython-311.pyc |   Bin [31m0[m -> [32m22465[m bytes
+ .../python3.11/site-packages/bullmq/__pycache__/queue.cpython-311.pyc   |   Bin [31m0[m -> [32m24264[m bytes
+ .../site-packages/bullmq/__pycache__/queue_keys.cpython-311.pyc         |   Bin [31m0[m -> [32m1672[m bytes
+ .../site-packages/bullmq/__pycache__/redis_connection.cpython-311.pyc   |   Bin [31m0[m -> [32m9519[m bytes
+ .../python3.11/site-packages/bullmq/__pycache__/scripts.cpython-311.pyc |   Bin [31m0[m -> [32m42163[m bytes
+ .../python3.11/site-packages/bullmq/__pycache__/timer.cpython-311.pyc   |   Bin [31m0[m -> [32m2152[m bytes
+ .../python3.11/site-packages/bullmq/__pycache__/utils.cpython-311.pyc   |   Bin [31m0[m -> [32m5226[m bytes
+ .../python3.11/site-packages/bullmq/__pycache__/worker.cpython-311.pyc  |   Bin [31m0[m -> [32m25376[m bytes
+ .venv/lib/python3.11/site-packages/bullmq/backoffs.py                   |    39 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/addDelayedJob-6.lua  |   568 [32m+[m
+ .../lib/python3.11/site-packages/bullmq/commands/addJobScheduler-11.lua |   574 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/addLog-2.lua         |    23 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/addParentJob-6.lua   |   465 [32m+[m
+ .../python3.11/site-packages/bullmq/commands/addPrioritizedJob-9.lua    |   538 [32m+[m
+ .../lib/python3.11/site-packages/bullmq/commands/addRepeatableJob-2.lua |   228 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/addStandardJob-9.lua |   542 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/changeDelay-4.lua    |    98 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/changePriority-7.lua |   118 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/cleanJobsInSet-3.lua |   359 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/drain-5.lua          |   265 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/extendLock-2.lua     |    20 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/extendLocks-1.lua    |    40 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/getCounts-1.lua      |    32 [32m+[m
+ .../python3.11/site-packages/bullmq/commands/getCountsPerPriority-4.lua |    36 [32m+[m
+ .../python3.11/site-packages/bullmq/commands/getDependencyCounts-4.lua  |    27 [32m+[m
+ .../lib/python3.11/site-packages/bullmq/commands/getJobScheduler-1.lua  |    13 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/getMetrics-2.lua     |    15 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/getRanges-1.lua      |    63 [32m+[m
+ .../lib/python3.11/site-packages/bullmq/commands/getRateLimitTtl-2.lua  |    34 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/getState-8.lua       |    63 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/getStateV2-8.lua     |    47 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/isFinished-3.lua     |    39 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/isJobInList-1.lua    |    22 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/isMaxed-2.lua        |    24 [32m+[m
+ .../site-packages/bullmq/commands/moveJobFromActiveToWait-9.lua         |   124 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/moveJobsToWait-8.lua |   108 [32m+[m
+ .../site-packages/bullmq/commands/moveStalledJobsToWait-8.lua           |   175 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/moveToActive-11.lua  |   234 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/moveToDelayed-12.lua |   389 [32m+[m
+ .../lib/python3.11/site-packages/bullmq/commands/moveToFinished-14.lua  |  1027 [32m++[m
+ .../site-packages/bullmq/commands/moveToWaitingChildren-7.lua           |    97 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/obliterate-2.lua     |   334 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/paginate-1.lua       |   100 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/pause-7.lua          |    57 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/promote-9.lua        |   100 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/releaseLock-1.lua    |    15 [32m+[m
+ .../site-packages/bullmq/commands/removeChildDependency-1.lua           |   156 [32m+[m
+ .../site-packages/bullmq/commands/removeDeduplicationKey-1.lua          |    17 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/removeJob-2.lua      |   342 [32m+[m
+ .../python3.11/site-packages/bullmq/commands/removeJobScheduler-3.lua   |    39 [32m+[m
+ .../python3.11/site-packages/bullmq/commands/removeOrphanedJobs-1.lua   |    67 [32m+[m
+ .../lib/python3.11/site-packages/bullmq/commands/removeRepeatable-3.lua |    53 [32m+[m
+ .../site-packages/bullmq/commands/removeUnprocessedChildren-2.lua       |   332 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/reprocessJob-8.lua   |   109 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/retryJob-11.lua      |   204 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/saveStacktrace-1.lua |    17 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/updateData-1.lua     |    16 [32m+[m
+ .../python3.11/site-packages/bullmq/commands/updateJobScheduler-12.lua  |   322 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/commands/updateProgress-3.lua |    36 [32m+[m
+ .../site-packages/bullmq/commands/updateRepeatableJobMillis-1.lua       |    23 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/custom_errors/__init__.py     |     2 [32m+[m
+ .../bullmq/custom_errors/__pycache__/__init__.cpython-311.pyc           |   Bin [31m0[m -> [32m398[m bytes
+ .../custom_errors/__pycache__/unrecoverable_error.cpython-311.pyc       |   Bin [31m0[m -> [32m527[m bytes
+ .../custom_errors/__pycache__/waiting_children_error.cpython-311.pyc    |   Bin [31m0[m -> [32m521[m bytes
+ .../site-packages/bullmq/custom_errors/unrecoverable_error.py           |     3 [32m+[m
+ .../site-packages/bullmq/custom_errors/waiting_children_error.py        |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/error_code.py                 |    12 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/event_emitter.py              |    20 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/flow_producer.py              |   146 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/job.py                        |   391 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/queue.py                      |   436 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/queue_keys.py                 |    22 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/redis_connection.py           |   187 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/scripts.py                    |   730 [32m++[m
+ .venv/lib/python3.11/site-packages/bullmq/timer.py                      |    28 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/types/__init__.py             |     8 [32m+[m
+ .../site-packages/bullmq/types/__pycache__/__init__.cpython-311.pyc     |   Bin [31m0[m -> [32m855[m bytes
+ .../bullmq/types/__pycache__/backoff_options.cpython-311.pyc            |   Bin [31m0[m -> [32m663[m bytes
+ .../bullmq/types/__pycache__/deduplication_options.cpython-311.pyc      |   Bin [31m0[m -> [32m797[m bytes
+ .../site-packages/bullmq/types/__pycache__/job_options.cpython-311.pyc  |   Bin [31m0[m -> [32m1518[m bytes
+ .../site-packages/bullmq/types/__pycache__/keep_jobs.cpython-311.pyc    |   Bin [31m0[m -> [32m777[m bytes
+ .../bullmq/types/__pycache__/promote_jobs_options.cpython-311.pyc       |   Bin [31m0[m -> [32m566[m bytes
+ .../bullmq/types/__pycache__/queue_options.cpython-311.pyc              |   Bin [31m0[m -> [32m1106[m bytes
+ .../bullmq/types/__pycache__/retry_jobs_options.cpython-311.pyc         |   Bin [31m0[m -> [32m623[m bytes
+ .../bullmq/types/__pycache__/worker_options.cpython-311.pyc             |   Bin [31m0[m -> [32m1181[m bytes
+ .venv/lib/python3.11/site-packages/bullmq/types/backoff_options.py      |    13 [32m+[m
+ .../lib/python3.11/site-packages/bullmq/types/deduplication_options.py  |    44 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/types/job_options.py          |    95 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/types/keep_jobs.py            |    19 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/types/promote_jobs_options.py |     6 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/types/queue_options.py        |    41 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/types/retry_jobs_options.py   |     8 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/types/worker_options.py       |    76 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/utils.py                      |    94 [32m+[m
+ .venv/lib/python3.11/site-packages/bullmq/worker.py                     |   509 [32m+[m
+ .../lib/python3.11/site-packages/certifi-2026.5.20.dist-info/INSTALLER  |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/certifi-2026.5.20.dist-info/METADATA |    78 [32m+[m
+ .venv/lib/python3.11/site-packages/certifi-2026.5.20.dist-info/RECORD   |    14 [32m+[m
+ .venv/lib/python3.11/site-packages/certifi-2026.5.20.dist-info/WHEEL    |     5 [32m+[m
+ .../site-packages/certifi-2026.5.20.dist-info/licenses/LICENSE          |    20 [32m+[m
+ .../python3.11/site-packages/certifi-2026.5.20.dist-info/top_level.txt  |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/certifi/__init__.py                  |     4 [32m+[m
+ .venv/lib/python3.11/site-packages/certifi/__main__.py                  |    12 [32m+[m
+ .../site-packages/certifi/__pycache__/__init__.cpython-311.pyc          |   Bin [31m0[m -> [32m326[m bytes
+ .../site-packages/certifi/__pycache__/__main__.cpython-311.pyc          |   Bin [31m0[m -> [32m715[m bytes
+ .../python3.11/site-packages/certifi/__pycache__/core.cpython-311.pyc   |   Bin [31m0[m -> [32m2385[m bytes
+ .venv/lib/python3.11/site-packages/certifi/cacert.pem                   |  3892 [32m+++++++[m
+ .venv/lib/python3.11/site-packages/certifi/core.py                      |    83 [32m+[m
+ .venv/lib/python3.11/site-packages/certifi/py.typed                     |     0
+ .venv/lib/python3.11/site-packages/click-8.4.1.dist-info/INSTALLER      |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/click-8.4.1.dist-info/METADATA       |    84 [32m+[m
+ .venv/lib/python3.11/site-packages/click-8.4.1.dist-info/RECORD         |    40 [32m+[m
+ .venv/lib/python3.11/site-packages/click-8.4.1.dist-info/WHEEL          |     4 [32m+[m
+ .../python3.11/site-packages/click-8.4.1.dist-info/licenses/LICENSE.txt |    28 [32m+[m
+ .venv/lib/python3.11/site-packages/click/__init__.py                    |   126 [32m+[m
+ .../python3.11/site-packages/click/__pycache__/__init__.cpython-311.pyc |   Bin [31m0[m -> [32m5387[m bytes
+ .../python3.11/site-packages/click/__pycache__/_compat.cpython-311.pyc  |   Bin [31m0[m -> [32m26260[m bytes
+ .../site-packages/click/__pycache__/_termui_impl.cpython-311.pyc        |   Bin [31m0[m -> [32m38591[m bytes
+ .../site-packages/click/__pycache__/_textwrap.cpython-311.pyc           |   Bin [31m0[m -> [32m8076[m bytes
+ .../python3.11/site-packages/click/__pycache__/_utils.cpython-311.pyc   |   Bin [31m0[m -> [32m1473[m bytes
+ .../site-packages/click/__pycache__/_winconsole.cpython-311.pyc         |   Bin [31m0[m -> [32m13881[m bytes
+ .../lib/python3.11/site-packages/click/__pycache__/core.cpython-311.pyc |   Bin [31m0[m -> [32m148215[m bytes
+ .../site-packages/click/__pycache__/decorators.cpython-311.pyc          |   Bin [31m0[m -> [32m23825[m bytes
+ .../site-packages/click/__pycache__/exceptions.cpython-311.pyc          |   Bin [31m0[m -> [32m18834[m bytes
+ .../site-packages/click/__pycache__/formatting.cpython-311.pyc          |   Bin [31m0[m -> [32m15889[m bytes
+ .../python3.11/site-packages/click/__pycache__/globals.cpython-311.pyc  |   Bin [31m0[m -> [32m3263[m bytes
+ .../python3.11/site-packages/click/__pycache__/parser.cpython-311.pyc   |   Bin [31m0[m -> [32m22609[m bytes
+ .../site-packages/click/__pycache__/shell_completion.cpython-311.pyc    |   Bin [31m0[m -> [32m25680[m bytes
+ .../python3.11/site-packages/click/__pycache__/termui.cpython-311.pyc   |   Bin [31m0[m -> [32m38979[m bytes
+ .../python3.11/site-packages/click/__pycache__/testing.cpython-311.pyc  |   Bin [31m0[m -> [32m37062[m bytes
+ .../python3.11/site-packages/click/__pycache__/types.cpython-311.pyc    |   Bin [31m0[m -> [32m60577[m bytes
+ .../python3.11/site-packages/click/__pycache__/utils.cpython-311.pyc    |   Bin [31m0[m -> [32m27432[m bytes
+ .venv/lib/python3.11/site-packages/click/_compat.py                     |   627 [32m++[m
+ .venv/lib/python3.11/site-packages/click/_termui_impl.py                |   929 [32m++[m
+ .venv/lib/python3.11/site-packages/click/_textwrap.py                   |   188 [32m+[m
+ .venv/lib/python3.11/site-packages/click/_utils.py                      |    36 [32m+[m
+ .venv/lib/python3.11/site-packages/click/_winconsole.py                 |   297 [32m+[m
+ .venv/lib/python3.11/site-packages/click/core.py                        |  3542 [32m++++++[m
+ .venv/lib/python3.11/site-packages/click/decorators.py                  |   551 [32m+[m
+ .venv/lib/python3.11/site-packages/click/exceptions.py                  |   347 [32m+[m
+ .venv/lib/python3.11/site-packages/click/formatting.py                  |   315 [32m+[m
+ .venv/lib/python3.11/site-packages/click/globals.py                     |    67 [32m+[m
+ .venv/lib/python3.11/site-packages/click/parser.py                      |   533 [32m+[m
+ .venv/lib/python3.11/site-packages/click/py.typed                       |     0
+ .venv/lib/python3.11/site-packages/click/shell_completion.py            |   680 [32m++[m
+ .venv/lib/python3.11/site-packages/click/termui.py                      |   941 [32m++[m
+ .venv/lib/python3.11/site-packages/click/testing.py                     |   736 [32m++[m
+ .venv/lib/python3.11/site-packages/click/types.py                       |  1309 [32m+++[m
+ .venv/lib/python3.11/site-packages/click/utils.py                       |   641 [32m++[m
+ .venv/lib/python3.11/site-packages/dateutil/__init__.py                 |    24 [32m+[m
+ .../site-packages/dateutil/__pycache__/__init__.cpython-311.pyc         |   Bin [31m0[m -> [32m1384[m bytes
+ .../site-packages/dateutil/__pycache__/_common.cpython-311.pyc          |   Bin [31m0[m -> [32m2000[m bytes
+ .../site-packages/dateutil/__pycache__/_version.cpython-311.pyc         |   Bin [31m0[m -> [32m301[m bytes
+ .../site-packages/dateutil/__pycache__/easter.cpython-311.pyc           |   Bin [31m0[m -> [32m2926[m bytes
+ .../site-packages/dateutil/__pycache__/relativedelta.cpython-311.pyc    |   Bin [31m0[m -> [32m26551[m bytes
+ .../python3.11/site-packages/dateutil/__pycache__/rrule.cpython-311.pyc |   Bin [31m0[m -> [32m74049[m bytes
+ .../python3.11/site-packages/dateutil/__pycache__/tzwin.cpython-311.pyc |   Bin [31m0[m -> [32m213[m bytes
+ .../python3.11/site-packages/dateutil/__pycache__/utils.cpython-311.pyc |   Bin [31m0[m -> [32m2682[m bytes
+ .venv/lib/python3.11/site-packages/dateutil/_common.py                  |    43 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/_version.py                 |     4 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/easter.py                   |    89 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/parser/__init__.py          |    61 [32m+[m
+ .../site-packages/dateutil/parser/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m3138[m bytes
+ .../site-packages/dateutil/parser/__pycache__/_parser.cpython-311.pyc   |   Bin [31m0[m -> [32m69789[m bytes
+ .../site-packages/dateutil/parser/__pycache__/isoparser.cpython-311.pyc |   Bin [31m0[m -> [32m17345[m bytes
+ .venv/lib/python3.11/site-packages/dateutil/parser/_parser.py           |  1613 [32m+++[m
+ .venv/lib/python3.11/site-packages/dateutil/parser/isoparser.py         |   416 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/relativedelta.py            |   599 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/rrule.py                    |  1737 [32m+++[m
+ .venv/lib/python3.11/site-packages/dateutil/tz/__init__.py              |    12 [32m+[m
+ .../site-packages/dateutil/tz/__pycache__/__init__.cpython-311.pyc      |   Bin [31m0[m -> [32m807[m bytes
+ .../site-packages/dateutil/tz/__pycache__/_common.cpython-311.pyc       |   Bin [31m0[m -> [32m15245[m bytes
+ .../site-packages/dateutil/tz/__pycache__/_factories.cpython-311.pyc    |   Bin [31m0[m -> [32m5204[m bytes
+ .../python3.11/site-packages/dateutil/tz/__pycache__/tz.cpython-311.pyc |   Bin [31m0[m -> [32m70483[m bytes
+ .../site-packages/dateutil/tz/__pycache__/win.cpython-311.pyc           |   Bin [31m0[m -> [32m18393[m bytes
+ .venv/lib/python3.11/site-packages/dateutil/tz/_common.py               |   419 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/tz/_factories.py            |    80 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/tz/tz.py                    |  1849 [32m++++[m
+ .venv/lib/python3.11/site-packages/dateutil/tz/win.py                   |   370 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/tzwin.py                    |     2 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/utils.py                    |    71 [32m+[m
+ .venv/lib/python3.11/site-packages/dateutil/zoneinfo/__init__.py        |   167 [32m+[m
+ .../dateutil/zoneinfo/__pycache__/__init__.cpython-311.pyc              |   Bin [31m0[m -> [32m8459[m bytes
+ .../site-packages/dateutil/zoneinfo/__pycache__/rebuild.cpython-311.pyc |   Bin [31m0[m -> [32m4629[m bytes
+ .../python3.11/site-packages/dateutil/zoneinfo/dateutil-zoneinfo.tar.gz |   Bin [31m0[m -> [32m156400[m bytes
+ .venv/lib/python3.11/site-packages/dateutil/zoneinfo/rebuild.py         |    75 [32m+[m
+ .venv/lib/python3.11/site-packages/distutils-precedence.pth             |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/__init__.py                   |    51 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/__main__.py                   |     6 [32m+[m
+ .../site-packages/dotenv/__pycache__/__init__.cpython-311.pyc           |   Bin [31m0[m -> [32m1994[m bytes
+ .../site-packages/dotenv/__pycache__/__main__.cpython-311.pyc           |   Bin [31m0[m -> [32m390[m bytes
+ .../lib/python3.11/site-packages/dotenv/__pycache__/cli.cpython-311.pyc |   Bin [31m0[m -> [32m11754[m bytes
+ .../python3.11/site-packages/dotenv/__pycache__/ipython.cpython-311.pyc |   Bin [31m0[m -> [32m2310[m bytes
+ .../python3.11/site-packages/dotenv/__pycache__/main.cpython-311.pyc    |   Bin [31m0[m -> [32m21658[m bytes
+ .../python3.11/site-packages/dotenv/__pycache__/parser.cpython-311.pyc  |   Bin [31m0[m -> [32m11337[m bytes
+ .../site-packages/dotenv/__pycache__/variables.cpython-311.pyc          |   Bin [31m0[m -> [32m5524[m bytes
+ .../python3.11/site-packages/dotenv/__pycache__/version.cpython-311.pyc |   Bin [31m0[m -> [32m202[m bytes
+ .venv/lib/python3.11/site-packages/dotenv/cli.py                        |   236 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/ipython.py                    |    50 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/main.py                       |   480 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/parser.py                     |   182 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/py.typed                      |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/variables.py                  |    86 [32m+[m
+ .venv/lib/python3.11/site-packages/dotenv/version.py                    |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi-0.136.3.dist-info/INSTALLER  |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi-0.136.3.dist-info/METADATA   |   618 [32m++[m
+ .venv/lib/python3.11/site-packages/fastapi-0.136.3.dist-info/RECORD     |   109 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi-0.136.3.dist-info/REQUESTED  |     0
+ .venv/lib/python3.11/site-packages/fastapi-0.136.3.dist-info/WHEEL      |     4 [32m+[m
+ .../python3.11/site-packages/fastapi-0.136.3.dist-info/entry_points.txt |     5 [32m+[m
+ .../python3.11/site-packages/fastapi-0.136.3.dist-info/licenses/LICENSE |    21 [32m+[m
+ .../python3.11/site-packages/fastapi/.agents/skills/fastapi/SKILL.md    |   436 [32m+[m
+ .../fastapi/.agents/skills/fastapi/references/dependencies.md           |   142 [32m+[m
+ .../fastapi/.agents/skills/fastapi/references/other-tools.md            |    76 [32m+[m
+ .../fastapi/.agents/skills/fastapi/references/streaming.md              |   105 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/__init__.py                  |    25 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/__main__.py                  |     3 [32m+[m
+ .../site-packages/fastapi/__pycache__/__init__.cpython-311.pyc          |   Bin [31m0[m -> [32m1398[m bytes
+ .../site-packages/fastapi/__pycache__/__main__.cpython-311.pyc          |   Bin [31m0[m -> [32m267[m bytes
+ .../site-packages/fastapi/__pycache__/applications.cpython-311.pyc      |   Bin [31m0[m -> [32m94770[m bytes
+ .../site-packages/fastapi/__pycache__/background.cpython-311.pyc        |   Bin [31m0[m -> [32m2641[m bytes
+ .../python3.11/site-packages/fastapi/__pycache__/cli.cpython-311.pyc    |   Bin [31m0[m -> [32m762[m bytes
+ .../site-packages/fastapi/__pycache__/concurrency.cpython-311.pyc       |   Bin [31m0[m -> [32m1930[m bytes
+ .../site-packages/fastapi/__pycache__/datastructures.cpython-311.pyc    |   Bin [31m0[m -> [32m8307[m bytes
+ .../site-packages/fastapi/__pycache__/encoders.cpython-311.pyc          |   Bin [31m0[m -> [32m13243[m bytes
+ .../fastapi/__pycache__/exception_handlers.cpython-311.pyc              |   Bin [31m0[m -> [32m2285[m bytes
+ .../site-packages/fastapi/__pycache__/exceptions.cpython-311.pyc        |   Bin [31m0[m -> [32m11775[m bytes
+ .../python3.11/site-packages/fastapi/__pycache__/logger.cpython-311.pyc |   Bin [31m0[m -> [32m282[m bytes
+ .../site-packages/fastapi/__pycache__/param_functions.cpython-311.pyc   |   Bin [31m0[m -> [32m46227[m bytes
+ .../python3.11/site-packages/fastapi/__pycache__/params.cpython-311.pyc |   Bin [31m0[m -> [32m26444[m bytes
+ .../site-packages/fastapi/__pycache__/requests.cpython-311.pyc          |   Bin [31m0[m -> [32m301[m bytes
+ .../site-packages/fastapi/__pycache__/responses.cpython-311.pyc         |   Bin [31m0[m -> [32m5996[m bytes
+ .../site-packages/fastapi/__pycache__/routing.cpython-311.pyc           |   Bin [31m0[m -> [32m115488[m bytes
+ .../python3.11/site-packages/fastapi/__pycache__/sse.cpython-311.pyc    |   Bin [31m0[m -> [32m8797[m bytes
+ .../site-packages/fastapi/__pycache__/staticfiles.cpython-311.pyc       |   Bin [31m0[m -> [32m258[m bytes
+ .../site-packages/fastapi/__pycache__/templating.cpython-311.pyc        |   Bin [31m0[m -> [32m260[m bytes
+ .../site-packages/fastapi/__pycache__/testclient.cpython-311.pyc        |   Bin [31m0[m -> [32m255[m bytes
+ .../python3.11/site-packages/fastapi/__pycache__/types.cpython-311.pyc  |   Bin [31m0[m -> [32m942[m bytes
+ .../python3.11/site-packages/fastapi/__pycache__/utils.cpython-311.pyc  |   Bin [31m0[m -> [32m6041[m bytes
+ .../site-packages/fastapi/__pycache__/websockets.cpython-311.pyc        |   Bin [31m0[m -> [32m365[m bytes
+ .venv/lib/python3.11/site-packages/fastapi/_compat/__init__.py          |    40 [32m+[m
+ .../site-packages/fastapi/_compat/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m2128[m bytes
+ .../site-packages/fastapi/_compat/__pycache__/shared.cpython-311.pyc    |   Bin [31m0[m -> [32m11317[m bytes
+ .../site-packages/fastapi/_compat/__pycache__/v2.cpython-311.pyc        |   Bin [31m0[m -> [32m23084[m bytes
+ .venv/lib/python3.11/site-packages/fastapi/_compat/shared.py            |   214 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/_compat/v2.py                |   493 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/applications.py              |  4691 [32m++++++++[m
+ .venv/lib/python3.11/site-packages/fastapi/background.py                |    61 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/cli.py                       |    13 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/concurrency.py               |    41 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/datastructures.py            |   186 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/dependencies/__init__.py     |     0
+ .../fastapi/dependencies/__pycache__/__init__.cpython-311.pyc           |   Bin [31m0[m -> [32m197[m bytes
+ .../fastapi/dependencies/__pycache__/models.cpython-311.pyc             |   Bin [31m0[m -> [32m10379[m bytes
+ .../fastapi/dependencies/__pycache__/utils.cpython-311.pyc              |   Bin [31m0[m -> [32m44433[m bytes
+ .venv/lib/python3.11/site-packages/fastapi/dependencies/models.py       |   193 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/dependencies/utils.py        |  1061 [32m++[m
+ .venv/lib/python3.11/site-packages/fastapi/encoders.py                  |   364 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/exception_handlers.py        |    34 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/exceptions.py                |   256 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/logger.py                    |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/middleware/__init__.py       |     1 [32m+[m
+ .../fastapi/middleware/__pycache__/__init__.cpython-311.pyc             |   Bin [31m0[m -> [32m264[m bytes
+ .../fastapi/middleware/__pycache__/asyncexitstack.cpython-311.pyc       |   Bin [31m0[m -> [32m1724[m bytes
+ .../site-packages/fastapi/middleware/__pycache__/cors.cpython-311.pyc   |   Bin [31m0[m -> [32m269[m bytes
+ .../site-packages/fastapi/middleware/__pycache__/gzip.cpython-311.pyc   |   Bin [31m0[m -> [32m269[m bytes
+ .../fastapi/middleware/__pycache__/httpsredirect.cpython-311.pyc        |   Bin [31m0[m -> [32m312[m bytes
+ .../fastapi/middleware/__pycache__/trustedhost.cpython-311.pyc          |   Bin [31m0[m -> [32m306[m bytes
+ .../site-packages/fastapi/middleware/__pycache__/wsgi.cpython-311.pyc   |   Bin [31m0[m -> [32m285[m bytes
+ .venv/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py |    18 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/middleware/cors.py           |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/middleware/gzip.py           |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/middleware/httpsredirect.py  |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/middleware/trustedhost.py    |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/middleware/wsgi.py           |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/openapi/__init__.py          |     0
+ .../site-packages/fastapi/openapi/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m192[m bytes
+ .../site-packages/fastapi/openapi/__pycache__/constants.cpython-311.pyc |   Bin [31m0[m -> [32m362[m bytes
+ .../site-packages/fastapi/openapi/__pycache__/docs.cpython-311.pyc      |   Bin [31m0[m -> [32m13528[m bytes
+ .../site-packages/fastapi/openapi/__pycache__/models.cpython-311.pyc    |   Bin [31m0[m -> [32m27038[m bytes
+ .../site-packages/fastapi/openapi/__pycache__/utils.cpython-311.pyc     |   Bin [31m0[m -> [32m25128[m bytes
+ .venv/lib/python3.11/site-packages/fastapi/openapi/constants.py         |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/openapi/docs.py              |   389 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/openapi/models.py            |   435 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/openapi/utils.py             |   606 [32m++[m
+ .venv/lib/python3.11/site-packages/fastapi/param_functions.py           |  2460 [32m+++++[m
+ .venv/lib/python3.11/site-packages/fastapi/params.py                    |   754 [32m++[m
+ .venv/lib/python3.11/site-packages/fastapi/py.typed                     |     0
+ .venv/lib/python3.11/site-packages/fastapi/requests.py                  |     2 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/responses.py                 |    98 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/routing.py                   |  4956 [32m+++++++++[m
+ .venv/lib/python3.11/site-packages/fastapi/security/__init__.py         |    15 [32m+[m
+ .../site-packages/fastapi/security/__pycache__/__init__.cpython-311.pyc |   Bin [31m0[m -> [32m1070[m bytes
+ .../site-packages/fastapi/security/__pycache__/api_key.cpython-311.pyc  |   Bin [31m0[m -> [32m11279[m bytes
+ .../site-packages/fastapi/security/__pycache__/base.cpython-311.pyc     |   Bin [31m0[m -> [32m592[m bytes
+ .../site-packages/fastapi/security/__pycache__/http.cpython-311.pyc     |   Bin [31m0[m -> [32m15842[m bytes
+ .../site-packages/fastapi/security/__pycache__/oauth2.cpython-311.pyc   |   Bin [31m0[m -> [32m22460[m bytes
+ .../fastapi/security/__pycache__/open_id_connect_url.cpython-311.pyc    |   Bin [31m0[m -> [32m4062[m bytes
+ .../site-packages/fastapi/security/__pycache__/utils.cpython-311.pyc    |   Bin [31m0[m -> [32m643[m bytes
+ .venv/lib/python3.11/site-packages/fastapi/security/api_key.py          |   320 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/security/base.py             |     6 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/security/http.py             |   417 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/security/oauth2.py           |   693 [32m++[m
+ .../python3.11/site-packages/fastapi/security/open_id_connect_url.py    |    94 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/security/utils.py            |     7 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/sse.py                       |   235 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/staticfiles.py               |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/templating.py                |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/testclient.py                |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/types.py                     |    12 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/utils.py                     |   136 [32m+[m
+ .venv/lib/python3.11/site-packages/fastapi/websockets.py                |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/h11-0.16.0.dist-info/INSTALLER       |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/h11-0.16.0.dist-info/METADATA        |   202 [32m+[m
+ .venv/lib/python3.11/site-packages/h11-0.16.0.dist-info/RECORD          |    29 [32m+[m
+ .venv/lib/python3.11/site-packages/h11-0.16.0.dist-info/WHEEL           |     5 [32m+[m
+ .../python3.11/site-packages/h11-0.16.0.dist-info/licenses/LICENSE.txt  |    22 [32m+[m
+ .venv/lib/python3.11/site-packages/h11-0.16.0.dist-info/top_level.txt   |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/__init__.py                      |    62 [32m+[m
+ .../python3.11/site-packages/h11/__pycache__/__init__.cpython-311.pyc   |   Bin [31m0[m -> [32m1313[m bytes
+ .../lib/python3.11/site-packages/h11/__pycache__/_abnf.cpython-311.pyc  |   Bin [31m0[m -> [32m1818[m bytes
+ .../site-packages/h11/__pycache__/_connection.cpython-311.pyc           |   Bin [31m0[m -> [32m24947[m bytes
+ .../python3.11/site-packages/h11/__pycache__/_events.cpython-311.pyc    |   Bin [31m0[m -> [32m15108[m bytes
+ .../python3.11/site-packages/h11/__pycache__/_headers.cpython-311.pyc   |   Bin [31m0[m -> [32m9269[m bytes
+ .../python3.11/site-packages/h11/__pycache__/_readers.cpython-311.pyc   |   Bin [31m0[m -> [32m11057[m bytes
+ .../site-packages/h11/__pycache__/_receivebuffer.cpython-311.pyc        |   Bin [31m0[m -> [32m5145[m bytes
+ .../lib/python3.11/site-packages/h11/__pycache__/_state.cpython-311.pyc |   Bin [31m0[m -> [32m9686[m bytes
+ .../lib/python3.11/site-packages/h11/__pycache__/_util.cpython-311.pyc  |   Bin [31m0[m -> [32m5366[m bytes
+ .../python3.11/site-packages/h11/__pycache__/_version.cpython-311.pyc   |   Bin [31m0[m -> [32m203[m bytes
+ .../python3.11/site-packages/h11/__pycache__/_writers.cpython-311.pyc   |   Bin [31m0[m -> [32m7303[m bytes
+ .venv/lib/python3.11/site-packages/h11/_abnf.py                         |   132 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_connection.py                   |   659 [32m++[m
+ .venv/lib/python3.11/site-packages/h11/_events.py                       |   369 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_headers.py                      |   282 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_readers.py                      |   250 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_receivebuffer.py                |   153 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_state.py                        |   365 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_util.py                         |   135 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_version.py                      |    16 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/_writers.py                      |   145 [32m+[m
+ .venv/lib/python3.11/site-packages/h11/py.typed                         |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore-1.0.9.dist-info/INSTALLER   |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore-1.0.9.dist-info/METADATA    |   625 [32m++[m
+ .venv/lib/python3.11/site-packages/httpcore-1.0.9.dist-info/RECORD      |    68 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore-1.0.9.dist-info/WHEEL       |     4 [32m+[m
+ .../site-packages/httpcore-1.0.9.dist-info/licenses/LICENSE.md          |    27 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/__init__.py                 |   141 [32m+[m
+ .../site-packages/httpcore/__pycache__/__init__.cpython-311.pyc         |   Bin [31m0[m -> [32m3924[m bytes
+ .../python3.11/site-packages/httpcore/__pycache__/_api.cpython-311.pyc  |   Bin [31m0[m -> [32m4087[m bytes
+ .../site-packages/httpcore/__pycache__/_exceptions.cpython-311.pyc      |   Bin [31m0[m -> [32m3803[m bytes
+ .../site-packages/httpcore/__pycache__/_models.cpython-311.pyc          |   Bin [31m0[m -> [32m24537[m bytes
+ .../python3.11/site-packages/httpcore/__pycache__/_ssl.cpython-311.pyc  |   Bin [31m0[m -> [32m631[m bytes
+ .../site-packages/httpcore/__pycache__/_synchronization.cpython-311.pyc |   Bin [31m0[m -> [32m15821[m bytes
+ .../site-packages/httpcore/__pycache__/_trace.cpython-311.pyc           |   Bin [31m0[m -> [32m5891[m bytes
+ .../site-packages/httpcore/__pycache__/_utils.cpython-311.pyc           |   Bin [31m0[m -> [32m1413[m bytes
+ .venv/lib/python3.11/site-packages/httpcore/_api.py                     |    94 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_async/__init__.py          |    39 [32m+[m
+ .../site-packages/httpcore/_async/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m1917[m bytes
+ .../httpcore/_async/__pycache__/connection.cpython-311.pyc              |   Bin [31m0[m -> [32m12312[m bytes
+ .../httpcore/_async/__pycache__/connection_pool.cpython-311.pyc         |   Bin [31m0[m -> [32m21613[m bytes
+ .../site-packages/httpcore/_async/__pycache__/http11.cpython-311.pyc    |   Bin [31m0[m -> [32m21493[m bytes
+ .../site-packages/httpcore/_async/__pycache__/http2.cpython-311.pyc     |   Bin [31m0[m -> [32m32785[m bytes
+ .../httpcore/_async/__pycache__/http_proxy.cpython-311.pyc              |   Bin [31m0[m -> [32m18744[m bytes
+ .../httpcore/_async/__pycache__/interfaces.cpython-311.pyc              |   Bin [31m0[m -> [32m6315[m bytes
+ .../httpcore/_async/__pycache__/socks_proxy.cpython-311.pyc             |   Bin [31m0[m -> [32m17298[m bytes
+ .venv/lib/python3.11/site-packages/httpcore/_async/connection.py        |   222 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_async/connection_pool.py   |   420 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_async/http11.py            |   379 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_async/http2.py             |   592 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_async/http_proxy.py        |   367 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_async/interfaces.py        |   137 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_async/socks_proxy.py       |   341 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_backends/__init__.py       |     0
+ .../httpcore/_backends/__pycache__/__init__.cpython-311.pyc             |   Bin [31m0[m -> [32m195[m bytes
+ .../site-packages/httpcore/_backends/__pycache__/anyio.cpython-311.pyc  |   Bin [31m0[m -> [32m9565[m bytes
+ .../site-packages/httpcore/_backends/__pycache__/auto.cpython-311.pyc   |   Bin [31m0[m -> [32m2873[m bytes
+ .../site-packages/httpcore/_backends/__pycache__/base.cpython-311.pyc   |   Bin [31m0[m -> [32m5311[m bytes
+ .../site-packages/httpcore/_backends/__pycache__/mock.cpython-311.pyc   |   Bin [31m0[m -> [32m8020[m bytes
+ .../site-packages/httpcore/_backends/__pycache__/sync.cpython-311.pyc   |   Bin [31m0[m -> [32m12713[m bytes
+ .../site-packages/httpcore/_backends/__pycache__/trio.cpython-311.pyc   |   Bin [31m0[m -> [32m10085[m bytes
+ .venv/lib/python3.11/site-packages/httpcore/_backends/anyio.py          |   146 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_backends/auto.py           |    52 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_backends/base.py           |   101 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_backends/mock.py           |   143 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_backends/sync.py           |   241 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_backends/trio.py           |   159 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_exceptions.py              |    81 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_models.py                  |   516 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_ssl.py                     |     9 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_sync/__init__.py           |    39 [32m+[m
+ .../site-packages/httpcore/_sync/__pycache__/__init__.cpython-311.pyc   |   Bin [31m0[m -> [32m1871[m bytes
+ .../site-packages/httpcore/_sync/__pycache__/connection.cpython-311.pyc |   Bin [31m0[m -> [32m11113[m bytes
+ .../httpcore/_sync/__pycache__/connection_pool.cpython-311.pyc          |   Bin [31m0[m -> [32m20921[m bytes
+ .../site-packages/httpcore/_sync/__pycache__/http11.cpython-311.pyc     |   Bin [31m0[m -> [32m19429[m bytes
+ .../site-packages/httpcore/_sync/__pycache__/http2.cpython-311.pyc      |   Bin [31m0[m -> [32m29462[m bytes
+ .../site-packages/httpcore/_sync/__pycache__/http_proxy.cpython-311.pyc |   Bin [31m0[m -> [32m18038[m bytes
+ .../site-packages/httpcore/_sync/__pycache__/interfaces.cpython-311.pyc |   Bin [31m0[m -> [32m5973[m bytes
+ .../httpcore/_sync/__pycache__/socks_proxy.cpython-311.pyc              |   Bin [31m0[m -> [32m16275[m bytes
+ .venv/lib/python3.11/site-packages/httpcore/_sync/connection.py         |   222 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py    |   420 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_sync/http11.py             |   379 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_sync/http2.py              |   592 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_sync/http_proxy.py         |   367 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_sync/interfaces.py         |   137 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_sync/socks_proxy.py        |   341 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_synchronization.py         |   318 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_trace.py                   |   107 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/_utils.py                   |    37 [32m+[m
+ .venv/lib/python3.11/site-packages/httpcore/py.typed                    |     0
+ .venv/lib/python3.11/site-packages/httpx-0.28.1.dist-info/INSTALLER     |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx-0.28.1.dist-info/METADATA      |   203 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx-0.28.1.dist-info/RECORD        |    55 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx-0.28.1.dist-info/REQUESTED     |     0
+ .venv/lib/python3.11/site-packages/httpx-0.28.1.dist-info/WHEEL         |     4 [32m+[m
+ .../python3.11/site-packages/httpx-0.28.1.dist-info/entry_points.txt    |     2 [32m+[m
+ .../python3.11/site-packages/httpx-0.28.1.dist-info/licenses/LICENSE.md |    12 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/__init__.py                    |   105 [32m+[m
+ .../python3.11/site-packages/httpx/__pycache__/__init__.cpython-311.pyc |   Bin [31m0[m -> [32m2373[m bytes
+ .../site-packages/httpx/__pycache__/__version__.cpython-311.pyc         |   Bin [31m0[m -> [32m305[m bytes
+ .../lib/python3.11/site-packages/httpx/__pycache__/_api.cpython-311.pyc |   Bin [31m0[m -> [32m9703[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_auth.cpython-311.pyc    |   Bin [31m0[m -> [32m17045[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_client.cpython-311.pyc  |   Bin [31m0[m -> [32m65528[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_config.cpython-311.pyc  |   Bin [31m0[m -> [32m11502[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_content.cpython-311.pyc |   Bin [31m0[m -> [32m11939[m bytes
+ .../site-packages/httpx/__pycache__/_decoders.cpython-311.pyc           |   Bin [31m0[m -> [32m18903[m bytes
+ .../site-packages/httpx/__pycache__/_exceptions.cpython-311.pyc         |   Bin [31m0[m -> [32m14477[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_main.cpython-311.pyc    |   Bin [31m0[m -> [32m23047[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_models.cpython-311.pyc  |   Bin [31m0[m -> [32m66368[m bytes
+ .../site-packages/httpx/__pycache__/_multipart.cpython-311.pyc          |   Bin [31m0[m -> [32m15614[m bytes
+ .../site-packages/httpx/__pycache__/_status_codes.cpython-311.pyc       |   Bin [31m0[m -> [32m7548[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_types.cpython-311.pyc   |   Bin [31m0[m -> [32m4652[m bytes
+ .../site-packages/httpx/__pycache__/_urlparse.cpython-311.pyc           |   Bin [31m0[m -> [32m20276[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_urls.cpython-311.pyc    |   Bin [31m0[m -> [32m30747[m bytes
+ .../python3.11/site-packages/httpx/__pycache__/_utils.cpython-311.pyc   |   Bin [31m0[m -> [32m10374[m bytes
+ .venv/lib/python3.11/site-packages/httpx/__version__.py                 |     3 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_api.py                        |   438 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_auth.py                       |   348 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_client.py                     |  2019 [32m++++[m
+ .venv/lib/python3.11/site-packages/httpx/_config.py                     |   248 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_content.py                    |   240 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_decoders.py                   |   393 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_exceptions.py                 |   379 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_main.py                       |   506 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_models.py                     |  1277 [32m+++[m
+ .venv/lib/python3.11/site-packages/httpx/_multipart.py                  |   300 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_status_codes.py               |   162 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_transports/__init__.py        |    15 [32m+[m
+ .../httpx/_transports/__pycache__/__init__.cpython-311.pyc              |   Bin [31m0[m -> [32m479[m bytes
+ .../site-packages/httpx/_transports/__pycache__/asgi.cpython-311.pyc    |   Bin [31m0[m -> [32m8122[m bytes
+ .../site-packages/httpx/_transports/__pycache__/base.cpython-311.pyc    |   Bin [31m0[m -> [32m4206[m bytes
+ .../site-packages/httpx/_transports/__pycache__/default.cpython-311.pyc |   Bin [31m0[m -> [32m17503[m bytes
+ .../site-packages/httpx/_transports/__pycache__/mock.cpython-311.pyc    |   Bin [31m0[m -> [32m2125[m bytes
+ .../site-packages/httpx/_transports/__pycache__/wsgi.cpython-311.pyc    |   Bin [31m0[m -> [32m7389[m bytes
+ .venv/lib/python3.11/site-packages/httpx/_transports/asgi.py            |   187 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_transports/base.py            |    86 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_transports/default.py         |   406 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_transports/mock.py            |    43 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_transports/wsgi.py            |   149 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_types.py                      |   114 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_urlparse.py                   |   527 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/_urls.py                       |   641 [32m++[m
+ .venv/lib/python3.11/site-packages/httpx/_utils.py                      |   242 [32m+[m
+ .venv/lib/python3.11/site-packages/httpx/py.typed                       |     0
+ .venv/lib/python3.11/site-packages/idna-3.18.dist-info/INSTALLER        |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/idna-3.18.dist-info/METADATA         |   155 [32m+[m
+ .venv/lib/python3.11/site-packages/idna-3.18.dist-info/RECORD           |    28 [32m+[m
+ .venv/lib/python3.11/site-packages/idna-3.18.dist-info/WHEEL            |     4 [32m+[m
+ .venv/lib/python3.11/site-packages/idna-3.18.dist-info/entry_points.txt |     3 [32m+[m
+ .../python3.11/site-packages/idna-3.18.dist-info/licenses/LICENSE.md    |    31 [32m+[m
+ .venv/lib/python3.11/site-packages/idna/__init__.py                     |    45 [32m+[m
+ .venv/lib/python3.11/site-packages/idna/__main__.py                     |     6 [32m+[m
+ .../python3.11/site-packages/idna/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m1088[m bytes
+ .../python3.11/site-packages/idna/__pycache__/__main__.cpython-311.pyc  |   Bin [31m0[m -> [32m387[m bytes
+ .venv/lib/python3.11/site-packages/idna/__pycache__/cli.cpython-311.pyc |   Bin [31m0[m -> [32m6610[m bytes
+ .../lib/python3.11/site-packages/idna/__pycache__/codec.cpython-311.pyc |   Bin [31m0[m -> [32m7071[m bytes
+ .../python3.11/site-packages/idna/__pycache__/compat.cpython-311.pyc    |   Bin [31m0[m -> [32m2028[m bytes
+ .../lib/python3.11/site-packages/idna/__pycache__/core.cpython-311.pyc  |   Bin [31m0[m -> [32m31536[m bytes
+ .../python3.11/site-packages/idna/__pycache__/idnadata.cpython-311.pyc  |   Bin [31m0[m -> [32m22040[m bytes
+ .../python3.11/site-packages/idna/__pycache__/intranges.cpython-311.pyc |   Bin [31m0[m -> [32m2905[m bytes
+ .../site-packages/idna/__pycache__/package_data.cpython-311.pyc         |   Bin [31m0[m -> [32m204[m bytes
+ .../python3.11/site-packages/idna/__pycache__/uts46data.cpython-311.pyc |   Bin [31m0[m -> [32m96336[m bytes
+ .venv/lib/python3.11/site-packages/idna/cli.py                          |   128 [32m+[m
+ .venv/lib/python3.11/site-packages/idna/codec.py                        |   159 [32m+[m
+ .venv/lib/python3.11/site-packages/idna/compat.py                       |    41 [32m+[m
+ .venv/lib/python3.11/site-packages/idna/core.py                         |   648 [32m++[m
+ .venv/lib/python3.11/site-packages/idna/idnadata.py                     |  1897 [32m++++[m
+ .venv/lib/python3.11/site-packages/idna/intranges.py                    |    55 [32m+[m
+ .venv/lib/python3.11/site-packages/idna/package_data.py                 |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/idna/py.typed                        |     0
+ .venv/lib/python3.11/site-packages/idna/uts46data.py                    | 16896 [32m+++++++++++++++++++++++++++++[m
+ .venv/lib/python3.11/site-packages/joblib-1.5.3.dist-info/INSTALLER     |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib-1.5.3.dist-info/METADATA      |   172 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib-1.5.3.dist-info/RECORD        |   218 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib-1.5.3.dist-info/REQUESTED     |     0
+ .venv/lib/python3.11/site-packages/joblib-1.5.3.dist-info/WHEEL         |     5 [32m+[m
+ .../site-packages/joblib-1.5.3.dist-info/licenses/LICENSE.txt           |    29 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib-1.5.3.dist-info/top_level.txt |     1 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/__init__.py                   |   163 [32m+[m
+ .../site-packages/joblib/__pycache__/__init__.cpython-311.pyc           |   Bin [31m0[m -> [32m5002[m bytes
+ .../joblib/__pycache__/_cloudpickle_wrapper.cpython-311.pyc             |   Bin [31m0[m -> [32m686[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/_dask.cpython-311.pyc   |   Bin [31m0[m -> [32m18496[m bytes
+ .../joblib/__pycache__/_memmapping_reducer.cpython-311.pyc              |   Bin [31m0[m -> [32m25308[m bytes
+ .../joblib/__pycache__/_multiprocessing_helpers.cpython-311.pyc         |   Bin [31m0[m -> [32m1978[m bytes
+ .../site-packages/joblib/__pycache__/_parallel_backends.cpython-311.pyc |   Bin [31m0[m -> [32m30170[m bytes
+ .../site-packages/joblib/__pycache__/_store_backends.cpython-311.pyc    |   Bin [31m0[m -> [32m26606[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/_utils.cpython-311.pyc  |   Bin [31m0[m -> [32m6016[m bytes
+ .../site-packages/joblib/__pycache__/backports.cpython-311.pyc          |   Bin [31m0[m -> [32m7859[m bytes
+ .../site-packages/joblib/__pycache__/compressor.cpython-311.pyc         |   Bin [31m0[m -> [32m27659[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/disk.cpython-311.pyc    |   Bin [31m0[m -> [32m5153[m bytes
+ .../site-packages/joblib/__pycache__/executor.cpython-311.pyc           |   Bin [31m0[m -> [32m4794[m bytes
+ .../site-packages/joblib/__pycache__/func_inspect.cpython-311.pyc       |   Bin [31m0[m -> [32m15295[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/hashing.cpython-311.pyc |   Bin [31m0[m -> [32m11118[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/logger.cpython-311.pyc  |   Bin [31m0[m -> [32m7213[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/memory.cpython-311.pyc  |   Bin [31m0[m -> [32m47949[m bytes
+ .../site-packages/joblib/__pycache__/numpy_pickle.cpython-311.pyc       |   Bin [31m0[m -> [32m28122[m bytes
+ .../joblib/__pycache__/numpy_pickle_compat.cpython-311.pyc              |   Bin [31m0[m -> [32m11243[m bytes
+ .../site-packages/joblib/__pycache__/numpy_pickle_utils.cpython-311.pyc |   Bin [31m0[m -> [32m10616[m bytes
+ .../site-packages/joblib/__pycache__/parallel.cpython-311.pyc           |   Bin [31m0[m -> [32m81374[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/pool.cpython-311.pyc    |   Bin [31m0[m -> [32m16814[m bytes
+ .../python3.11/site-packages/joblib/__pycache__/testing.cpython-311.pyc |   Bin [31m0[m -> [32m4775[m bytes
+ .venv/lib/python3.11/site-packages/joblib/_cloudpickle_wrapper.py       |    18 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/_dask.py                      |   381 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/_memmapping_reducer.py        |   715 [32m++[m
+ .venv/lib/python3.11/site-packages/joblib/_multiprocessing_helpers.py   |    51 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/_parallel_backends.py         |   753 [32m++[m
+ .venv/lib/python3.11/site-packages/joblib/_store_backends.py            |   500 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/_utils.py                     |   120 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/backports.py                  |   195 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/compressor.py                 |   572 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/disk.py                       |   131 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/executor.py                   |   131 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/externals/__init__.py         |     0
+ .../site-packages/joblib/externals/__pycache__/__init__.cpython-311.pyc |   Bin [31m0[m -> [32m193[m bytes
+ .../python3.11/site-packages/joblib/externals/cloudpickle/__init__.py   |    18 [32m+[m
+ .../joblib/externals/cloudpickle/__pycache__/__init__.cpython-311.pyc   |   Bin [31m0[m -> [32m482[m bytes
+ .../externals/cloudpickle/__pycache__/cloudpickle.cpython-311.pyc       |   Bin [31m0[m -> [32m59364[m bytes
+ .../externals/cloudpickle/__pycache__/cloudpickle_fast.cpython-311.pyc  |   Bin [31m0[m -> [32m704[m bytes
+ .../site-packages/joblib/externals/cloudpickle/cloudpickle.py           |  1552 [32m+++[m
+ .../site-packages/joblib/externals/cloudpickle/cloudpickle_fast.py      |    14 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/externals/loky/__init__.py    |    45 [32m+[m
+ .../joblib/externals/loky/__pycache__/__init__.cpython-311.pyc          |   Bin [31m0[m -> [32m1405[m bytes
+ .../joblib/externals/loky/__pycache__/_base.cpython-311.pyc             |   Bin [31m0[m -> [32m1068[m bytes
+ .../externals/loky/__pycache__/cloudpickle_wrapper.cpython-311.pyc      |   Bin [31m0[m -> [32m5577[m bytes
+ .../joblib/externals/loky/__pycache__/initializers.cpython-311.pyc      |   Bin [31m0[m -> [32m3500[m bytes
+ .../joblib/externals/loky/__pycache__/process_executor.cpython-311.pyc  |   Bin [31m0[m -> [32m57299[m bytes
+ .../joblib/externals/loky/__pycache__/reusable_executor.cpython-311.pyc |   Bin [31m0[m -> [32m12100[m bytes
+ .venv/lib/python3.11/site-packages/joblib/externals/loky/_base.py       |    28 [32m+[m
+ .../python3.11/site-packages/joblib/externals/loky/backend/__init__.py  |    14 [32m+[m
+ .../joblib/externals/loky/backend/__pycache__/__init__.cpython-311.pyc  |   Bin [31m0[m -> [32m774[m bytes
+ .../externals/loky/backend/__pycache__/_posix_reduction.cpython-311.pyc |   Bin [31m0[m -> [32m2916[m bytes
+ .../externals/loky/backend/__pycache__/_win_reduction.cpython-311.pyc   |   Bin [31m0[m -> [32m709[m bytes
+ .../joblib/externals/loky/backend/__pycache__/context.cpython-311.pyc   |   Bin [31m0[m -> [32m16416[m bytes
+ .../joblib/externals/loky/backend/__pycache__/fork_exec.cpython-311.pyc |   Bin [31m0[m -> [32m2158[m bytes
+ .../externals/loky/backend/__pycache__/popen_loky_posix.cpython-311.pyc |   Bin [31m0[m -> [32m9586[m bytes
+ .../externals/loky/backend/__pycache__/popen_loky_win32.cpython-311.pyc |   Bin [31m0[m -> [32m7538[m bytes
+ .../joblib/externals/loky/backend/__pycache__/process.cpython-311.pyc   |   Bin [31m0[m -> [32m3082[m bytes
+ .../joblib/externals/loky/backend/__pycache__/queues.cpython-311.pyc    |   Bin [31m0[m -> [32m8572[m bytes
+ .../joblib/externals/loky/backend/__pycache__/reduction.cpython-311.pyc |   Bin [31m0[m -> [32m7849[m bytes
+ .../externals/loky/backend/__pycache__/resource_tracker.cpython-311.pyc |   Bin [31m0[m -> [32m16195[m bytes
+ .../joblib/externals/loky/backend/__pycache__/spawn.cpython-311.pyc     |   Bin [31m0[m -> [32m9111[m bytes
+ .../externals/loky/backend/__pycache__/synchronize.cpython-311.pyc      |   Bin [31m0[m -> [32m19900[m bytes
+ .../joblib/externals/loky/backend/__pycache__/utils.cpython-311.pyc     |   Bin [31m0[m -> [32m7430[m bytes
+ .../site-packages/joblib/externals/loky/backend/_posix_reduction.py     |    67 [32m+[m
+ .../site-packages/joblib/externals/loky/backend/_win_reduction.py       |    18 [32m+[m
+ .../python3.11/site-packages/joblib/externals/loky/backend/context.py   |   405 [32m+[m
+ .../python3.11/site-packages/joblib/externals/loky/backend/fork_exec.py |    73 [32m+[m
+ .../site-packages/joblib/externals/loky/backend/popen_loky_posix.py     |   193 [32m+[m
+ .../site-packages/joblib/externals/loky/backend/popen_loky_win32.py     |   173 [32m+[m
+ .../python3.11/site-packages/joblib/externals/loky/backend/process.py   |    85 [32m+[m
+ .../python3.11/site-packages/joblib/externals/loky/backend/queues.py    |   236 [32m+[m
+ .../python3.11/site-packages/joblib/externals/loky/backend/reduction.py |   223 [32m+[m
+ .../site-packages/joblib/externals/loky/backend/resource_tracker.py     |   411 [32m+[m
+ .../lib/python3.11/site-packages/joblib/externals/loky/backend/spawn.py |   244 [32m+[m
+ .../site-packages/joblib/externals/loky/backend/synchronize.py          |   409 [32m+[m
+ .../lib/python3.11/site-packages/joblib/externals/loky/backend/utils.py |   181 [32m+[m
+ .../site-packages/joblib/externals/loky/cloudpickle_wrapper.py          |   102 [32m+[m
+ .../lib/python3.11/site-packages/joblib/externals/loky/initializers.py  |    80 [32m+[m
+ .../python3.11/site-packages/joblib/externals/loky/process_executor.py  |  1344 [32m+++[m
+ .../python3.11/site-packages/joblib/externals/loky/reusable_executor.py |   294 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/func_inspect.py               |   379 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/hashing.py                    |   270 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/logger.py                     |   159 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/memory.py                     |  1242 [32m+++[m
+ .venv/lib/python3.11/site-packages/joblib/numpy_pickle.py               |   756 [32m++[m
+ .venv/lib/python3.11/site-packages/joblib/numpy_pickle_compat.py        |   250 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/numpy_pickle_utils.py         |   291 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/parallel.py                   |  2075 [32m++++[m
+ .venv/lib/python3.11/site-packages/joblib/pool.py                       |   362 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/test/__init__.py              |     0
+ .../site-packages/joblib/test/__pycache__/__init__.cpython-311.pyc      |   Bin [31m0[m -> [32m188[m bytes
+ .../site-packages/joblib/test/__pycache__/common.cpython-311.pyc        |   Bin [31m0[m -> [32m3140[m bytes
+ .../joblib/test/__pycache__/test_backports.cpython-311.pyc              |   Bin [31m0[m -> [32m2823[m bytes
+ .../joblib/test/__pycache__/test_cloudpickle_wrapper.cpython-311.pyc    |   Bin [31m0[m -> [32m1430[m bytes
+ .../site-packages/joblib/test/__pycache__/test_config.cpython-311.pyc   |   Bin [31m0[m -> [32m12913[m bytes
+ .../site-packages/joblib/test/__pycache__/test_dask.cpython-311.pyc     |   Bin [31m0[m -> [32m56324[m bytes
+ .../site-packages/joblib/test/__pycache__/test_disk.cpython-311.pyc     |   Bin [31m0[m -> [32m4304[m bytes
+ .../joblib/test/__pycache__/test_func_inspect.cpython-311.pyc           |   Bin [31m0[m -> [32m15809[m bytes
+ .../test/__pycache__/test_func_inspect_special_encoding.cpython-311.pyc |   Bin [31m0[m -> [32m363[m bytes
+ .../site-packages/joblib/test/__pycache__/test_hashing.cpython-311.pyc  |   Bin [31m0[m -> [32m24554[m bytes
+ .../site-packages/joblib/test/__pycache__/test_init.cpython-311.pyc     |   Bin [31m0[m -> [32m550[m bytes
+ .../site-packages/joblib/test/__pycache__/test_logger.cpython-311.pyc   |   Bin [31m0[m -> [32m1252[m bytes
+ .../joblib/test/__pycache__/test_memmapping.cpython-311.pyc             |   Bin [31m0[m -> [32m62293[m bytes
+ .../site-packages/joblib/test/__pycache__/test_memory.cpython-311.pyc   |   Bin [31m0[m -> [32m82766[m bytes
+ .../joblib/test/__pycache__/test_memory_async.cpython-311.pyc           |   Bin [31m0[m -> [32m9109[m bytes
+ .../test/__pycache__/test_missing_multiprocessing.cpython-311.pyc       |   Bin [31m0[m -> [32m1661[m bytes
+ .../site-packages/joblib/test/__pycache__/test_module.cpython-311.pyc   |   Bin [31m0[m -> [32m2625[m bytes
+ .../joblib/test/__pycache__/test_numpy_pickle.cpython-311.pyc           |   Bin [31m0[m -> [32m72518[m bytes
+ .../joblib/test/__pycache__/test_numpy_pickle_compat.cpython-311.pyc    |   Bin [31m0[m -> [32m1278[m bytes
+ .../joblib/test/__pycache__/test_numpy_pickle_utils.cpython-311.pyc     |   Bin [31m0[m -> [32m864[m bytes
+ .../site-packages/joblib/test/__pycache__/test_parallel.cpython-311.pyc |   Bin [31m0[m -> [32m145789[m bytes
+ .../joblib/test/__pycache__/test_store_backends.cpython-311.pyc         |   Bin [31m0[m -> [32m6544[m bytes
+ .../site-packages/joblib/test/__pycache__/test_testing.cpython-311.pyc  |   Bin [31m0[m -> [32m4098[m bytes
+ .../site-packages/joblib/test/__pycache__/test_utils.cpython-311.pyc    |   Bin [31m0[m -> [32m2543[m bytes
+ .../site-packages/joblib/test/__pycache__/testutils.cpython-311.pyc     |   Bin [31m0[m -> [32m724[m bytes
+ .venv/lib/python3.11/site-packages/joblib/test/common.py                |    84 [32m+[m
+ .venv/lib/python3.11/site-packages/joblib/test/data/__init__.py         |     0
+ .../site-packages/joblib/test/data/__pycache__/__init__.cpython-311.pyc |   Bin [31m0[m -> [32m193[m bytes
+ .../joblib/test/data/__pycache__/create_numpy_pickle.cpython-311.pyc    |   Bin [31m0[m -> [32m4758[m bytes
+ .../python3.11/site-packages/joblib/test/data/create_numpy_pickle.py    |   106 [32m+[m
+ .../joblib/test/data/joblib_0.10.0_compressed_pickle_py27_np16.gz       |   Bin [31m0[m -> [32m769[m bytes
+ .../joblib/test/data/joblib_0.10.0_compressed_pickle_py27_np17.gz       |   Bin [31m0[m -> [32m757[m bytes
+ .../joblib/test/data/joblib_0.10.0_compressed_pickle_py33_np18.gz       |   Bin [31m0[m -> [32m792[m bytes
+ .../joblib/test/data/joblib_0.10.0_compressed_pickle_py34_np19.gz       |   Bin [31m0[m -> [32m794[m bytes
+ .../joblib/test/data/joblib_0.10.0_compressed_pickle_py35_np19.gz       |   Bin [31m0[m -> [32m790[m bytes
+ .../site-packages/joblib/test/data/joblib_0.10.0_pickle_py27_np17.pkl   |   Bin [31m0[m -> [32m986[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py27_np17.pkl.bz2             |   Bin [31m0[m -> [32m997[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py27_np17.pkl.gzip            |   Bin [31m0[m -> [32m798[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py27_np17.pkl.lzma            |   Bin [31m0[m -> [32m660[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py27_np17.pkl.xz              |   Bin [31m0[m -> [32m712[m bytes
+ .../site-packages/joblib/test/data/joblib_0.10.0_pickle_py33_np18.pkl   |   Bin [31m0[m -> [32m1068[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py33_np18.pkl.bz2             |   Bin [31m0[m -> [32m1000[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py33_np18.pkl.gzip            |   Bin [31m0[m -> [32m831[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py33_np18.pkl.lzma            |   Bin [31m0[m -> [32m694[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py33_np18.pkl.xz              |   Bin [31m0[m -> [32m752[m bytes
+ .../site-packages/joblib/test/data/joblib_0.10.0_pickle_py34_np19.pkl   |   Bin [31m0[m -> [32m1068[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py34_np19.pkl.bz2             |   Bin [31m0[m -> [32m1021[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py34_np19.pkl.gzip            |   Bin [31m0[m -> [32m831[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py34_np19.pkl.lzma            |   Bin [31m0[m -> [32m697[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py34_np19.pkl.xz              |   Bin [31m0[m -> [32m752[m bytes
+ .../site-packages/joblib/test/data/joblib_0.10.0_pickle_py35_np19.pkl   |   Bin [31m0[m -> [32m1068[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py35_np19.pkl.bz2             |   Bin [31m0[m -> [32m1005[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py35_np19.pkl.gzip            |   Bin [31m0[m -> [32m833[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py35_np19.pkl.lzma            |   Bin [31m0[m -> [32m701[m bytes
+ .../joblib/test/data/joblib_0.10.0_pickle_py35_np19.pkl.xz              |   Bin [31m0[m -> [32m752[m bytes
+ .../joblib/test/data/joblib_0.11.0_compressed_pickle_py36_np111.gz      |   Bin [31m0[m -> [32m800[m bytes
+ .../site-packages/joblib/test/data/joblib_0.11.0_pickle_py36_np111.pkl  |   Bin [31m0[m -> [32m1068[m bytes
+ .../joblib/test/data/joblib_0.11.0_pickle_py36_np111.pkl.bz2            |   Bin [31m0[m -> [32m991[m bytes
+ .../joblib/test/data/joblib_0.11.0_pickle_py36_np111.pkl.gzip           |   Bin [31m0[m -> [32m800[m bytes
+ .../joblib/test/data/joblib_0.11.0_pickle_py36_np111.pkl.lzma           |   Bin [31m0[m -> [32m715[m bytes
+ .../joblib/test/data/joblib_0.11.0_pickle_py36_np111.pkl.xz             |   Bin [31m0[m -> [32m752[m bytes
+ .../joblib/test/data/joblib_0.8.4_compressed_pickle_py27_np17.gz        |   Bin [31m0[m -> [32m659[m bytes
+ .../joblib/test/data/joblib_0.9.2_compressed_pickle_py27_np16.gz        |   Bin [31m0[m -> [32m658[m bytes
+ .../joblib/test/data/joblib_0.9.2_compressed_pickle_py27_np17.gz        |   Bin [31m0[m -> [32m658[m bytes
+ .../joblib/test/data/joblib_0.9.2_compressed_pickle_py34_np19.gz        |   Bin [31m0[m -> [32m673[m bytes
+ .../joblib/test/data/joblib_0.9.2_compressed_pickle_py35_np19.gz        |   Bin [31m0[m -> [32m673[m bytes
+ .../site-packages/joblib/test/data/joblib_0.9.2_pickle_py27_np16.pkl    |   Bin [31m0[m -> [32m670[m bytes
+ .../joblib/test/data/joblib_0.9.2_pickle_py27_np16.pkl_01.npy           |   Bin [31m0[m -> [32m120[m bytes
+ .../joblib/test/data/joblib_0.9.2_pickle_py27_np16.pkl_02.npy           |   Bin [31m0[m -> [32m120[m bytes
+ .../joblib/test/data/joblib_0.9.2_pickle_py27_np16.pkl_03.npy           |   Bin [31m0[m -> [32m236[m bytes
+ .../joblib/test/data/joblib_0.9.2_pickle_py27_np16.pkl_04.npy           |   Bin [31m0[m -> [32m104[m bytes
