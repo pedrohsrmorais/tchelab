@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" fill="none">
+  <defs>
+    <linearGradient id="heroBg" x1="0" y1="0" x2="800" y2="500" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#172554"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="flaskGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="liquidGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#1e40af"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur1"><feGaussianBlur stdDeviation="30"/></filter>
+    <filter id="blur2"><feGaussianBlur stdDeviation="20"/></filter>
+    <filter id="glow-f">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#heroBg)"/>
+
+  <!-- Ambient blobs -->
+  <ellipse cx="200" cy="200" rx="200" ry="200" fill="url(#glow1)" filter="url(#blur1)"/>
+  <ellipse cx="600" cy="350" rx="180" ry="180" fill="url(#glow2)" filter="url(#blur1)"/>
+
+  <!-- Grid dots -->
+  <g opacity="0.06">
+    <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1" fill="#93c5fd"/>
+    </pattern>
+    <rect width="800" height="500" fill="url(#dots)"/>
+  </g>
+
+  <!-- Orbit rings -->
+  <circle cx="400" cy="250" r="180" stroke="#3b82f6" stroke-width="0.5" stroke-opacity="0.2" stroke-dasharray="4 6"/>
+  <circle cx="400" cy="250" r="240" stroke="#6366f1" stroke-width="0.5" stroke-opacity="0.12" stroke-dasharray="6 10"/>
+  <circle cx="400" cy="250" r="310" stroke="#2563eb" stroke-width="0.5" stroke-opacity="0.08" stroke-dasharray="3 8"/>
+
+  <!-- Orbit dots -->
+  <circle cx="580" cy="250" r="5" fill="#3b82f6" opacity="0.8" filter="url(#glow-f)"/>
+  <circle cx="400" cy="70" r="4" fill="#60a5fa" opacity="0.7" filter="url(#glow-f)"/>
+  <circle cx="160" cy="250" r="5" fill="#3b82f6" opacity="0.6" filter="url(#glow-f)"/>
+  <circle cx="400" cy="90" r="3" fill="#93c5fd" opacity="0.5"/>
+  <circle cx="680" cy="140" r="3" fill="#6366f1" opacity="0.6" filter="url(#glow-f)"/>
+  <circle cx="120" cy="370" r="3" fill="#3b82f6" opacity="0.5"/>
+
+  <!-- Central Flask (large) -->
+  <g transform="translate(400,250)">
+    <!-- Flask shadow -->
+    <ellipse cx="0" cy="110" rx="70" ry="12" fill="#1d4ed8" opacity="0.3" filter="url(#blur2)"/>
+
+    <!-- Flask body -->
+    <path d="M-28 -90 L-28 10 L-80 90 Q-92 110 -70 115 L70 115 Q92 110 80 90 L28 10 L28 -90 Z"
+          fill="#1e3a8a" opacity="0.6" stroke="#3b82f6" stroke-width="1.5"/>
+
+    <!-- Flask neck -->
+    <rect x="-30" y="-100" width="60" height="18" rx="6" fill="#2563eb" opacity="0.7"/>
+    <rect x="-25" y="-100" width="50" height="14" rx="5" fill="#3b82f6" opacity="0.8"/>
+
+    <!-- Liquid -->
+    <path d="M-76 68 Q-50 55 0 60 Q50 65 76 52 L80 90 Q92 110 70 115 L-70 115 Q-92 110 -80 90 Z"
+          fill="url(#liquidGrad)" opacity="0.9"/>
+
+    <!-- Liquid shimmer -->
+    <path d="M-76 68 Q-50 55 0 60 Q50 65 76 52" stroke="#60a5fa" stroke-width="2" fill="none" opacity="0.8"/>
+
+    <!-- Bubbles -->
+    <circle cx="-40" cy="82" r="5" fill="#60a5fa" opacity="0.7" filter="url(#glow-f)"/>
+    <circle cx="10" cy="78" r="4" fill="#93c5fd" opacity="0.6" filter="url(#glow-f)"/>
+    <circle cx="45" cy="86" r="3.5" fill="#3b82f6" opacity="0.5"/>
+    <circle cx="-15" cy="96" r="2.5" fill="#bfdbfe" opacity="0.5"/>
+
+    <!-- Spectral wave lines (left side) -->
+    <line x1="-115" y1="-20" x2="-90" y2="-20" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-115" y1="-8" x2="-84" y2="-8" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+    <line x1="-115" y1="4" x2="-90" y2="4" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+    <line x1="-115" y1="16" x2="-88" y2="16" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-115" y1="28" x2="-92" y2="28" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+    <line x1="-115" y1="40" x2="-86" y2="40" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Spectral lines (right) -->
+    <line x1="90" y1="-20" x2="115" y2="-20" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+    <line x1="84" y1="-8" x2="115" y2="-8" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+    <line x1="90" y1="4" x2="115" y2="4" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+    <line x1="86" y1="16" x2="115" y2="16" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  </g>
+
+  <!-- Sine wave (spectral) — bottom -->
+  <path d="M50 420 Q150 400 200 420 Q250 440 300 420 Q350 400 400 420 Q450 440 500 420 Q550 400 600 420 Q650 440 700 420 Q750 400 780 420"
+        stroke="#3b82f6" stroke-width="1.5" fill="none" opacity="0.3"/>
+  <path d="M50 435 Q130 415 200 435 Q270 455 350 435 Q430 415 500 435 Q580 455 650 435 Q720 415 780 435"
+        stroke="#6366f1" stroke-width="1" fill="none" opacity="0.2"/>
+
+  <!-- Data points scatter -->
+  <g opacity="0.5">
+    <circle cx="100" cy="150" r="3" fill="#60a5fa"/>
+    <circle cx="130" cy="130" r="2.5" fill="#93c5fd"/>
+    <circle cx="80" cy="170" r="2" fill="#3b82f6"/>
+    <circle cx="660" cy="160" r="3" fill="#60a5fa"/>
+    <circle cx="700" cy="140" r="2.5" fill="#93c5fd"/>
+    <circle cx="680" cy="180" r="2" fill="#6366f1"/>
+    <circle cx="720" cy="165" r="2" fill="#3b82f6"/>
+  </g>
+
+  <!-- Score plot dots (PCA-style, bottom right) -->
+  <g transform="translate(620,380)" opacity="0.7">
+    <circle cx="-20" cy="-15" r="4" fill="#3b82f6" filter="url(#glow-f)"/>
+    <circle cx="10" cy="-25" r="3.5" fill="#60a5fa"/>
+    <circle cx="-5" cy="5" r="4.5" fill="#2563eb"/>
+    <circle cx="25" cy="10" r="3" fill="#93c5fd"/>
+    <circle cx="-30" cy="8" r="3" fill="#6366f1"/>
+    <circle cx="15" cy="20" r="2.5" fill="#3b82f6"/>
+    <line x1="-40" y1="0" x2="45" y2="0" stroke="#60a5fa" stroke-width="0.8" opacity="0.4"/>
+    <line x1="0" y1="-40" x2="0" y2="40" stroke="#60a5fa" stroke-width="0.8" opacity="0.4"/>
+    <text x="-38" y="3" font-size="8" fill="#60a5fa" opacity="0.6" font-family="monospace">PC1</text>
+    <text x="2" y="-28" font-size="8" fill="#60a5fa" opacity="0.6" font-family="monospace">PC2</text>
+  </g>
+
+  <!-- Title text -->
+  <text x="400" y="475" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#60a5fa" opacity="0.7" letter-spacing="4">TCHELAB</text>
+  <text x="400" y="492" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="9" fill="#3b82f6" opacity="0.5" letter-spacing="6">CHEMOMETRIC PLATFORM</text>
+</svg>

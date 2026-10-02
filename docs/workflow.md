@@ -1,1493 +1,473 @@
-# TcheLab — Workflow
+# TcheLab — Workflows
+
+> Um workflow é um grafo de blocos conectados que representa um pipeline de análise completo.
+> Cada bloco é uma instância de uma técnica do catálogo (`catalogo_scripts.md`).
+> Cada conexão identifica explicitamente qual porta de saída alimenta qual porta de entrada.
+> O banco persiste a estrutura conforme descrito em `database.md`.
+
+---
 
 ## O que é um workflow
 
-No TcheLab, um **workflow** é um grafo de blocos conectados que representa um pipeline de análise completo, da entrada dos dados até os resultados finais.
+No TcheLab, o pesquisador monta visualmente o caminho matemático da análise. O sistema garante que:
 
-Cada bloco do workflow representa uma operação ou técnica do catálogo e possui:
+1. As conexões sejam matematicamente válidas (tipos, shapes, ordem, eixo de amostras)
+2. As operações respeitem a dimensionalidade dos dados
+3. As técnicas sejam compatíveis com a estrutura do dataset
+4. A execução seja reproduzível (parâmetros, seed, versão do código registrados)
+5. A origem de cada resultado possa ser rastreada (linhagem de datasets, nó de origem)
 
-* entradas (`inputs`);
-* parâmetros;
-* saídas (`outputs`);
-* regras de validação;
-* requisitos de dimensionalidade;
-* requisitos de eixo de amostras;
-* tipos de dados aceitos;
-* tipos de dados produzidos.
-
-O workflow não é necessariamente linear. Pode conter:
-
-* ramificações;
-* múltiplas entradas;
-* múltiplas saídas;
-* comparações paralelas;
-* operações matemáticas;
-* transformações estruturais;
-* modelos quimiométricos;
-* etapas de validação;
-* visualizações;
-* resultados intermediários reutilizados por vários blocos.
-
-A ideia central é que o pesquisador **monte visualmente** o pipeline e o TcheLab garanta que:
-
-1. as conexões sejam matematicamente válidas;
-2. os tipos e shapes sejam compatíveis;
-3. as operações respeitem a dimensionalidade dos dados;
-4. as técnicas sejam compatíveis com a estrutura do dataset;
-5. a execução seja reproduzível;
-6. a origem de cada resultado possa ser rastreada.
+Um workflow não é necessariamente linear. Pode conter ramificações, múltiplas entradas, múltiplas saídas, comparações paralelas e resultados intermediários reutilizados por vários blocos.
 
 ---
 
-## Princípio fundamental: o workflow é um grafo tipado
+## Princípio fundamental: grafo tipado
 
-Uma conexão entre dois blocos não significa apenas:
+Uma conexão nunca é apenas `A → B`. É sempre:
 
-```text
-A → B
+```
+output específico de A  →  input específico de B
 ```
 
-Ela significa:
+Cada aresta carrega:
 
-```text
-output específico de A
-        ↓
-input específico de B
-```
+- `source_node_key` — nó de origem
+- `source_port` — porta de saída do nó de origem
+- `target_node_key` — nó de destino
+- `target_port` — porta de entrada do nó de destino
 
-Por isso, cada conexão possui explicitamente:
-
-* nó de origem;
-* porta de saída da origem;
-* nó de destino;
-* porta de entrada do destino.
-
-Conceitualmente:
-
-```text
-[Dataset A]
-    │
-    └── output: X
-             │
-             ▼
-        input: X
-       [Transpose]
-             │
-             └── output: X
-                      │
-                      ▼
-                 [PCA]
-```
-
-Para operações com múltiplas entradas:
-
-```text
-[Dataset A] ── output:X ──→ input:A
-                              │
-                              ▼
-                           [Soma]
-                              ▲
-                              │
-[Dataset B] ── output:X ──────┘
-```
-
-Essa distinção é fundamental para operações como:
-
-* soma;
-* subtração;
-* multiplicação elemento a elemento;
-* divisão;
-* produto matricial;
-* concatenação;
-* operações entre datasets;
-* combinação de matrizes de calibração e teste;
-* operações matemáticas entre outputs de diferentes modelos.
+Isso é necessário porque blocos têm múltiplas portas. `SVD` produz `U`, `S` e `Vt`. `PARAFAC` produz `scores`, `loadings`, `residuals`, `core_consistency`. `Soma` consome `A` e `B`.
 
 ---
 
-# Anatomia de um script / bloco
+## Anatomia de um nó
 
-Todo script no catálogo do TcheLab segue uma interface padronizada.
+Cada nó do workflow é uma instância de uma técnica do catálogo com:
 
-Um bloco declara:
+- `node_key` — identificador único no workflow (ex: `node_pca_1`)
+- `technique_id` — técnica do catálogo instanciada
+- `parameters` — parâmetros configurados pelo usuário (override dos defaults)
+- `position_x`, `position_y` — posição no canvas
 
-```python
-{
-  "nome": "PARAFAC",
-
-  "categoria": "07_decomposicao_multiway",
-
-  "descricao": "Decomposição por análise de fatores paralelos para arrays N-way.",
-
-  "input": {
-    "X": {
-      "tipo": "tensor",
-      "min_order": 2,
-      "max_order": None,
-      "requires_sample_axis": None,
-      "dtype": "float"
-    }
-  },
-
-  "parametros": {
-    "n_components": {
-      "tipo": "int",
-      "default": 3,
-      "range": [1, 50]
-    },
-
-    "initialization": {
-      "tipo": "str",
-      "default": "svd",
-      "opcoes": ["svd", "random", "dtld"]
-    },
-
-    "constraints": {
-      "tipo": "list",
-      "default": [],
-      "opcoes": ["non_negativity", "unimodality"]
-    },
-
-    "max_iter": {
-      "tipo": "int",
-      "default": 2500
-    },
-
-    "tolerance": {
-      "tipo": "float",
-      "default": 1e-6
-    }
-  },
-
-  "output": {
-    "scores": {
-      "tipo": "matrix",
-      "shape": "(I, R)"
-    },
-
-    "loadings": {
-      "tipo": "array",
-      "descricao": "Uma matriz de loadings por modo."
-    },
-
-    "core_consistency": {
-      "tipo": "float"
-    },
-
-    "explained_variance": {
-      "tipo": "float"
-    },
-
-    "residuals": {
-      "tipo": "tensor"
-    }
-  }
-}
-```
-
-Esse contrato é declarado uma vez por script.
-
-O frontend pode então descobrir:
-
-* quais entradas o bloco possui;
-* quais tipos são aceitos;
-* quais shapes são aceitos;
-* quais parâmetros existem;
-* quais saídas existem;
-* quais operações podem ser conectadas;
-* quais ordens do array são suportadas;
-* se o bloco exige eixo de amostras;
-* se o bloco pode receber múltiplas conexões.
+As portas disponíveis (input e output) são determinadas pelo `input_schema` e `output_schema` da técnica — não pelo nó.
 
 ---
 
-# Inputs e outputs nomeados
-
-Cada bloco possui portas nomeadas.
-
-Exemplo:
-
-```text
-Produto matricial
-
-inputs:
-    A
-    B
-
-output:
-    result
-```
-
-Outro:
-
-```text
-PARAFAC
-
-input:
-    X
-
-outputs:
-    scores
-    loadings
-    residuals
-    core_consistency
-```
-
-Outro:
-
-```text
-Divisão
-
-inputs:
-    numerator
-    denominator
-
-output:
-    result
-```
-
-O workflow nunca deve depender apenas da posição física dos conectores no frontend.
-
-A identidade lógica da conexão é dada pelas portas.
-
----
-
-# Conexões entre blocos
-
-A estrutura conceitual de uma aresta é:
-
-```text
-workflow_edge
-
-source_node_id
-source_output_key
-target_node_id
-target_input_key
-```
-
-Exemplo:
-
-```text
-Dataset A
-    output: X
-        │
-        ▼
-Transpose
-    input: X
-```
-
-Representação:
-
-```json
-{
-  "source_node_id": 10,
-  "source_output_key": "X",
-  "target_node_id": 15,
-  "target_input_key": "X"
-}
-```
-
-Para múltiplas entradas:
-
-```json
-{
-  "source_node_id": 10,
-  "source_output_key": "X",
-  "target_node_id": 20,
-  "target_input_key": "A"
-}
-```
-
-e:
-
-```json
-{
-  "source_node_id": 11,
-  "source_output_key": "X",
-  "target_node_id": 20,
-  "target_input_key": "B"
-}
-```
-
-O bloco 20 recebe:
-
-```text
-A ← Dataset 10
-B ← Dataset 11
-```
-
----
-
-# Operações de dados versus técnicas de modelagem
-
-O catálogo possui diferentes tipos de blocos.
-
-Uma distinção importante é entre:
+## Tipos de blocos
 
 ### Operações estruturais
-
-Alteram a organização dos dados:
-
-* transpose;
-* permutação de eixos;
-* reshape;
-* unfolding;
-* folding;
-* slice;
-* seleção;
-* concatenação;
-* stack.
+Alteram a organização do array sem contexto quimiométrico:
+`transpose`, `reshape`, `slice`, `squeeze`, `expand_dims`, `unfolding`, `folding`, `concatenacao`, `stack`, `split`, `selecao_amostras`, `selecao_variaveis`
 
 ### Operações matemáticas
-
-Executam operações algébricas:
-
-* soma;
-* subtração;
-* multiplicação;
-* divisão;
-* produto matricial;
-* inversa;
-* pseudo-inversa;
-* determinante;
-* autovalores;
-* autovetores;
-* SVD;
-* norma;
-* média;
-* desvio padrão;
-* operações elemento a elemento.
+Álgebra sobre arrays:
+`soma`, `subtracao`, `multiplicacao_elementwise`, `divisao_elementwise`, `produto_matricial`, `inversa`, `pseudo_inversa`, `determinante`, `autovalores`, `autovetores`, `eig`, `svd`, `norma`, `trace`, `rank`, `mean`, `median`, `std`, `min`, `max`, `sum`, `formula_customizada`
 
 ### Pré-processamento
-
-Transformam os dados segundo métodos quimiométricos:
-
-* SNV;
-* MSC;
-* Savitzky-Golay;
-* baseline;
-* centering;
-* autoscaling;
-* Pareto;
-* etc.
+Transformações espectrais:
+`snv`, `msc`, `detrend`, `baseline`, `savitzky_golay`, `normalizacao`, `centering`, `autoscaling`, `pareto`
 
 ### Modelagem
+Algoritmos quimiométricos e de ML (famílias 03–11 do catálogo)
 
-Executam algoritmos:
+### Validação e diagnóstico
+Famílias 14, 15 e 16 do catálogo
 
-* PCA;
-* PLS;
-* PLS-DA;
-* SIMCA;
-* PARAFAC;
-* Tucker;
-* MCR-ALS;
-* N-PLS;
-* U-PLS;
-* redes neurais;
-* etc.
-
-Essa separação é importante porque uma operação matemática pode ser usada como parte de praticamente qualquer workflow.
+### Visualização
+Scripts da família 17 — retornam dados estruturados para o frontend renderizar
 
 ---
 
-# Operações matriciais e tensoriais
+## Validação de conexões
 
-O TcheLab deve permitir que o usuário manipule diretamente seus arrays antes, depois ou entre técnicas quimiométricas.
+Antes de aceitar uma aresta, o sistema verifica (via `ShapeValidatorService`):
 
-Exemplo simples:
+### 1. Existência
+`source_node_key` e `target_node_key` existem no workflow.
 
-```text
-Dataset
+### 2. Porta válida
+`source_port` existe no `output_schema` da técnica de origem.
+`target_port` existe no `input_schema` da técnica de destino.
 
-shape = (3, 2)
+### 3. Tipo compatível
+O tipo declarado no `output_schema` da porta de origem é compatível com o tipo no `input_schema` da porta de destino.
 
-[ 1  2 ]
-[ 3  4 ]
-[ 5  6 ]
+```
+tensor → tensor     ✓
+matrix → matrix     ✓
+model  → tensor     ✗ (geralmente)
+scalar → matrix     ✗
 ```
 
-Aplicando `Transpose`:
+### 4. Ordem analítica
+O `data_order` do array de entrada satisfaz `min_order` e `max_order` da técnica de destino.
 
-```text
-axes = [1, 0]
+```
+PARAFAC recebe tensor de order=1   ✗  (min_order=2)
+PARAFAC recebe tensor de order=5   ✓  (max_order=NULL)
+SNV     recebe matrix de order=2   ✗  (max_order=1)
 ```
 
-Resultado:
+### 5. Eixo de amostras
+O `sample_axis` do array satisfaz `requires_sample_axis` da técnica.
 
-```text
-shape = (2, 3)
-
-[ 1  3  5 ]
-[ 2  4  6 ]
+```
+requires_sample_axis = 1 → dataset deve ter sample_axis declarado
+requires_sample_axis = 0 → dataset não deve ter sample_axis
+requires_sample_axis = NULL → indiferente
 ```
 
-Para um tensor:
+### 6. Compatibilidade matemática de shape
+Para operações com restrições de shape:
 
-```text
-shape = (I, J, K)
+```
+produto_matricial: A.shape[-1] == B.shape[-2]
+soma: shapes compatíveis
+inversa: A deve ser quadrada
 ```
 
-uma operação:
+### 7. Compatibilidade semântica
+Declarada em `technique_compatibilities`. Mesmo shape idêntico não garante compatibilidade semântica:
 
-```text
-Transpose
-axes = [2, 0, 1]
+```
+scores PCA  shape=(100,5)  ≠  matriz espectral  shape=(100,5)
 ```
 
-produz:
-
-```text
-shape = (K, I, J)
-```
-
-A operação não precisa conhecer previamente se o array é 2D, 3D, 4D ou N-dimensional. Ela recebe uma permutação válida dos eixos.
+### 8. Ausência de ciclos
+A aresta não pode criar um ciclo — o grafo deve ser um DAG (grafo acíclico dirigido).
 
 ---
 
-# Operações que preservam, alteram ou reduzem a ordem
+## Erros de validação
 
-Cada operação deve declarar o efeito esperado sobre o shape.
+Erros devem ser explícitos e acionáveis. Nunca silenciosos.
 
-Exemplos:
-
-```text
-Transpose
-(3,2) → (2,3)
-
-Reshape
-(3,2) → (2,3)
-
-Slice
-(100,200,30) → (50,200,30)
-
-Sum(axis=0)
-(100,200,30) → (200,30)
-
-Mean(axis=1)
-(100,200,30) → (100,30)
-
-Unfolding
-(10,20,30) → (10,600)
-
-Folding
-(10,600) → (10,20,30)
 ```
-
-Isso permite que o sistema atualize o metadata do resultado sem depender de execução para descobrir sua estrutura.
-
----
-
-# Operações com múltiplas entradas
-
-Operações que utilizam mais de um objeto possuem múltiplos inputs nomeados.
-
-Exemplo:
-
-```text
-Soma
-
-inputs:
-    A
-    B
-
-output:
-    result
-```
-
-Para:
-
-```text
-A.shape = (100,200)
-B.shape = (100,200)
-```
-
-temos:
-
-```text
-A + B
-```
-
-com:
-
-```text
-result.shape = (100,200)
-```
-
-Se os shapes forem incompatíveis, o frontend bloqueia a conexão ou a execução.
-
-O mesmo vale para produto matricial:
-
-```text
-A.shape = (100,20)
-B.shape = (20,5)
-```
-
-Resultado:
-
-```text
-A @ B
-
-shape = (100,5)
-```
-
-Mas:
-
-```text
-A.shape = (100,20)
-B.shape = (30,5)
-```
-
-é inválido.
-
-O erro deve ser explícito:
-
-```text
-Produto matricial inválido.
-
-A possui shape (100,20).
-B possui shape (30,5).
-
-Para A @ B, a segunda dimensão de A
-deve ser igual à primeira dimensão de B.
-```
-
----
-
-# Operações matemáticas com restrições
-
-Cada operação declara suas próprias regras matemáticas.
-
-## Inversa
-
-Entrada:
-
-```text
-A.shape = (n,n)
-```
-
-Saída:
-
-```text
-A⁻¹.shape = (n,n)
-```
-
-Uma matriz não quadrada é rejeitada.
-
-O TcheLab **não converte automaticamente** uma matriz não quadrada em pseudo-inversa.
-
-Erro:
-
-```text
 Inversa exige uma matriz quadrada.
+Entrada recebida: shape = (3, 2).
+Use o bloco "Pseudo-inversa" se a intenção for calcular a Moore-Penrose pseudoinverse.
+```
 
-Entrada recebida:
-shape = (3,2)
+```
+Produto matricial inválido.
+A possui shape (100, 20). B possui shape (30, 5).
+Para A @ B, a segunda dimensão de A deve ser igual à primeira dimensão de B.
+```
 
-Utilize o bloco "Pseudo-inversa" se a intenção
-for calcular a Moore-Penrose pseudoinverse.
+```
+SNV aceita apenas arrays de ordem 1 (max_order = 1).
+O dataset conectado tem data_order = 3.
+Considere aplicar SNV após um unfolding ou sobre cada modo separadamente.
+```
+
+```
+PARAFAC exige arrays de ordem mínima 2 (min_order = 2).
+O dataset conectado tem data_order = 1.
 ```
 
 ---
 
-## Pseudo-inversa
+## Múltiplas entradas
 
-A pseudo-inversa é um bloco separado.
+Blocos com múltiplas entradas declaram todas as portas no `input_schema`. Cada porta deve ser conectada por uma aresta separada.
 
-Aceita:
-
-```text
-A.shape = (m,n)
+```
+Dataset A  →  output:X  →  input:A  →  [Soma]  →  output:result
+Dataset B  →  output:X  →  input:B  ↗
 ```
 
-e produz:
-
-```text
-A⁺.shape = (n,m)
-```
-
-Pode ser aplicada a matrizes quadradas ou retangulares.
-
----
-
-## Determinante
-
-Exige:
-
-```text
-A.shape = (n,n)
-```
-
-Produz:
-
-```text
-det(A)
-```
-
-com saída escalar.
-
----
-
-## Autovalores e autovetores
-
-O bloco exige matriz quadrada:
-
-```text
-A.shape = (n,n)
-```
-
-Os autovalores são:
-
-```text
-λ.shape = (n,)
-```
-
-e os autovetores:
-
-```text
-V.shape = (n,n)
-```
-
-Quando o resultado for complexo, a representação da API/JSON será:
+Representação no banco (`workflow_edges`):
 
 ```json
-{
-  "real": [...],
-  "imag": [...]
-}
-```
-
-Internamente, o worker Python pode utilizar números complexos nativos, como `complex64` ou `complex128`.
-
-A representação JSON existe apenas para garantir uma serialização explícita e compatível.
-
----
-
-# Fórmula customizada
-
-O TcheLab pode oferecer um bloco de fórmula customizada para operações matemáticas que não estejam no catálogo.
-
-Exemplo:
-
-```text
-X * 2
-```
-
-ou:
-
-```text
-sqrt(X)
-```
-
-ou:
-
-```text
-(X - mean(X)) / std(X)
-```
-
-ou:
-
-```text
-A @ B
-```
-
-Entretanto, o sistema **não deve executar a expressão diretamente com `eval()`**.
-
-O backend deve utilizar um parser seguro baseado em AST ou mecanismo equivalente com whitelist explícita.
-
-A linguagem deve permitir somente operações declaradas pelo catálogo, por exemplo:
-
-```text
-+
--
-*
-/
-**
-@
-sqrt()
-log()
-exp()
-abs()
-mean()
-std()
-min()
-max()
-transpose()
-```
-
-Não devem existir acesso a:
-
-```text
-os
-subprocess
-open
-exec
-eval
-import
-__import__
-```
-
-nem acesso arbitrário ao sistema de arquivos, rede ou processo.
-
-A expressão é:
-
-```text
-texto
-  ↓
-parser
-  ↓
-AST validada
-  ↓
-whitelist
-  ↓
-executor matemático
-  ↓
-resultado
-```
-
-O usuário nunca executa código Python arbitrário no servidor.
-
----
-
-# Dataset derivado
-
-Uma operação realizada sobre um dataset cria um **resultado derivado**.
-
-Exemplo:
-
-```text
-Dataset A
-    │
-    ▼
-Transpose
-    │
-    ▼
-Dataset B
-```
-
-O Dataset B deve manter a relação com o Dataset A.
-
-Conceitualmente:
-
-```text
-Dataset B
-
-parent_dataset_id = A
-operation = transpose
-parameters = {
-    "axes": [1,0]
-}
-```
-
-Isso cria uma linhagem:
-
-```text
-arquivo_original
-      ↓
-Dataset A
-      ↓
-Transpose
-      ↓
-Dataset B
-      ↓
-PCA
-      ↓
-Scores
-```
-
-O usuário deve poder consultar:
-
-```text
-"De onde veio este resultado?"
-```
-
-e o sistema deve conseguir reconstruir a cadeia.
-
----
-
-# Resultados que não são datasets
-
-Nem todo output deve ser armazenado como um novo dataset.
-
-Exemplos:
-
-```text
-determinante → escalar
-
-autovalores → vetor
-
-core_consistency → escalar
-
-R² → escalar
-
-confusion_matrix → matriz de métricas
-
-modelo PLS → objeto de modelo
-
-scores → matriz
-
-loadings → conjunto de matrizes
-```
-
-O schema de output deve informar a natureza do resultado.
-
-Exemplo:
-
-```json
-{
-  "tipo": "scalar",
-  "dtype": "float"
-}
-```
-
-ou:
-
-```json
-{
-  "tipo": "vector",
-  "dtype": "complex128"
-}
-```
-
-ou:
-
-```json
-{
-  "tipo": "matrix",
-  "dtype": "float64"
-}
-```
-
-ou:
-
-```json
-{
-  "tipo": "tensor",
-  "dtype": "float32"
-}
-```
-
-ou:
-
-```json
-{
-  "tipo": "model"
-}
-```
-
-Isso permite que o frontend saiba se o resultado pode ser conectado a outro bloco.
-
----
-
-# Ordem do array versus eixo de amostras
-
-Um erro comum ao modelar pipelines de quimiometria é tratar "quantas dimensões tem o dado" como um número só.
-
-O TcheLab trata duas propriedades separadamente.
-
-## 1. Existe um eixo de amostras?
-
-Em calibração clássica:
-
-```text
-amostras × variáveis
-```
-
-existe um eixo de amostras.
-
-Em uma matriz aumentada usada pelo MCR-ALS, ou em um array único analisado como bloco, pode não existir.
-
-## 2. Qual a ordem do array de uma medição?
-
-Exemplos:
-
-```text
-espectro → ordem 1
-
-EEM → ordem 2
-
-cromatografia + EEM → ordem 3
-
-cromatografia + excitação + emissão + decaimento
-→ ordem 4
-```
-
-O eixo de amostras é tratado separadamente.
-
-Um dataset pode ser:
-
-```text
-sample_axis = 0
-data_order = 4
-```
-
-e possuir shape:
-
-```text
-(I, J, K, L, M)
-```
-
-onde:
-
-```text
-I = amostras
-J..M = modos instrumentais
+{"source_node_key": "node_dataset_a", "source_port": "X", "target_node_key": "node_soma", "target_port": "A"}
+{"source_node_key": "node_dataset_b", "source_port": "X", "target_node_key": "node_soma", "target_port": "B"}
 ```
 
 ---
 
-# Compatibilidade de ordem
+## Múltiplas saídas
 
-Cada técnica declara:
+Blocos com múltiplas saídas permitem que cada porta seja conectada a diferentes nós downstream.
 
-```text
-min_order
-max_order
-requires_sample_axis
 ```
-
-Exemplo:
-
-```text
-PARAFAC
-
-min_order = 2
-max_order = NULL
-requires_sample_axis = NULL
-```
-
-Isso significa:
-
-```text
-PARAFAC
-2-way ✓
-3-way ✓
-4-way ✓
-5-way ✓
-10-way ✓
-```
-
-desde que a implementação consiga processar o array.
-
----
-
-# Validação de conexões
-
-O TcheLab realiza várias validações antes de permitir uma conexão.
-
-## 1. Tipo
-
-Exemplo:
-
-```text
-tensor → tensor
-```
-
-válido.
-
-```text
-model → tensor
-```
-
-normalmente inválido.
-
-## 2. Shape
-
-Exemplo:
-
-```text
-A = (100,20)
-B = (20,5)
-
-A @ B
-```
-
-válido.
-
-## 3. Ordem
-
-Exemplo:
-
-```text
-PARAFAC
-min_order = 2
-```
-
-recebendo:
-
-```text
-order = 1
-```
-
-é inválido.
-
-## 4. Eixo de amostras
-
-Uma validação pode exigir:
-
-```text
-sample_axis != NULL
-```
-
-para validação cruzada.
-
-## 5. Compatibilidade semântica
-
-Mesmo que duas saídas tenham o mesmo shape, isso não significa necessariamente que sejam semanticamente compatíveis.
-
-Por exemplo:
-
-```text
-scores PCA
-shape = (100,5)
-```
-
-e:
-
-```text
-matriz espectral
-shape = (100,5)
-```
-
-podem ter o mesmo shape, mas representar objetos diferentes.
-
-O catálogo pode declarar restrições semânticas por meio de `technique_compatibilities`.
-
----
-
-# Conexões válidas
-
-```text
-Dataset
-    ↓
-Transpose
-    ↓
-PCA
-```
-
-```text
-Dataset A ──┐
-            ├──→ Soma
-Dataset B ──┘
-```
-
-```text
-Dataset
-    ↓
-Unfolding
-    ↓
-U-PLS
-```
-
-```text
-Dataset 4-way
-    ↓
-PARAFAC
-    ├──→ scores
-    ├──→ loadings
-    └──→ residuals
-```
-
-```text
-PARAFAC
-    ↓
-scores
-    ↓
-Regressão
-```
-
----
-
-# Conexões inválidas
-
-```text
-Dataset 6-way
-    ↓
-SNV
-```
-
-quando SNV aceita somente ordem 1.
-
-```text
-Matriz 3×2
-    ↓
-Inversa
-```
-
-inválido porque a matriz não é quadrada.
-
-```text
-Matriz 3×2
-    ↓
-Determinante
-```
-
-inválido.
-
-```text
-Matriz 3×2
-    ↓
-Autovalores
-```
-
-inválido.
-
-```text
-A(100×20) @ B(30×5)
-```
-
-inválido por incompatibilidade de dimensões internas.
-
----
-
-# Exemplo de workflow matemático
-
-```text
-[Dataset A]
-shape = (3,2)
-      │
-      ▼
-[Transpose]
-axes = [1,0]
-      │
-      ▼
-[Dataset derivado]
-shape = (2,3)
-      │
-      ▼
-[Visualização]
-```
-
-Outro exemplo:
-
-```text
-[Dataset A]
-shape = (100,20)
-      │
-      ├──────────────┐
-      │              │
-      ▼              ▼
- [Centering]     [SNV]
-      │              │
-      ▼              ▼
-     PCA            PLS
-      │              │
-      └──────┬───────┘
-             ▼
-        [Comparação]
-```
-
----
-
-# Exemplo de workflow multi-input
-
-```text
-Dataset A (100×20)
-        │
-        │ output: X
-        ▼
-      ┌─────────┐
-      │         │
-      │  SOMA   │
-      │         │
-      └─────────┘
-        ▲
-        │ input: B
-        │
-Dataset B (100×20)
-```
-
-As duas conexões são diferentes:
-
-```text
-A.X → Soma.A
-B.X → Soma.B
-```
-
-O frontend precisa representar visualmente essas portas.
-
----
-
-# Exemplo de workflow completo
-
-## Cenário: Quantificação de analitos em dados EEM
-
-```text
-[Importação]
-
-data_order: 2
-sample_axis: 0
-
-        ↓
-
-[Seleção de sensores]
-
-        ↓
-
 [PARAFAC]
-
-n_components: 3
-
-        ├──→ [Core Consistency]
-        ├──→ [Perfis por modo]
-        ├──→ [Resíduos]
-        │
-        └──→ [Calibração pseudo-univariada]
-                    │
-                    ├──→ [Figuras de mérito]
-                    ├──→ [Predição]
-                    └──→ [Relatório]
+    ├── scores       →  [Regressão]
+    ├── loadings     →  [Visualização de perfis]
+    ├── residuals    →  [Diagnóstico]
+    └── core_consistency  →  [Exibição]
 ```
 
 ---
 
-# Cenário: dados de ordem 4
+## Transformação de shape
 
-```text
-[Importação]
+Cada operação declara o efeito esperado sobre o shape antes da execução, permitindo que o sistema atualize metadados sem executar o nó:
 
-data_order = 4
+| Operação | Shape in | Shape out |
+|----------|----------|-----------|
+| `transpose(axes=[1,0])` | (3,2) | (2,3) |
+| `reshape(new_shape=[2,3])` | (3,2) | (2,3) |
+| `slice(axis0=0:50)` | (100,200,30) | (50,200,30) |
+| `mean(axis=0)` | (100,200,30) | (200,30) |
+| `unfolding(mode=0)` | (10,20,30) | (10,600) |
+| `folding(shape=[10,20,30])` | (10,600) | (10,20,30) |
+| `produto_matricial` | (100,20)×(20,5) | (100,5) |
+| `svd` | (m,n) | U:(m,k), S:(k,), Vt:(k,n) |
+| `squeeze` | (100,1,30) | (100,30) |
+| `stack(axis=0)` | (10,20)+(10,20) | (2,10,20) |
+
+---
+
+## Status do workflow
+
+```
+draft    →  ready  →  archived
+```
+
+- `draft` — em edição
+- `ready` — pronto para execução
+- `archived` — não executável, mantido para histórico
+
+Alterações em um nó intermediário podem marcar outputs downstream como `stale` (desatualizados) na última execução, permitindo reexecução seletiva a partir daquele nó.
+
+---
+
+## Versionamento
+
+O workflow mantém duas representações paralelas:
+
+1. **Tabelas normalizadas** (`workflow_nodes`, `workflow_edges`) — fonte estrutural para execução e validação
+2. **`definition` (JSON snapshot)** — cópia denormalizada para reconstituição rápida no frontend
+
+Versões explícitas ficam em `workflow_versions`. O usuário pode salvar um snapshot antes de grandes modificações e restaurar depois.
+
+---
+
+## Dataset derivado
+
+Quando um nó produz um novo dataset (ex: após `transpose`, `unfolding`, `concatenacao`), o dataset derivado é registrado com linhagem:
+
+```
+Dataset A  →  [Transpose axes=[1,0]]  →  Dataset B
+```
+
+`Dataset B` registra em `dataset_lineage`:
+```
+source_dataset_id = A.id
+target_dataset_id = B.id
+operation = "transpose"
+parameters = {"axes": [1, 0]}
+workflow_node_id = <id do nó>
+execution_id = <id da execução>
+```
+
+---
+
+## Resultados que não são datasets
+
+Nem todo output vira um dataset. O `output_schema` declara o tipo:
+
+| Output | Tipo | Exemplo |
+|--------|------|---------|
+| determinante | scalar | 4.72 |
+| autovalores | vector (complex) | `{"real":[…],"imag":[…]}` |
+| core_consistency | scalar | 87.3 |
+| R² | scalar | 0.982 |
+| confusion_matrix | matrix | [[45,2],[1,52]] |
+| modelo PLS | model | referência ao arquivo serializado |
+| scores PCA | matrix | shape (I, R) |
+| loadings | matrix | shape (J, R) |
+
+---
+
+## Geração por IA
+
+A IA pode sugerir um workflow a partir de artigo, DOI, PDF ou dataset:
+
+```
+PDF / DOI
+    ↓
+analyze_article  (job)
+    ↓
+article_analyses + article_techniques
+    ↓
+generate_workflow  (job)
+    ↓
+workflow + workflow_nodes + workflow_edges
+          com workflow_node_origins
+    ↓
+usuário revisa e edita no canvas
+    ↓
+execution
+```
+
+A IA **não gera código**. Ela produz uma definição de grafo usando exclusivamente blocos existentes no catálogo. Cada nó gerado é rastreado em `workflow_node_origins` com referência à técnica identificada no artigo.
+
+---
+
+## Exemplos
+
+### Workflow simples
+
+```
+[Dataset]
+shape = (100, 200)
 sample_axis = 0
-
-dimensions =
-[
-  samples,
-  chromatographic_time,
-  excitation,
-  emission,
-  phosphorescence_decay
-]
-
-        ↓
-
-[Seleção]
-
-        ↓
-
-[PARAFAC]
-
-        ├──→ [Core Consistency]
-        ├──→ [Perfis modo 1]
-        ├──→ [Perfis modo 2]
-        ├──→ [Perfis modo 3]
-        ├──→ [Perfis modo 4]
-        │
-        └──→ [Calibração]
+data_order = 1
+    ↓  output:X → input:X
+[SNV]
+    ↓  output:X → input:X
+[Centering]
+    ↓  output:X → input:X
+[PCA]  n_components=5
+    ├──  output:scores → input:X  →  [Visualização scores]
+    └──  output:loadings → input:X  →  [Visualização loadings]
 ```
-
-O mesmo bloco PARAFAC é utilizado independentemente da ordem.
 
 ---
 
-# Cenário: MCR-ALS com matriz aumentada
+### Workflow multi-entrada
 
-```text
-[Importação]
+```
+[Dataset A]  shape=(100,20)          [Dataset B]  shape=(100,20)
+    │ output:X                                │ output:X
+    ▼                                         ▼
+    └──────────────── input:A ──[Soma]── input:B ───────────────┘
+                                   │ output:result
+                                   ▼
+                                [PCA]
+                                   │
+                                   ▼
+                               [Scores]
+```
 
+---
+
+### Workflow matemático com tensor
+
+```
+[Dataset]
+shape = (50, 20, 30, 10)
+sample_axis = 0
+data_order = 3
+    ↓  output:X → input:X
+[Transpose]  axes=[0,2,1,3]
+    ↓  output:X_T → input:X       (shape agora: 50,30,20,10)
+[PARAFAC]  n_components=3
+    ├──  scores      →  [Regressão PLS]
+    ├──  loadings    →  [Perfis por modo]
+    ├──  residuals   →  [Diagnóstico Q-residuals]
+    └──  core_consistency  →  [Exibição]
+```
+
+---
+
+### Workflow com operação de linhagem
+
+```
+[Dataset A]  shape=(200,100)
+    ↓
+[Unfolding]  mode=0
+    ↓
+[Dataset B]  shape=(200,10000)     ← novo dataset com linhagem registrada
+parent_dataset_id = A.id
+operation = "unfolding"
+parameters = {"mode": 0}
+    ↓
+[U-PLS]
+    ↓
+[Métricas]
+```
+
+---
+
+### Workflow com comparação paralela
+
+```
+[Dataset]
+    ├──────────────────────────────────────────┐
+    │                                          │
+    ↓  output:X → input:X                     ↓  output:X → input:X
+[SNV → Centering → PLS]              [MSC → Autoscaling → N-PLS]
+    │                                          │
+    ↓                                          ↓
+[Métricas PLS]                        [Métricas N-PLS]
+    └──────────────────────────────────────────┘
+                          │
+                 [Execution Comparison]
+```
+
+---
+
+### Workflow MCR-ALS com matriz aumentada
+
+```
+[Dataset aumentado]
 data_order = 2
 sample_axis = NULL
-
-augmentation_scheme =
-{
-  "type": "augmented",
-  "augmented_mode": "C&D",
-  "n_blocks": 9
+augmentation_scheme = {
+    "type": "augmented",
+    "augmented_mode": "C&D",
+    "n_blocks": 9
 }
-
-        ↓
-
-[MCR-ALS]
-
-        ├──→ [Perfis espectrais]
-        ├──→ [Perfis aumentados]
-        └──→ [Calibração]
+    ↓
+[MCR-ALS]  n_components=2, constraints=["non_negativity"]
+    ├──  C  →  [Perfis de concentração]
+    ├──  S  →  [Perfis espectrais]
+    └──  residuals  →  [Diagnóstico]
 ```
 
-O workflow não trata automaticamente essa matriz como um tensor ortogonal comum.
+O sistema não trata esta matriz como tensor ortogonal regular — o `augmentation_scheme` é preservado e repassado ao worker.
 
 ---
 
-# Camada de IA sobre os workflows
+### Workflow calibração de segunda ordem
 
-O TcheLab possui uma camada de IA capaz de sugerir ou gerar workflows a partir de:
-
-* texto livre;
-* artigos;
-* DOI;
-* PDFs;
-* datasets.
-
-A IA identifica:
-
-```text
-Tipo de dado
-Dimensionalidade
-Eixo de amostras
-Pré-processamento
-Operações necessárias
-Modelo
-Hiperparâmetros
-Validação
-Métricas
-Visualizações
 ```
-
-A IA pode sugerir:
-
-```text
-PDF
- ↓
-análise da metodologia
- ↓
-workflow candidato
- ↓
-validação estrutural
- ↓
-workflow disponível no canvas
- ↓
-usuário revisa
- ↓
-execução
+[Dataset EEM]
+shape = (30, 50, 40)
+sample_axis = 0
+data_order = 2
+    ↓
+[Seleção de variáveis]  mode=1, ranges=[[5,45]]
+    ↓
+[PARAFAC]  n_components=2
+    ├──  core_consistency  →  [Diagnóstico]
+    │
+    └──  scores  →  [PLS]  ←─  [y_ref] (concentrações de referência)
+                       │
+                       ├──  [Figuras de mérito analítico]
+                       └──  [Predição em novas amostras]
 ```
-
-A IA **não deve gerar código arbitrário para execução**.
-
-Ela deve gerar uma definição baseada nos blocos existentes no catálogo.
 
 ---
 
-# Os mundos do frontend
+## Modelos customizados no workflow
 
-## 1. Dados e operações
+Modelos customizados (Requisito 5) aparecem no catálogo como qualquer outra técnica (`is_custom=1`). Podem ser instanciados em nós de workflow normalmente.
 
-Dados · Transformações · Operações matemáticas · Estrutura de arrays
+Internamente, quando o worker encontra um nó com técnica `is_custom=1`, ele expande a `custom_definition` e executa os sub-blocos em sequência, aplicando as validações de cada um.
 
-## 2. Pré-processamento
-
-SNV · MSC · Savitzky-Golay · Baseline · Scaling
-
-## 3. Modelagem 1D
-
-Exploratória · Regressão · Classificação · Deep Learning
-
-## 4. Modelagem Multiway
-
-Decomposição · Regressão · Classificação · Calibração de ordem superior
-
-## 5. Avaliação
-
-Validação · Métricas · Diagnósticos · Visualização
-
-## 6. Dados Sintéticos / IA
-
-Geração de espectros · Dados multiway · Outliers · Interferentes · Difusão
+```
+[Dataset novo]
+    ↓
+[Meu Pré-processamento XYZ]   ← técnica customizada
+    ↓                            internamente: snv → centering → selecao_variaveis
+[PCA]
+    ↓
+[Scores]
+```
 
 ---
 
-# Princípios de design
+## Princípios de design
 
-## Reprodutibilidade
-
-Cada execução registra:
-
-* versão dos scripts;
-* parâmetros;
-* datasets;
-* operações;
-* seeds;
-* ambiente;
-* resultados.
-
-## Modularidade
-
-Um bloco pode ser substituído por outro desde que os contratos sejam compatíveis.
-
-## Sem teto artificial de dimensionalidade
-
-A arquitetura não deve assumir que o maior tensor possível é 3-way ou 4-way.
-
-## Rastreabilidade
-
-Todo resultado derivado deve permitir reconstruir sua origem.
-
-## Segurança
-
-Fórmulas customizadas não podem executar código arbitrário.
-
-## Validação explícita
-
-Operações matematicamente inválidas devem gerar erros claros em vez de conversões silenciosas.
-
-## Comparação
-
-Workflows podem ser clonados e executados com diferentes operações ou modelos para comparação.
-
-## Separação entre estrutura e modelagem
-
-O usuário pode manipular o array diretamente antes de aplicar qualquer técnica quimiométrica.
-
----
-
-# Estado de um workflow
-
-Um workflow pode possuir:
-
-```text
-draft
-ready
-running
-completed
-failed
-archived
-```
-
-Alterações em um bloco intermediário podem marcar outputs downstream como:
-
-```text
-stale
-```
-
-ou:
-
-```text
-outdated
-```
-
-permitindo reexecução seletiva.
-
----
-
-# Princípio final
-
-O workflow do TcheLab não representa apenas uma sequência de modelos quimiométricos.
-
-Ele representa uma **linguagem visual de operações científicas sobre dados**.
-
-Um pipeline pode começar com:
-
-```text
-Importação
-```
-
-passar por:
-
-```text
-Transpose
-Reshape
-Slice
-Soma
-Centering
-Unfolding
-```
-
-e somente então chegar a:
-
-```text
-PCA
-PLS
-PARAFAC
-MCR-ALS
-Tucker
-```
-
-Isso permite que o usuário construa explicitamente o caminho matemático utilizado na análise, mantendo a operação reproduzível e rastreável.
+| Princípio | Implicação |
+|-----------|-----------|
+| Sem teto artificial de dimensionalidade | Nenhum bloco codifica "3D" ou "4D" — descobre ndim do input |
+| Validação explícita | Operações inválidas geram erros descritivos, nunca conversões silenciosas |
+| Modularidade | Um bloco pode ser substituído por outro com contrato compatível |
+| Reprodutibilidade | Toda execução registra seed, código, parâmetros, ambiente |
+| Rastreabilidade | Todo dataset derivado e todo nó tem origem registrada |
+| Segurança | `formula_customizada` nunca usa `eval()` — sempre AST + whitelist |
+| Separação estrutura/modelagem | O usuário pode manipular arrays antes de qualquer técnica quimiométrica |

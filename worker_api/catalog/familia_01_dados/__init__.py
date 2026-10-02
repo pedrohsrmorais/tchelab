@@ -1,0 +1,2 @@
+# família 01 — Dados e Operações
+from . import scripts  # Importacao, Limpeza, TratamentoMissing, SelecaoAmostras, SelecaoVariaveis, Transpose, Reshape, SliceArray, Squeeze, ExpandDims, Unfolding, Folding, Concatenacao, Stack, Split, Soma, Subtracao, MultiplicacaoElementwise, DivisaoElementwise, ProdutoMatricial, Inversa, PseudoInversa, Determinante, Autovalores, Autovetores, Eig, SVD, Norma, Trace, RankMatrix, Mean, Median, Std, Min, Max, Sum, FormulaCustomizada
