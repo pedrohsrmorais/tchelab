@@ -1153,12 +1153,15 @@ CREATE TABLE `jobs` (
   `celery_task_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `queue_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'default',
   `payload` json DEFAULT NULL,
-  `status` enum('queued','running','done','failed','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  -- 'pending' is used by the retry endpoint to re-queue failed/cancelled jobs;
+  -- 'queued' is set on initial creation by job.service.js.
+  `status` enum('queued','pending','running','done','failed','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
   `progress` decimal(5,2) DEFAULT '0.00',
   `result` json DEFAULT NULL,
   `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `error_traceback` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `queued_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Alias read by some list queries',
   `started_at` datetime DEFAULT NULL,
   `finished_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -1179,10 +1182,6 @@ CREATE TABLE `jobs` (
   CONSTRAINT `fk_jobs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_jobs_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Add deferred FK on jobs.prediction_id (predictions created after jobs)
-ALTER TABLE `jobs`
-  ADD CONSTRAINT `fk_jobs_prediction` FOREIGN KEY (`prediction_id`) REFERENCES `predictions` (`id`) ON DELETE SET NULL;
 
 -- =============================================================================
 -- PREDICTIONS
@@ -1214,6 +1213,12 @@ CREATE TABLE `predictions` (
   CONSTRAINT `fk_predictions_model` FOREIGN KEY (`model_id`) REFERENCES `models` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_predictions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Deferred FKs: jobs ↔ predictions (circular ref — must be added after both tables exist)
+ALTER TABLE `jobs`
+  ADD CONSTRAINT `fk_jobs_prediction` FOREIGN KEY (`prediction_id`) REFERENCES `predictions` (`id`) ON DELETE SET NULL;
+ALTER TABLE `predictions`
+  ADD CONSTRAINT `fk_predictions_job` FOREIGN KEY (`job_id`) REFERENCES `jobs` (`id`) ON DELETE SET NULL;
 
 -- =============================================================================
 -- EXECUTION COMPARISONS

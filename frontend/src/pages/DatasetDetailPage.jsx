@@ -1,11 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Database, GitBranch, Eye, BarChart2, Activity, Table } from 'lucide-react';
+import { ArrowLeft, Database, GitBranch, Eye, BarChart2, Activity, Table, Boxes } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import EmptyState from '../components/ui/EmptyState';
+
+const MultiDimModal = lazy(() => import('../components/datasets/MultiDimModal'));
 
 function Tab({ active, onClick, children }) {
   return (
@@ -167,6 +169,7 @@ function StatsTab({ meta }) {
 export default function DatasetDetailPage() {
   const { id } = useParams();
   const [tab, setTab] = useState('preview');
+  const [showViz, setShowViz] = useState(false);
 
   const { data: raw, loading } = useApi(() => api.datasets.get(id), [id]);
   const { data: lineageRaw, loading: lineageLoading } = useApi(() => api.datasets.lineage(id), [id]);
@@ -238,6 +241,15 @@ export default function DatasetDetailPage() {
                   {ds.data_type  && <Badge color="purple">{ds.data_type}</Badge>}
                   {ds.visibility && <Badge color={ds.visibility === 'public' ? 'green' : 'amber'}>{ds.visibility}</Badge>}
                   {ds.technique  && <Badge color="blue">{ds.technique}</Badge>}
+                  <button
+                    onClick={() => setShowViz(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.25)' }}
+                    title="Visualização multidimensional"
+                  >
+                    <Boxes className="w-3.5 h-3.5" />
+                    Visualizar {dimensions ? `(${dimensions.length}D)` : ''}
+                  </button>
                 </div>
               </div>
               <div className="flex items-center gap-4 text-xs text-slate-500 mt-3 flex-wrap">
@@ -368,6 +380,13 @@ export default function DatasetDetailPage() {
             <p className="text-slate-400 text-sm">Nenhum histórico de linhagem disponível.</p>
           )}
         </motion.div>
+      )}
+
+      {/* Multidimensional Visualization Modal */}
+      {showViz && (
+        <Suspense fallback={null}>
+          <MultiDimModal dataset={ds} onClose={() => setShowViz(false)} />
+        </Suspense>
       )}
     </div>
   );

@@ -20,19 +20,24 @@ function ContentLoader() {
 }
 
 /**
- * PageTransition wraps the <Outlet /> and implements a smart fade:
+ * PageTransition — cross-fade entre rotas sem animação de entrada redundante.
  *
- * 1. On route change, the CURRENT page fades out over ~0.5s.
- * 2. The new page is mounted (React renders it, lazy chunks load, data hooks fire)
- *    WHILE the old page is still visible (or fading).
- * 3. The new page starts FULLY TRANSPARENT (opacity: 0) and only becomes
- *    visible AFTER the exit animation completes — thanks to AnimatePresence
- *    mode="wait", which lets the exit finish before starting the enter.
- * 4. The enter fade-in is quick (0.35s) so the total perceived delay is minimal.
+ * Comportamento desejado:
+ *   Clicou no link → página atual faz fade-out (0.35s)
+ *                  → nova página aparece imediatamente (opacity=1, sem fade-in)
  *
- * This eliminates the "flash" because:
- * - There is no blank frame between pages.
- * - The new page starts at opacity 0 and smoothly fades in once ready.
+ * Por que NÃO usar initial={{ opacity: 0 }} + animate={{ opacity: 1 }}:
+ *   Isso causaria "página aparece → fade-out → fade-in dela mesma" porque
+ *   o AnimatePresence mode="wait" primeiro completa o exit da página anterior
+ *   e SÓ ENTÃO monta a nova. Com initial=0, a nova página aparece do zero
+ *   fazendo fade-in — o usuário vê a tela piscar.
+ *
+ * Solução: a nova página entra com opacity=1 (sem animação de entrada).
+ *   Apenas a saída anima. Isso dá a sensação de troca suave sem flash.
+ *
+ * Suspense fallback=null: mantém o motion.div montado mesmo quando o chunk
+ * lazy ainda está carregando, impedindo que o Suspense externo substitua
+ * o motion.div e quebre a animação de saída.
  */
 function PageTransition() {
   const location = useLocation();
@@ -41,23 +46,12 @@ function PageTransition() {
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={location.pathname}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{
-          // exit: slow fade-out so the old page lingers while new one loads
-          // animate: quicker fade-in once new page is mounted and ready
-          opacity: {
-            duration: 0.5,
-            ease: 'easeInOut',
-          },
-        }}
+        initial={{ opacity: 1 }}   // nova página já visível ao montar
+        animate={{ opacity: 1 }}   // nenhuma animação de entrada
+        exit={{ opacity: 0 }}      // página antiga faz fade-out ao sair
+        transition={{ opacity: { duration: 0.3, ease: 'easeOut' } }}
         style={{ minHeight: '100%', padding: '1.5rem' }}
       >
-        {/* Suspense fallback=null keeps the motion.div mounted and animatable
-            even when a lazy page chunk is still loading. Without this, React
-            would bubble up to the outer Suspense and replace the motion.div
-            with the PageLoader, causing an opacity snap / flicker. */}
         <Suspense fallback={null}>
           <Outlet />
         </Suspense>
