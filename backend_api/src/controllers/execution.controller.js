@@ -40,7 +40,12 @@ async function listExecutions(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-// POST /workflows/:wid/executions
+// Núcleo de dispatch de um workflow — decompõe os nós em jobs (um por nó, na
+// ordem topológica) e enfileira no worker Python. Extraído de dispatchExecution
+// para ser reaproveitado por quem precisa disparar um workflow programaticamente
+// (ex: a "operação rápida" de dataset em datasetOperation.controller.js, que
+// monta um workflow de 1 nó só e dispara pelo mesmíssimo caminho do editor
+// visual — nenhuma operação sobre dataset foge de virar um workflow real).
 //
 // O worker Python processa um job por vez com o schema JobPayload:
 //   { job_id, execution_id, node_id, slug, inputs, params }
@@ -48,98 +53,116 @@ async function listExecutions(req, res) {
 // na ordem topológica (nós sem arestas de entrada primeiro).
 // O worker executa cada job independentemente; a orquestração de
 // dependências é resolvida aqui no momento do dispatch.
+async function dispatchExecutionCore(workflow, user, { parameters_override = {}, dataset_bindings = {} } = {}) {
+  // Carrega nós e arestas
+  const [nodes] = await db.query(
+    `SELECT wn.id, wn.node_key, wn.parameters, t.slug AS technique_slug
+     FROM workflow_nodes wn
+     JOIN techniques t ON t.id = wn.technique_id
+     WHERE wn.workflow_id = ?`,
+    [workflow.id],
+  );
+  if (nodes.length === 0) {
+    const err = new Error('O workflow não possui nós.');
+    err.validation = [{ field: 'workflow', message: err.message }];
+    throw err;
+  }
+  const [edges] = await db.query(
+    'SELECT source_node_key, target_node_key FROM workflow_edges WHERE workflow_id = ?',
+    [workflow.id],
+  );
+
+  // Ordena topologicamente (Kahn)
+  const inDegree = Object.fromEntries(nodes.map((n) => [n.node_key, 0]));
+  for (const e of edges) { inDegree[e.target_node_key] = (inDegree[e.target_node_key] || 0) + 1; }
+  const queue = nodes.filter((n) => inDegree[n.node_key] === 0).map((n) => n.node_key);
+  const sorted = [];
+  while (queue.length) {
+    const key = queue.shift();
+    sorted.push(key);
+    for (const e of edges) {
+      if (e.source_node_key === key) {
+        inDegree[e.target_node_key] -= 1;
+        if (inDegree[e.target_node_key] === 0) queue.push(e.target_node_key);
+      }
+    }
+  }
+  if (sorted.length !== nodes.length) {
+    const err = new Error('Ciclo detectado no workflow.');
+    err.validation = [{ field: 'workflow', message: err.message }];
+    throw err;
+  }
+
+  const execUuid = uuidv4();
+  const [execResult] = await db.query(
+    `INSERT INTO executions
+       (uuid, workflow_id, user_id, status, parameters_override, triggered_by, created_at, updated_at)
+     VALUES (?, ?, ?, 'queued', ?, 'user', NOW(), NOW())`,
+    [execUuid, workflow.id, user.id, JSON.stringify(parameters_override)],
+  );
+  const executionId = execResult.insertId;
+
+  // Cria execution_nodes e enfileira um job por nó na ordem topológica
+  const nodeMap = Object.fromEntries(nodes.map((n) => [n.node_key, n]));
+  const jobUuids = [];
+  for (const nodeKey of sorted) {
+    const node = nodeMap[nodeKey];
+    // node.parameters é uma coluna JSON: o mysql2 já entrega um objeto JS
+    // (não uma string) na maioria dos casos, mas tratamos ambos por segurança.
+    let storedParams = {};
+    if (node.parameters) {
+      storedParams = typeof node.parameters === 'string' ? JSON.parse(node.parameters) : node.parameters;
+    }
+    const nodeParams = {
+      ...storedParams,
+      ...(parameters_override[nodeKey] || {}),
+    };
+    const inputs = dataset_bindings[nodeKey] || {};
+
+    // Registra nó de execução com status pending
+    const [enResult] = await db.query(
+      `INSERT INTO execution_nodes (execution_id, workflow_node_id, status, created_at, updated_at)
+       VALUES (?, ?, 'pending', NOW(), NOW())`,
+      [executionId, node.id],
+    );
+
+    const { uuid: jobUuid } = await jobService.createJob({
+      job_type: 'execute_node',
+      user_id: user.id,
+      execution_id: executionId,
+      workflow_id: workflow.id,
+      payload: {
+        // Campos obrigatórios do JobPayload do worker Python
+        execution_id: execUuid,
+        node_id: nodeKey,
+        slug: node.technique_slug,
+        inputs,
+        params: nodeParams,
+        // Metadados extras para rastreabilidade
+        execution_node_id: enResult.insertId,
+        workflow_uuid: workflow.uuid,
+      },
+    });
+    jobUuids.push(jobUuid);
+  }
+
+  return { execution_id: execUuid, execution_db_id: executionId, job_ids: jobUuids };
+}
+
+// POST /workflows/:wid/executions
 async function dispatchExecution(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
     if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
 
-    // Carrega nós e arestas
-    const [nodes] = await db.query(
-      `SELECT wn.id, wn.node_key, wn.parameters, t.slug AS technique_slug
-       FROM workflow_nodes wn
-       JOIN techniques t ON t.id = wn.technique_id
-       WHERE wn.workflow_id = ?`,
-      [workflow.id],
-    );
-    if (nodes.length === 0) {
-      return R.unprocessable(res, [{ field: 'workflow', message: 'O workflow não possui nós.' }]);
-    }
-    const [edges] = await db.query(
-      'SELECT source_node_key, target_node_key FROM workflow_edges WHERE workflow_id = ?',
-      [workflow.id],
-    );
-
-    // Ordena topologicamente (Kahn)
-    const inDegree = Object.fromEntries(nodes.map((n) => [n.node_key, 0]));
-    for (const e of edges) { inDegree[e.target_node_key] = (inDegree[e.target_node_key] || 0) + 1; }
-    const queue = nodes.filter((n) => inDegree[n.node_key] === 0).map((n) => n.node_key);
-    const sorted = [];
-    while (queue.length) {
-      const key = queue.shift();
-      sorted.push(key);
-      for (const e of edges) {
-        if (e.source_node_key === key) {
-          inDegree[e.target_node_key] -= 1;
-          if (inDegree[e.target_node_key] === 0) queue.push(e.target_node_key);
-        }
-      }
-    }
-    if (sorted.length !== nodes.length) {
-      return R.unprocessable(res, [{ field: 'workflow', message: 'Ciclo detectado no workflow.' }]);
-    }
-
     const { parameters_override = {}, dataset_bindings = {} } = req.body;
-    const execUuid = uuidv4();
-
-    const [execResult] = await db.query(
-      `INSERT INTO executions
-         (uuid, workflow_id, user_id, status, parameters_override, triggered_by, created_at, updated_at)
-       VALUES (?, ?, ?, 'queued', ?, 'user', NOW(), NOW())`,
-      [execUuid, workflow.id, req.user.id, JSON.stringify(parameters_override)],
-    );
-    const executionId = execResult.insertId;
-
-    // Cria execution_nodes e enfileira um job por nó na ordem topológica
-    const nodeMap = Object.fromEntries(nodes.map((n) => [n.node_key, n]));
-    const jobUuids = [];
-    for (const nodeKey of sorted) {
-      const node = nodeMap[nodeKey];
-      const nodeParams = {
-        ...(node.parameters ? JSON.parse(node.parameters) : {}),
-        ...(parameters_override[nodeKey] || {}),
-      };
-      const inputs = dataset_bindings[nodeKey] || {};
-
-      // Registra nó de execução com status pending
-      const [enResult] = await db.query(
-        `INSERT INTO execution_nodes (execution_id, workflow_node_id, status, created_at, updated_at)
-         VALUES (?, ?, 'pending', NOW(), NOW())`,
-        [executionId, node.id],
-      );
-
-      const { uuid: jobUuid } = await jobService.createJob({
-        job_type: 'execute_node',
-        user_id: req.user.id,
-        execution_id: executionId,
-        workflow_id: workflow.id,
-        payload: {
-          // Campos obrigatórios do JobPayload do worker Python
-          execution_id: execUuid,
-          node_id: nodeKey,
-          slug: node.technique_slug,
-          inputs,
-          params: nodeParams,
-          // Metadados extras para rastreabilidade
-          execution_node_id: enResult.insertId,
-          workflow_uuid: workflow.uuid,
-        },
-      });
-      jobUuids.push(jobUuid);
-    }
-
-    return R.accepted(res, { execution_id: execUuid, job_ids: jobUuids });
-  } catch (err) { return R.serverError(res, err); }
+    const result = await dispatchExecutionCore(workflow, req.user, { parameters_override, dataset_bindings });
+    return R.accepted(res, { execution_id: result.execution_id, job_ids: result.job_ids });
+  } catch (err) {
+    if (err.validation) return R.unprocessable(res, err.validation);
+    return R.serverError(res, err);
+  }
 }
 
 // GET /executions/:id
@@ -258,4 +281,5 @@ async function getExecutionLogs(req, res) {
 module.exports = {
   listExecutions, dispatchExecution, getExecution, cancelExecution,
   listExecutionNodes, getExecutionNode, getExecutionLogs,
+  dispatchExecutionCore, resolveWorkflow,
 };

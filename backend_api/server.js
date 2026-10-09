@@ -113,4 +113,13 @@ app.listen(PORT, () => {
   console.log(`[TcheLab API] Serving frontend from: ${distPath}`);
 });
 
+// Assina os resultados que o worker Python publica no Redis (jobs, execuções
+// de workflow e as operações rápidas de dataset só saem de "queued"/"pending"
+// por causa disso — ver src/services/resultConsumer.service.js).
+try {
+  require('./src/services/resultConsumer.service').start();
+} catch (err) {
+  console.error('[TcheLab API] Não foi possível iniciar o ResultConsumer:', err.message);
+}
+
 module.exports = app; // facilita testes

@@ -365,6 +365,48 @@ VALUES
 ('b0000020-0000-0000-0000-000000000006','Spectral Database Search','spectral_database_search','utility',NULL,'20_utilitarios','Busca espectral por similaridade (cosine ou SAM).', 1);
 
 -- =============================================================================
+-- Família 01 — operações de álgebra linear / estatística básica sobre um
+-- único array (a base do botão "Realizar operação matricial" de um dataset).
+-- Diferente das linhas simplificadas acima (que têm slug só decorativo —
+-- "array_transpose", "array_reshape" etc. não existem no catálogo Python),
+-- estas aqui usam o slug EXATO de worker_api/catalog/familia_01_dados/scripts.py
+-- (BaseScript.slug), então um nó de workflow com estas técnicas executa de
+-- verdade no worker. input_schema/parameter_schema seguem os parâmetros reais
+-- lidos por cada script (`inputs["X"]`/`inputs["A"]`, `params.get(...)`).
+-- =============================================================================
+
+INSERT INTO `techniques`
+  (`uuid`,`name`,`slug`,`category`,`subcategory`,`family`,`description`,`input_type`,`output_type`,`input_schema`,`output_schema`,`min_order`,`max_order`,`requires_sample_axis`,`parameter_schema`,`tags`,`version`,`is_beta`,`is_custom`,`implementation`,`documentation`,`active`)
+VALUES
+('c0000001-0000-0000-0000-000000000001','Transposição / Permutação de Eixos','transpose','utility','algebra_linear','01_dados','Permuta os eixos do array.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"X_T": {"type": "tensor"}}',1,NULL,0,'{"axes": {"type": "array", "default": null, "description": "Nova ordem dos eixos (ex: [1,0] para transpor uma matriz). Omitido = inverte todos os eixos."}}','["algebra", "transpose", "01_dados"]','1.0',0,0,'familia_01_dados.transpose',NULL,1),
+('c0000001-0000-0000-0000-000000000002','Reshape','reshape','utility','algebra_linear','01_dados','Altera a forma do array sem alterar a ordem dos elementos.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"X_reshaped": {"type": "tensor"}}',1,NULL,0,'{"new_shape": {"type": "array", "description": "Novo shape, ex: [6,5]. O produto das dimensões deve ser igual ao do array original."}}','["algebra", "reshape", "01_dados"]','1.0',0,0,'familia_01_dados.reshape',NULL,1),
+('c0000001-0000-0000-0000-000000000003','Squeeze','squeeze','utility','algebra_linear','01_dados','Remove eixos de tamanho 1.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"X_sq": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "default": null, "description": "Eixo específico a remover (deve ter tamanho 1). Omitido = remove todos."}}','["algebra", "squeeze", "01_dados"]','1.0',0,0,'familia_01_dados.squeeze',NULL,1),
+('c0000001-0000-0000-0000-000000000004','Expand Dims','expand_dims','utility','algebra_linear','01_dados','Insere um eixo de tamanho 1.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"X_exp": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "description": "Posição onde inserir o novo eixo."}}','["algebra", "expand_dims", "01_dados"]','1.0',0,0,'familia_01_dados.expand_dims',NULL,1),
+('c0000001-0000-0000-0000-000000000005','Unfolding (Tensor → Matriz)','unfolding','utility','algebra_linear','01_dados','Transforma tensor N-way em matriz 2D ao longo de um modo.','Tensor','Matrix','{"X": {"type": "tensor"}}','{"X_unf": {"type": "matrix"}}',2,NULL,0,'{"mode": {"type": "integer", "default": 0, "description": "Eixo (modo) ao longo do qual desdobrar."}, "ordering": {"type": "string", "default": "C", "options": ["C", "F"]}}','["multiway", "unfolding", "01_dados"]','1.0',0,0,'familia_01_dados.unfolding',NULL,1),
+('c0000001-0000-0000-0000-000000000006','Folding (Matriz → Tensor)','folding','utility','algebra_linear','01_dados','Operação inversa do unfolding. Reconstrói tensor a partir de matriz.','Matrix','Tensor','{"X_unf": {"type": "matrix"}}','{"X": {"type": "tensor"}}',2,2,0,'{"original_shape": {"type": "array", "description": "Shape original do tensor antes do unfolding."}, "mode": {"type": "integer", "default": 0}, "ordering": {"type": "string", "default": "C", "options": ["C", "F"]}}','["multiway", "folding", "01_dados"]','1.0',0,0,'familia_01_dados.folding',NULL,1),
+('c0000001-0000-0000-0000-000000000007','Soma Elemento a Elemento','soma','utility','algebra_linear','01_dados','Adição A + B, elemento a elemento (B pode ser outro dataset ou um escalar/array literal).','Tensor','Tensor','{"A": {"type": "tensor"}, "B": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{}','["algebra", "soma", "01_dados"]','1.0',0,0,'familia_01_dados.soma',NULL,1),
+('c0000001-0000-0000-0000-000000000008','Subtração','subtracao','utility','algebra_linear','01_dados','Subtração A − B, elemento a elemento.','Tensor','Tensor','{"A": {"type": "tensor"}, "B": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{}','["algebra", "subtracao", "01_dados"]','1.0',0,0,'familia_01_dados.subtracao',NULL,1),
+('c0000001-0000-0000-0000-000000000009','Multiplicação Elemento a Elemento','multiplicacao_elementwise','utility','algebra_linear','01_dados','Multiplicação A × B, elemento a elemento.','Tensor','Tensor','{"A": {"type": "tensor"}, "B": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{}','["algebra", "multiplicacao", "01_dados"]','1.0',0,0,'familia_01_dados.multiplicacao_elementwise',NULL,1),
+('c0000001-0000-0000-0000-000000000010','Divisão Elemento a Elemento','divisao_elementwise','utility','algebra_linear','01_dados','Divisão A / B, elemento a elemento.','Tensor','Tensor','{"A": {"type": "tensor"}, "B": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{}','["algebra", "divisao", "01_dados"]','1.0',0,0,'familia_01_dados.divisao_elementwise',NULL,1),
+('c0000001-0000-0000-0000-000000000011','Produto Matricial','produto_matricial','utility','algebra_linear','01_dados','Multiplicação matricial A @ B.','Matrix','Matrix','{"A": {"type": "matrix"}, "B": {"type": "matrix"}}','{"result": {"type": "matrix"}}',2,NULL,0,'{}','["algebra", "produto_matricial", "01_dados"]','1.0',0,0,'familia_01_dados.produto_matricial',NULL,1),
+('c0000001-0000-0000-0000-000000000012','Inversa de Matriz','inversa','utility','algebra_linear','01_dados','Calcula A⁻¹. Exige A quadrada.','Matrix','Matrix','{"A": {"type": "matrix"}}','{"A_inv": {"type": "matrix"}}',2,2,0,'{}','["algebra", "inversa", "01_dados"]','1.0',0,0,'familia_01_dados.inversa',NULL,1),
+('c0000001-0000-0000-0000-000000000013','Pseudo-Inversa (Moore-Penrose)','pseudo_inversa','utility','algebra_linear','01_dados','Calcula a pseudo-inversa A⁺.','Matrix','Matrix','{"A": {"type": "matrix"}}','{"A_pinv": {"type": "matrix"}}',2,2,0,'{}','["algebra", "pseudo_inversa", "01_dados"]','1.0',0,0,'familia_01_dados.pseudo_inversa',NULL,1),
+('c0000001-0000-0000-0000-000000000014','Determinante','determinante','utility','algebra_linear','01_dados','Calcula det(A). Exige A quadrada.','Matrix','Scalar','{"A": {"type": "matrix"}}','{"result": {"type": "float"}}',2,2,0,'{}','["algebra", "determinante", "01_dados"]','1.0',0,0,'familia_01_dados.determinante',NULL,1),
+('c0000001-0000-0000-0000-000000000015','Autovalores','autovalores','utility','algebra_linear','01_dados','Calcula autovalores de A. Exige A quadrada.','Matrix','Array','{"A": {"type": "matrix"}}','{"result": {"type": "array"}}',2,2,0,'{}','["algebra", "autovalores", "01_dados"]','1.0',0,0,'familia_01_dados.autovalores',NULL,1),
+('c0000001-0000-0000-0000-000000000016','Autovetores','autovetores','utility','algebra_linear','01_dados','Calcula autovetores de A (cada coluna = autovetor). Exige A quadrada.','Matrix','Matrix','{"A": {"type": "matrix"}}','{"result": {"type": "matrix"}}',2,2,0,'{}','["algebra", "autovetores", "01_dados"]','1.0',0,0,'familia_01_dados.autovetores',NULL,1),
+('c0000001-0000-0000-0000-000000000017','EIG (autovalores + autovetores)','eig','utility','algebra_linear','01_dados','Retorna autovalores e autovetores juntos. Exige A quadrada.','Matrix','EIG_Result','{"A": {"type": "matrix"}}','{"autovalores": {"type": "array"}, "autovetores": {"type": "matrix"}}',2,2,0,'{}','["algebra", "eig", "01_dados"]','1.0',0,0,'familia_01_dados.eig',NULL,1),
+('c0000001-0000-0000-0000-000000000018','SVD (Decomposição em Valores Singulares)','svd','utility','algebra_linear','01_dados','A = U Σ Vᵀ.','Matrix','SVD_Result','{"A": {"type": "matrix"}}','{"U": {"type": "matrix"}, "S": {"type": "array"}, "Vt": {"type": "matrix"}}',2,2,0,'{"full_matrices": {"type": "boolean", "default": false}}','["algebra", "svd", "01_dados"]','1.0',0,0,'familia_01_dados.svd',NULL,1),
+('c0000001-0000-0000-0000-000000000019','Norma','norma','utility','algebra_linear','01_dados','Calcula norma do array.','Tensor','Scalar','{"X": {"type": "tensor"}}','{"result": {"type": "float"}}',1,NULL,0,'{"ord": {"type": "string", "default": null, "description": "Ordem da norma (numpy.linalg.norm): null=padrão, \\"fro\\", 1, 2, etc."}, "axis": {"type": "integer", "default": null}}','["algebra", "norma", "01_dados"]','1.0',0,0,'familia_01_dados.norma',NULL,1),
+('c0000001-0000-0000-0000-000000000020','Traço da Matriz','trace','utility','algebra_linear','01_dados','Soma dos elementos da diagonal principal. Exige A quadrada.','Matrix','Scalar','{"A": {"type": "matrix"}}','{"result": {"type": "float"}}',2,2,0,'{}','["algebra", "trace", "01_dados"]','1.0',0,0,'familia_01_dados.trace',NULL,1),
+('c0000001-0000-0000-0000-000000000021','Posto da Matriz','rank','utility','algebra_linear','01_dados','Posto numérico da matriz.','Matrix','Scalar','{"A": {"type": "matrix"}}','{"result": {"type": "integer"}}',2,2,0,'{"tol": {"type": "number", "default": null}}','["algebra", "rank", "01_dados"]','1.0',0,0,'familia_01_dados.rank',NULL,1),
+('c0000001-0000-0000-0000-000000000022','Média','mean','utility','estatistica_basica','01_dados','Média ao longo de um ou mais eixos.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "default": null}, "keepdims": {"type": "boolean", "default": false}}','["estatistica", "mean", "01_dados"]','1.0',0,0,'familia_01_dados.mean',NULL,1),
+('c0000001-0000-0000-0000-000000000023','Mediana','median','utility','estatistica_basica','01_dados','Mediana ao longo de um ou mais eixos.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "default": null}, "keepdims": {"type": "boolean", "default": false}}','["estatistica", "median", "01_dados"]','1.0',0,0,'familia_01_dados.median',NULL,1),
+('c0000001-0000-0000-0000-000000000024','Desvio Padrão','std','utility','estatistica_basica','01_dados','Desvio padrão ao longo de um eixo.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "default": null}, "keepdims": {"type": "boolean", "default": false}, "ddof": {"type": "integer", "default": 0}}','["estatistica", "std", "01_dados"]','1.0',0,0,'familia_01_dados.std',NULL,1),
+('c0000001-0000-0000-0000-000000000025','Mínimo','min','utility','estatistica_basica','01_dados','Valor mínimo ao longo de um eixo.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "default": null}, "keepdims": {"type": "boolean", "default": false}}','["estatistica", "min", "01_dados"]','1.0',0,0,'familia_01_dados.min',NULL,1),
+('c0000001-0000-0000-0000-000000000026','Máximo','max','utility','estatistica_basica','01_dados','Valor máximo ao longo de um eixo.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "default": null}, "keepdims": {"type": "boolean", "default": false}}','["estatistica", "max", "01_dados"]','1.0',0,0,'familia_01_dados.max',NULL,1),
+('c0000001-0000-0000-0000-000000000027','Soma','sum','utility','estatistica_basica','01_dados','Soma ao longo de um eixo.','Tensor','Tensor','{"X": {"type": "tensor"}}','{"result": {"type": "tensor"}}',1,NULL,0,'{"axis": {"type": "integer", "default": null}, "keepdims": {"type": "boolean", "default": false}}','["estatistica", "sum", "01_dados"]','1.0',0,0,'familia_01_dados.sum',NULL,1);
+
+-- =============================================================================
 -- TECHNIQUE COMPATIBILITIES
 -- =============================================================================
 
@@ -1371,6 +1413,46 @@ CREATE TABLE `dataset_lineage` (
   CONSTRAINT `fk_lineage_target` FOREIGN KEY (`target_dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_lineage_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_lineage_workflow_node` FOREIGN KEY (`workflow_node_id`) REFERENCES `workflow_nodes` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- dataset_operations — "operação rápida" sobre um dataset (botão no
+-- DatasetDetailPage). Toda operação, mesmo a rápida, instancia um
+-- `workflows`/`workflow_nodes` de verdade (1 nó) e uma `executions` real —
+-- isso aqui é só a camada fina que lembra o que fazer com o dataset quando
+-- a execução terminar (gravar como novo dataset ou sobrescrever o atual).
+-- =============================================================================
+
+CREATE TABLE `dataset_operations` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `source_dataset_id` bigint unsigned NOT NULL,
+  `technique_id` bigint unsigned NOT NULL,
+  `workflow_id` bigint unsigned NOT NULL,
+  `execution_id` bigint unsigned NOT NULL,
+  `params` json DEFAULT NULL,
+  `save_mode` enum('new_dataset','in_place') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'new_dataset',
+  `new_dataset_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `output_dataset_id` bigint unsigned DEFAULT NULL COMMENT 'Preenchido quando save_mode=new_dataset e a execução conclui com sucesso',
+  `status` enum('pending','completed','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_dataset_operations_user` (`user_id`),
+  KEY `idx_dataset_operations_source` (`source_dataset_id`),
+  KEY `idx_dataset_operations_technique` (`technique_id`),
+  KEY `idx_dataset_operations_workflow` (`workflow_id`),
+  KEY `idx_dataset_operations_execution` (`execution_id`),
+  KEY `idx_dataset_operations_status` (`status`),
+  CONSTRAINT `fk_dataset_operations_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dataset_operations_source` FOREIGN KEY (`source_dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dataset_operations_technique` FOREIGN KEY (`technique_id`) REFERENCES `techniques` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_dataset_operations_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dataset_operations_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dataset_operations_output` FOREIGN KEY (`output_dataset_id`) REFERENCES `datasets` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================

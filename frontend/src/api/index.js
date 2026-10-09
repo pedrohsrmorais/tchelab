@@ -104,6 +104,11 @@ export const api = {
     delete:          (id)      => del(`/datasets/${id}`),
     lineage:         (id)      => get(`/datasets/${id}/lineage`),
     preview:         (id)      => get(`/datasets/${id}/preview`),
+
+    // "Operação rápida" — instancia um workflow de 1 nó e dispara exatamente
+    // pelo mesmo caminho que o editor visual, sem precisar abrir o editor.
+    createOperation: (id, d)   => post(`/datasets/${id}/operations`, d),
+    listOperations:  (id)      => get(`/datasets/${id}/operations`),
   },
 
   // ── Workflows ─────────────────────────────────────────────────────────────
@@ -169,6 +174,11 @@ export const api = {
     nodes:           (id)      => get(`/executions/${id}/nodes`),
     getNode:         (id, nid) => get(`/executions/${id}/nodes/${nid}`),
     logs:            (id)      => get(`/executions/${id}/logs`),
+  },
+
+  // ── Dataset Operations (operação rápida) ───────────────────────────────────
+  operations: {
+    get:             (id)      => get(`/operations/${id}`),
   },
 
   // ── Models ────────────────────────────────────────────────────────────────

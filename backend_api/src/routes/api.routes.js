@@ -12,6 +12,7 @@ const projectCtrl         = require('../controllers/project.controller');
 const spectrumCtrl        = require('../controllers/spectrum.controller');
 const collectionCtrl      = require('../controllers/collection.controller');
 const datasetCtrl         = require('../controllers/dataset.controller');
+const datasetOperationCtrl = require('../controllers/datasetOperation.controller');
 const articleCtrl         = require('../controllers/article.controller');
 const articleAnalysisCtrl = require('../controllers/articleAnalysis.controller');
 const techniqueCtrl       = require('../controllers/technique.controller');
@@ -133,6 +134,11 @@ router.get   ('/datasets/:id/slice',                            authenticate, da
 router.get   ('/datasets/:id/preview',                          authenticate, datasetCtrl.getPreview);
 router.post  ('/datasets/:id/spectra',                          authenticate, datasetCtrl.addSpectraToDataset);
 router.get   ('/datasets/:id/spectra',                          authenticate, datasetCtrl.listDatasetSpectra);
+
+// Operação rápida sobre um dataset — instancia e dispara um workflow de 1 nó
+router.post  ('/datasets/:id/operations',                       authenticate, datasetOperationCtrl.createQuickOperation);
+router.get   ('/datasets/:id/operations',                       authenticate, datasetOperationCtrl.listOperations);
+router.get   ('/operations/:id',                                authenticate, datasetOperationCtrl.getOperation);
 
 // ─── ARTICLES ──────────────────────────────────────────────────────────────────
 router.get   ('/articles',                                      authenticate, articleCtrl.listArticles);

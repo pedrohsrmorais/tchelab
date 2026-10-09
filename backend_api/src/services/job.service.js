@@ -49,12 +49,24 @@ async function createJob({
 
   const jobId = result.insertId;
 
-  // Enfileira no Redis para o worker Python consumir via BLPOP
+  // Enfileira no Redis para o worker Python consumir via BLPOP.
+  //
+  // O worker espera o schema Pydantic `JobPayload` (worker_api/schemas.py):
+  //   { job_id, execution_id, node_id, slug, inputs, params }
+  // Antes, só {job_id, uuid, job_type} era enviado — o slug/inputs/params
+  // (ou seja, o próprio payload da operação) nunca chegava no worker, que
+  // descartava o job por falhar a validação. Agora mandamos o payload
+  // completo, usando o uuid do job como job_id (mais estável que o id
+  // autoincrement para casar o resultado depois).
+  //
+  // RPUSH+BLPOP (não LPUSH+BLPOP) para manter FIFO — a ordem topológica
+  // calculada em dispatchExecution() depende disso quando um workflow tem
+  // mais de um nó.
   try {
-    await redis.lpush(REDIS_JOB_QUEUE, JSON.stringify({ job_id: jobId, uuid, job_type }));
+    await redis.rpush(REDIS_JOB_QUEUE, JSON.stringify({ job_id: uuid, job_type, ...payload }));
   } catch (err) {
     console.error('[JobService] Falha ao enfileirar no Redis:', err.message);
-    // Job já está no banco; worker pode consultar periodicamente como fallback
+    // Job já está no banco; fica em status "queued" até ser reprocessado.
   }
 
   return { id: jobId, uuid };

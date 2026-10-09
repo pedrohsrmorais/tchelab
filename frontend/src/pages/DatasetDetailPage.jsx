@@ -1,12 +1,13 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Database, GitBranch, Eye, BarChart2, Activity, Table, Boxes } from 'lucide-react';
+import { ArrowLeft, Database, GitBranch, Eye, BarChart2, Activity, Table, Boxes, Sigma } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import EmptyState from '../components/ui/EmptyState';
 
 const MultiDimModal = lazy(() => import('../components/datasets/MultiDimModal'));
+const QuickOperationModal = lazy(() => import('../components/datasets/QuickOperationModal'));
 
 function Tab({ active, onClick, children }) {
   return (
@@ -169,6 +170,7 @@ export default function DatasetDetailPage() {
   const { id } = useParams();
   const [tab, setTab] = useState('preview');
   const [showViz, setShowViz] = useState(false);
+  const [showOp, setShowOp] = useState(false);
 
   const { data: raw, loading } = useApi(() => api.datasets.get(id), [id]);
   const { data: lineageRaw, loading: lineageLoading } = useApi(() => api.datasets.lineage(id), [id]);
@@ -248,6 +250,15 @@ export default function DatasetDetailPage() {
                   >
                     <Boxes className="w-3.5 h-3.5" />
                     Visualizar {dimensions ? `(${dimensions.length}D)` : ''}
+                  </button>
+                  <button
+                    onClick={() => setShowOp(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }}
+                    title="Realizar operação matricial"
+                  >
+                    <Sigma className="w-3.5 h-3.5" />
+                    Realizar operação matricial
                   </button>
                 </div>
               </div>
@@ -385,6 +396,13 @@ export default function DatasetDetailPage() {
       {showViz && (
         <Suspense fallback={null}>
           <MultiDimModal dataset={ds} onClose={() => setShowViz(false)} />
+        </Suspense>
+      )}
+
+      {/* Quick Operation Modal — "Realizar operação matricial" */}
+      {showOp && (
+        <Suspense fallback={null}>
+          <QuickOperationModal dataset={ds} onClose={() => setShowOp(false)} />
         </Suspense>
       )}
     </div>
