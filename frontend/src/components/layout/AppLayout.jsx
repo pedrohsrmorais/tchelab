@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
@@ -54,7 +54,13 @@ function PageTransition() {
         }}
         style={{ minHeight: '100%', padding: '1.5rem' }}
       >
-        <Outlet />
+        {/* Suspense fallback=null keeps the motion.div mounted and animatable
+            even when a lazy page chunk is still loading. Without this, React
+            would bubble up to the outer Suspense and replace the motion.div
+            with the PageLoader, causing an opacity snap / flicker. */}
+        <Suspense fallback={null}>
+          <Outlet />
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   );

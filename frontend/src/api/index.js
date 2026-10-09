@@ -66,8 +66,10 @@ export const api = {
 
   // ── Communities ──────────────────────────────────────────────────────────
   communities: {
-    // GET /communities já retorna as comunidades do usuário autenticado
+    // GET /communities retorna as comunidades do usuário autenticado
     list:            (p)       => get('/communities', p),
+    listMine:        (p)       => get('/communities', p),           // alias — same route
+    listPublic:      (p)       => get('/communities/public', p),
     create:          (d)       => post('/communities', d),
     get:             (id)      => get(`/communities/${id}`),
     update:          (id, d)   => put(`/communities/${id}`, d),

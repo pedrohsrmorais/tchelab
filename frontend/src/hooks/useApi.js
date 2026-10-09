@@ -10,6 +10,8 @@ export function useApi(apiFn, deps = [], opts = {}) {
     setError(null)
     try {
       const res = await apiFn(...args)
+      // apiFn may return null/undefined to signal "nothing to fetch" (e.g. conditional calls)
+      if (res == null) { setLoading(false); return null }
       setData(res.data?.data ?? res.data)
       return res.data?.data ?? res.data
     } catch (e) {

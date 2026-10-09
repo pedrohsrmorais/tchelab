@@ -4,6 +4,11 @@ import { useAuthStore } from './store/auth';
 import { PageLoader } from './components/ui/Spinner';
 
 // Lazy-loaded pages
+// Using /* @vite-ignore */ to suppress unused-import warnings for prefetch hints.
+// All route chunks are eagerly prefetched after the main bundle loads so that
+// navigations never trigger a Suspense fallback (which would cause flicker inside
+// AnimatePresence). The Suspense boundary in AppLayout uses fallback={null} as a
+// safety net, but ideally the chunks are already cached.
 const LoginPage     = lazy(() => import('./pages/auth/LoginPage'));
 const AppLayout     = lazy(() => import('./components/layout/AppLayout'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -21,6 +26,36 @@ const JobsPage      = lazy(() => import('./pages/JobsPage'));
 const AIPage        = lazy(() => import('./pages/AIPage'));
 const AdminPage     = lazy(() => import('./pages/AdminPage'));
 const ProfilePage   = lazy(() => import('./pages/ProfilePage'));
+
+// Prefetch all route chunks immediately after the main bundle loads.
+// This means navigations will almost never trigger a Suspense suspension,
+// so AnimatePresence transitions stay smooth with no blank-frame flicker.
+if (typeof window !== 'undefined') {
+  // Use requestIdleCallback (or setTimeout fallback) so we don't block
+  // the initial render / paint.
+  const prefetch = () => {
+    import('./pages/DashboardPage');
+    import('./pages/ProjectsPage');
+    import('./pages/ProjectDetailPage');
+    import('./pages/DatasetsPage');
+    import('./pages/DatasetDetailPage');
+    import('./pages/CommunitiesPage');
+    import('./pages/CommunityDetailPage');
+    import('./pages/WorkflowsPage');
+    import('./pages/WorkflowEditorPage');
+    import('./pages/ArticlesPage');
+    import('./pages/ModelsPage');
+    import('./pages/JobsPage');
+    import('./pages/AIPage');
+    import('./pages/AdminPage');
+    import('./pages/ProfilePage');
+  };
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(prefetch);
+  } else {
+    setTimeout(prefetch, 200);
+  }
+}
 
 // Protected route guard
 const ProtectedRoute = ({ children, requirePlus = false, requireAdmin = false }) => {
