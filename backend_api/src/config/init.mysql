@@ -2,6 +2,7 @@
 -- TcheLab — Database Initialization Script
 -- Generated: 2026-10-09
 -- Admin: admin@intellsn.com.br
+-- All schema + seed data in a single file — no migrations needed.
 -- =============================================================================
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
@@ -19,6 +20,8 @@
 -- DROP ORDER (reverse dependency order)
 -- =============================================================================
 
+DROP TABLE IF EXISTS `workflow_versions`;
+DROP TABLE IF EXISTS `project_history`;
 DROP TABLE IF EXISTS `workflow_node_origins`;
 DROP TABLE IF EXISTS `article_techniques`;
 DROP TABLE IF EXISTS `article_analyses`;
@@ -54,6 +57,7 @@ DROP TABLE IF EXISTS `spectra`;
 DROP TABLE IF EXISTS `technique_compatibilities`;
 DROP TABLE IF EXISTS `techniques`;
 DROP TABLE IF EXISTS `audit_logs`;
+DROP TABLE IF EXISTS `articles`;
 DROP TABLE IF EXISTS `users`;
 
 -- =============================================================================
@@ -149,6 +153,7 @@ CREATE TABLE `techniques` (
   `tags` json DEFAULT NULL,
   `version` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_beta` tinyint(1) NOT NULL DEFAULT '0',
+  `is_custom` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Script definido pelo usuário fora do catálogo oficial',
   `implementation` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `documentation` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `active` tinyint(1) NOT NULL DEFAULT '1',
@@ -168,21 +173,188 @@ CREATE TABLE `techniques` (
   CONSTRAINT `chk_techniques_order_range` CHECK ((`max_order` IS NULL OR `min_order` IS NULL OR `max_order` >= `min_order`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Seed: technique catalog
-INSERT INTO `techniques` VALUES
-(1,'399fab36-b854-11f1-a672-8eaf6b4b2bf7','Dataset','dataset','input','importacao','01_dados','Entrada de dados para o workflow.','Dataset','Matrix',NULL,'{\"X\": {\"type\": \"matrix\"}}',1,NULL,NULL,'{}','[\"input\", \"dataset\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(2,'39a01eb1-b854-11f1-a672-8eaf6b4b2bf7','SNV','snv','preprocessing','scatter_correction','02_pre_processamento','Standard Normal Variate.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,1,1,'{}','[\"preprocessing\", \"NIR\", \"scatter\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(3,'39a02237-b854-11f1-a672-8eaf6b4b2bf7','MSC','msc','preprocessing','scatter_correction','02_pre_processamento','Multiplicative Scatter Correction.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,1,1,'{}','[\"preprocessing\", \"NIR\", \"scatter\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(4,'39a024ad-b854-11f1-a672-8eaf6b4b2bf7','Savitzky-Golay','savitzky-golay','preprocessing','smoothing_derivative','02_pre_processamento','Filtro e derivada Savitzky-Golay.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,1,NULL,'{\"window\": {\"type\": \"integer\", \"default\": 11}, \"polyorder\": {\"type\": \"integer\", \"default\": 2}, \"derivative\": {\"type\": \"integer\", \"default\": 0}}','[\"preprocessing\", \"smoothing\", \"derivative\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(5,'39a030f1-b854-11f1-a672-8eaf6b4b2bf7','Normalization','normalization','preprocessing','scaling','02_pre_processamento','Normalização dos dados.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,NULL,NULL,'{}','[\"preprocessing\", \"scaling\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(6,'39a039be-b854-11f1-a672-8eaf6b4b2bf7','PCA','pca','exploratory',NULL,'03_exploratoria_1d','Principal Component Analysis.','Matrix','PCA_Result','{\"X\": {\"type\": \"matrix\"}}','{\"scores\": {\"type\": \"matrix\", \"shape\": \"(I, R)\"}, \"loadings\": {\"type\": \"matrix\", \"shape\": \"(J, R)\"}, \"explained_variance\": {\"type\": \"float\"}}',1,1,1,'{\"components\": {\"type\": \"integer\", \"default\": 2, \"minimum\": 1}}','[\"exploratory\", \"PCA\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(7,'39a03e67-b854-11f1-a672-8eaf6b4b2bf7','PLS','pls','regression',NULL,'04_regressao_1d','Partial Least Squares regression.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}, \"scores\": {\"type\": \"matrix\"}}',1,1,1,'{\"components\": {\"type\": \"integer\", \"default\": 5, \"minimum\": 1}}','[\"regression\", \"PLS\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(8,'39a04101-b854-11f1-a672-8eaf6b4b2bf7','PLS-DA','pls-da','classification',NULL,'05_classificacao_1d','Partial Least Squares Discriminant Analysis.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}}',1,1,1,'{\"components\": {\"type\": \"integer\", \"default\": 5, \"minimum\": 1}}','[\"classification\", \"PLS-DA\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(9,'39a044fb-b854-11f1-a672-8eaf6b4b2bf7','PARAFAC','parafac','multiway',NULL,'07_decomposicao_multiway','Parallel Factor Analysis para dados multiway.','Tensor','PARAFAC_Result','{\"X\": {\"type\": \"tensor\"}}','{\"scores\": {\"type\": \"matrix\", \"shape\": \"(I, R)\"}, \"loadings\": {\"type\": \"array\"}, \"residuals\": {\"type\": \"tensor\"}, \"core_consistency\": {\"type\": \"float\"}, \"explained_variance\": {\"type\": \"float\"}}',2,NULL,NULL,'{\"max_iter\": {\"type\": \"integer\", \"default\": 2500}, \"tolerance\": {\"type\": \"number\", \"default\": 0.000001}, \"components\": {\"type\": \"integer\", \"default\": 3, \"minimum\": 1}, \"non_negative\": {\"type\": \"boolean\", \"default\": true}, \"initialization\": {\"type\": \"string\", \"default\": \"svd\", \"options\": [\"svd\", \"random\", \"dtld\"]}}','[\"multiway\", \"PARAFAC\", \"N-way\", \"EEM\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(10,'39a04a1b-b854-11f1-a672-8eaf6b4b2bf7','Tucker3','tucker3','multiway',NULL,'07_decomposicao_multiway','Tucker3 tensor decomposition.','Tensor','Tucker_Result','{\"X\": {\"type\": \"tensor\"}}','{\"core\": {\"type\": \"tensor\"}, \"loadings\": {\"type\": \"array\"}, \"explained_variance\": {\"type\": \"float\"}}',2,NULL,NULL,'{\"rank\": {\"type\": \"array\"}}','[\"multiway\", \"Tucker3\", \"N-way\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(11,'39a04d28-b854-11f1-a672-8eaf6b4b2bf7','Random Forest','random-forest','classification',NULL,'05_classificacao_1d','Random Forest.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}}',1,1,1,'{\"n_estimators\": {\"type\": \"integer\", \"default\": 100}}','[\"classification\", \"random-forest\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(12,'39a04fa5-b854-11f1-a672-8eaf6b4b2bf7','RNN','rnn','deep_learning',NULL,'06_deep_learning_1d','Recurrent Neural Network.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}}',1,1,1,'{\"epochs\": {\"type\": \"integer\", \"default\": 100}, \"hidden_units\": {\"type\": \"integer\", \"default\": 64}, \"hidden_layers\": {\"type\": \"integer\", \"default\": 2}}','[\"deep_learning\", \"RNN\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
-(13,'39a052c3-b854-11f1-a672-8eaf6b4b2bf7','Cross Validation','cross-validation','validation',NULL,'14_validacao','Validação cruzada.','Matrix','Metrics','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"metrics\": {\"type\": \"object\"}}',NULL,NULL,1,'{\"folds\": {\"type\": \"integer\", \"default\": 10, \"minimum\": 2}}','[\"validation\", \"cross-validation\"]','1.0',0,NULL,NULL,1,NOW(),NOW());
+-- Seed: core technique catalog (13 base techniques with corrected slugs and families)
+INSERT INTO `techniques`
+  (id,uuid,name,slug,category,subcategory,family,description,input_type,output_type,input_schema,output_schema,min_order,max_order,requires_sample_axis,parameter_schema,tags,version,is_beta,is_custom,implementation,documentation,active,created_at,updated_at)
+VALUES
+(1,'399fab36-b854-11f1-a672-8eaf6b4b2bf7','Dataset','dataset','input','importacao','01_dados','Entrada de dados para o workflow.','Dataset','Matrix',NULL,'{"X": {"type": "matrix"}}',1,NULL,NULL,'{}','["input", "dataset"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(2,'39a01eb1-b854-11f1-a672-8eaf6b4b2bf7','SNV','snv','preprocessing','scatter_correction','02_preprocessamento','Standard Normal Variate.','Matrix','Matrix','{"X": {"type": "matrix"}}','{"X": {"type": "matrix"}}',1,1,1,'{}','["preprocessing", "NIR", "scatter"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(3,'39a02237-b854-11f1-a672-8eaf6b4b2bf7','MSC','msc','preprocessing','scatter_correction','02_preprocessamento','Multiplicative Scatter Correction.','Matrix','Matrix','{"X": {"type": "matrix"}}','{"X": {"type": "matrix"}}',1,1,1,'{}','["preprocessing", "NIR", "scatter"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(4,'39a024ad-b854-11f1-a672-8eaf6b4b2bf7','Savitzky-Golay','savitzky_golay','preprocessing','smoothing_derivative','02_preprocessamento','Filtro e derivada Savitzky-Golay.','Matrix','Matrix','{"X": {"type": "matrix"}}','{"X": {"type": "matrix"}}',1,1,NULL,'{"window": {"type": "integer", "default": 11}, "polyorder": {"type": "integer", "default": 2}, "derivative": {"type": "integer", "default": 0}}','["preprocessing", "smoothing", "derivative"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(5,'39a030f1-b854-11f1-a672-8eaf6b4b2bf7','Normalization','normalization','preprocessing','scaling','02_preprocessamento','Normalização dos dados.','Matrix','Matrix','{"X": {"type": "matrix"}}','{"X": {"type": "matrix"}}',1,NULL,NULL,'{}','["preprocessing", "scaling"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(6,'39a039be-b854-11f1-a672-8eaf6b4b2bf7','PCA','pca','exploratory',NULL,'03_exploratoria','Principal Component Analysis.','Matrix','PCA_Result','{"X": {"type": "matrix"}}','{"scores": {"type": "matrix", "shape": "(I, R)"}, "loadings": {"type": "matrix", "shape": "(J, R)"}, "explained_variance": {"type": "float"}}',1,1,1,'{"components": {"type": "integer", "default": 2, "minimum": 1}}','["exploratory", "PCA"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(7,'39a03e67-b854-11f1-a672-8eaf6b4b2bf7','PLS','pls','regression',NULL,'04_regressao_1d','Partial Least Squares regression.','Matrix','Model','{"X": {"type": "matrix"}, "y": {"type": "matrix"}}','{"model": {"type": "model"}, "scores": {"type": "matrix"}}',1,1,1,'{"components": {"type": "integer", "default": 5, "minimum": 1}}','["regression", "PLS"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(8,'39a04101-b854-11f1-a672-8eaf6b4b2bf7','PLS-DA','pls_da','classification',NULL,'05_classificacao_1d','Partial Least Squares Discriminant Analysis.','Matrix','Model','{"X": {"type": "matrix"}, "y": {"type": "matrix"}}','{"model": {"type": "model"}}',1,1,1,'{"components": {"type": "integer", "default": 5, "minimum": 1}}','["classification", "PLS-DA"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(9,'39a044fb-b854-11f1-a672-8eaf6b4b2bf7','PARAFAC','parafac','multiway',NULL,'07_multiway_decomp','Parallel Factor Analysis para dados multiway.','Tensor','PARAFAC_Result','{"X": {"type": "tensor"}}','{"scores": {"type": "matrix", "shape": "(I, R)"}, "loadings": {"type": "array"}, "residuals": {"type": "tensor"}, "core_consistency": {"type": "float"}, "explained_variance": {"type": "float"}}',2,NULL,NULL,'{"max_iter": {"type": "integer", "default": 2500}, "tolerance": {"type": "number", "default": 0.000001}, "components": {"type": "integer", "default": 3, "minimum": 1}, "non_negative": {"type": "boolean", "default": true}, "initialization": {"type": "string", "default": "svd", "options": ["svd", "random", "dtld"]}}','["multiway", "PARAFAC", "N-way", "EEM"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(10,'39a04a1b-b854-11f1-a672-8eaf6b4b2bf7','Tucker3','tucker3','multiway',NULL,'07_multiway_decomp','Tucker3 tensor decomposition.','Tensor','Tucker_Result','{"X": {"type": "tensor"}}','{"core": {"type": "tensor"}, "loadings": {"type": "array"}, "explained_variance": {"type": "float"}}',2,NULL,NULL,'{"rank": {"type": "array"}}','["multiway", "Tucker3", "N-way"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(11,'39a04d28-b854-11f1-a672-8eaf6b4b2bf7','Random Forest','random_forest','classification',NULL,'05_classificacao_1d','Random Forest.','Matrix','Model','{"X": {"type": "matrix"}, "y": {"type": "matrix"}}','{"model": {"type": "model"}}',1,1,1,'{"n_estimators": {"type": "integer", "default": 100}}','["classification", "random-forest"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(12,'39a04fa5-b854-11f1-a672-8eaf6b4b2bf7','RNN','rnn','deep_learning',NULL,'06_deep_learning','Recurrent Neural Network.','Matrix','Model','{"X": {"type": "matrix"}, "y": {"type": "matrix"}}','{"model": {"type": "model"}}',1,1,1,'{"epochs": {"type": "integer", "default": 100}, "hidden_units": {"type": "integer", "default": 64}, "hidden_layers": {"type": "integer", "default": 2}}','["deep_learning", "RNN"]','1.0',0,0,NULL,NULL,1,NOW(),NOW()),
+(13,'39a052c3-b854-11f1-a672-8eaf6b4b2bf7','Cross Validation','cross_validation','validation',NULL,'12_validacao_modelos','Validação cruzada.','Matrix','Metrics','{"X": {"type": "matrix"}, "y": {"type": "matrix"}}','{"metrics": {"type": "object"}}',NULL,NULL,1,'{"folds": {"type": "integer", "default": 10, "minimum": 2}}','["validation", "cross-validation"]','1.0',0,0,NULL,NULL,1,NOW(),NOW());
+
+-- Seed: extended catalog (~100 techniques across all 20 families)
+INSERT IGNORE INTO `techniques`
+  (`uuid`,`name`,`slug`,`category`,`subcategory`,`family`,`description`,`active`)
+VALUES
+
+-- FAMÍLIA 01 — Dados
+('b0000001-0000-0000-0000-000000000001','Dataset Upload','dataset_upload','input','upload','01_dados','Carrega arquivo de dados (CSV, Excel, MAT, HDF5) e cria um dataset.', 1),
+('b0000001-0000-0000-0000-000000000002','Dataset Info','dataset_info','input','info','01_dados','Retorna metadados, shape e estatísticas básicas de um dataset.', 1),
+('b0000001-0000-0000-0000-000000000003','Array Reshape','array_reshape','input','manipulation','01_dados','Remodela um array para shape especificado.', 1),
+('b0000001-0000-0000-0000-000000000004','Array Transpose','array_transpose','input','manipulation','01_dados','Transpõe eixos de um array N-way.', 1),
+('b0000001-0000-0000-0000-000000000005','Array Unfold','array_unfold','input','manipulation','01_dados','Desdobra (unfold) um tensor em matriz ao longo de um modo.', 1),
+('b0000001-0000-0000-0000-000000000006','Array Concatenate','array_concatenate','input','manipulation','01_dados','Concatena datasets ao longo de um eixo especificado.', 1),
+('b0000001-0000-0000-0000-000000000007','Dataset Split','dataset_split','input','split','01_dados','Divide dataset em treino/teste/validação.', 1),
+('b0000001-0000-0000-0000-000000000008','Formula Customizada','formula_customizada','input','custom','01_dados','Aplica expressão matemática customizada (avaliador AST seguro).', 1),
+
+-- FAMÍLIA 02 — Pré-processamento
+('b0000002-0000-0000-0000-000000000001','Mean Center','mean_center','preprocessing','scaling','02_preprocessamento','Centraliza os espectros na média.', 1),
+('b0000002-0000-0000-0000-000000000002','Autoscale','autoscale','preprocessing','scaling','02_preprocessamento','Centraliza e escala pela desvio padrão (UV scaling).', 1),
+('b0000002-0000-0000-0000-000000000003','Pareto Scaling','pareto_scaling','preprocessing','scaling','02_preprocessamento','Escala pela raiz quadrada do desvio padrão.', 1),
+('b0000002-0000-0000-0000-000000000004','Baseline Correction','baseline_correction','preprocessing','baseline','02_preprocessamento','Corrige linha de base por polinômio ou rubberband.', 1),
+('b0000002-0000-0000-0000-000000000005','Detrend','detrend','preprocessing','baseline','02_preprocessamento','Remove tendência linear ou constante dos espectros.', 1),
+('b0000002-0000-0000-0000-000000000006','Smoothing','smoothing','preprocessing','smoothing_derivative','02_preprocessamento','Suavização por média móvel, mediana ou Gaussian.', 1),
+('b0000002-0000-0000-0000-000000000007','OSC','osc','preprocessing','scatter_correction','02_preprocessamento','Orthogonal Signal Correction.', 1),
+('b0000002-0000-0000-0000-000000000008','EMSC','emsc','preprocessing','scatter_correction','02_preprocessamento','Extended Multiplicative Scatter Correction.', 1),
+('b0000002-0000-0000-0000-000000000009','Spectral Cropping','spectral_cropping','preprocessing','region_selection','02_preprocessamento','Recorta intervalo espectral.', 1),
+('b0000002-0000-0000-0000-000000000010','Interpolation','interpolation','preprocessing','resampling','02_preprocessamento','Reamosta espectros para eixo comum por interpolação.', 1),
+('b0000002-0000-0000-0000-000000000011','Nbet Correction','nbet_correction','preprocessing','baseline','02_preprocessamento','Correção NBET para dados de fluorescência.', 1),
+('b0000002-0000-0000-0000-000000000012','Rayleigh Masking','rayleigh_masking','preprocessing','masking','02_preprocessamento','Mascara regiões de Rayleigh e Raman em matrizes EEM.', 1),
+
+-- FAMÍLIA 03 — Análise Exploratória
+('b0000003-0000-0000-0000-000000000001','PCA Multiway','pca_multiway','exploratory','multiway','03_exploratoria','PCA em dados multiway via Tucker com R=1 por modo.', 1),
+('b0000003-0000-0000-0000-000000000002','HOSVD','hosvd','exploratory','multiway','03_exploratoria','Higher-Order SVD para análise exploratória de tensores.', 1),
+('b0000003-0000-0000-0000-000000000003','Cluster Analysis','cluster_analysis','exploratory','clustering','03_exploratoria','Agrupamento hierárquico ou k-means.', 1),
+('b0000003-0000-0000-0000-000000000004','Outlier Detection','outlier_detection','exploratory','outliers','03_exploratoria','Detecção de outliers por leverage, distância de Mahalanobis ou Hotelling T².', 1),
+('b0000003-0000-0000-0000-000000000005','SIMCA','simca','exploratory','classification','03_exploratoria','Soft Independent Modelling of Class Analogies.', 1),
+('b0000003-0000-0000-0000-000000000006','Correlation Analysis','correlation_analysis','exploratory','statistics','03_exploratoria','Matriz de correlação e heatmap.', 1),
+('b0000003-0000-0000-0000-000000000007','Descriptive Statistics','descriptive_statistics','exploratory','statistics','03_exploratoria','Média, desvio padrão, CV, curtose, assimetria por variável.', 1),
+
+-- FAMÍLIA 04 — Regressão 1D
+('b0000004-0000-0000-0000-000000000001','MLR','mlr','regression','linear','04_regressao_1d','Multiple Linear Regression.', 1),
+('b0000004-0000-0000-0000-000000000002','PCR','pcr','regression','linear','04_regressao_1d','Principal Component Regression.', 1),
+('b0000004-0000-0000-0000-000000000003','Ridge Regression','ridge_regression','regression','regularized','04_regressao_1d','Regressão Ridge (regularização L2).', 1),
+('b0000004-0000-0000-0000-000000000004','LASSO Regression','lasso_regression','regression','regularized','04_regressao_1d','Least Absolute Shrinkage and Selection Operator (L1).', 1),
+('b0000004-0000-0000-0000-000000000005','SVR','svr','regression','kernel','04_regressao_1d','Support Vector Regression.', 1),
+('b0000004-0000-0000-0000-000000000006','GPR','gpr','regression','probabilistic','04_regressao_1d','Gaussian Process Regression.', 1),
+('b0000004-0000-0000-0000-000000000007','Interval PLS','ipls','regression','interval','04_regressao_1d','iPLS — seleção do melhor intervalo espectral por PLS.', 1),
+('b0000004-0000-0000-0000-000000000008','Prediction','prediction','regression','prediction','04_regressao_1d','Aplica modelo treinado em novas amostras.', 1),
+
+-- FAMÍLIA 05 — Classificação 1D
+('b0000005-0000-0000-0000-000000000001','LDA','lda','classification','linear','05_classificacao_1d','Linear Discriminant Analysis.', 1),
+('b0000005-0000-0000-0000-000000000002','QDA','qda','classification','quadratic','05_classificacao_1d','Quadratic Discriminant Analysis.', 1),
+('b0000005-0000-0000-0000-000000000003','SVM','svm','classification','kernel','05_classificacao_1d','Support Vector Machine com kernel RBF ou linear.', 1),
+('b0000005-0000-0000-0000-000000000004','KNN','knn','classification','distance','05_classificacao_1d','K-Nearest Neighbors.', 1),
+('b0000005-0000-0000-0000-000000000005','Naive Bayes','naive_bayes','classification','probabilistic','05_classificacao_1d','Classificador Naive Bayes Gaussiano.', 1),
+('b0000005-0000-0000-0000-000000000006','Logistic Regression','logistic_regression','classification','linear','05_classificacao_1d','Regressão Logística (binária ou multiclasse).', 1),
+
+-- FAMÍLIA 06 — Deep Learning
+('b0000006-0000-0000-0000-000000000001','MLP Regression','mlp_regression','deep_learning','mlp','06_deep_learning','Multilayer Perceptron para regressão.', 1),
+('b0000006-0000-0000-0000-000000000002','MLP Classification','mlp_classification','deep_learning','mlp','06_deep_learning','Multilayer Perceptron para classificação.', 1),
+('b0000006-0000-0000-0000-000000000003','CNN 1D','cnn_1d','deep_learning','cnn','06_deep_learning','Convolutional Neural Network 1D para espectros.', 1),
+('b0000006-0000-0000-0000-000000000004','LSTM','lstm','deep_learning','recurrent','06_deep_learning','Long Short-Term Memory.', 1),
+('b0000006-0000-0000-0000-000000000005','Autoencoder','autoencoder','deep_learning','autoencoder','06_deep_learning','Autoencoder para aprendizado de representações e detecção de anomalias.', 1),
+('b0000006-0000-0000-0000-000000000006','Transformer','transformer','deep_learning','attention','06_deep_learning','Transformer com atenção multi-head para séries espectrais.', 1),
+
+-- FAMÍLIA 07 — Decomposição Multiway
+('b0000007-0000-0000-0000-000000000001','MCR-ALS','mcr_als','multiway','factorization','07_multiway_decomp','Multivariate Curve Resolution — Alternating Least Squares.', 1),
+('b0000007-0000-0000-0000-000000000002','PARAFAC2','parafac2','multiway','factorization','07_multiway_decomp','PARAFAC2 para dados com variação de perfil em um modo.', 1),
+('b0000007-0000-0000-0000-000000000003','NTF','ntf','multiway','factorization','07_multiway_decomp','Non-negative Tensor Factorization.', 1),
+('b0000007-0000-0000-0000-000000000004','CP Decomposition','cp_decomp','multiway','factorization','07_multiway_decomp','Canonical Polyadic Decomposition genérica.', 1),
+('b0000007-0000-0000-0000-000000000005','HOOI','hooi','multiway','factorization','07_multiway_decomp','Higher-Order Orthogonal Iteration (Tucker otimizado).', 1),
+('b0000007-0000-0000-0000-000000000006','Core Consistency','core_consistency','multiway','diagnostics','07_multiway_decomp','Diagnóstico de consistência do núcleo para seleção do número de componentes.', 1),
+
+-- FAMÍLIA 08 — Regressão Multiway
+('b0000008-0000-0000-0000-000000000001','N-PLS','n_pls','multiway_regression','regression','08_multiway_regression','N-PLS — regressão multilinear para dados de ordem superior.', 1),
+('b0000008-0000-0000-0000-000000000002','Tucker-PLS','tucker_pls','multiway_regression','regression','08_multiway_regression','PLS combinado com decomposição Tucker.', 1),
+('b0000008-0000-0000-0000-000000000003','Unfolded PLS','unfolded_pls','multiway_regression','regression','08_multiway_regression','PLS em dados multiway desdobrados (unfold + PLS).', 1),
+('b0000008-0000-0000-0000-000000000004','PARAFAC Regression','parafac_regression','multiway_regression','regression','08_multiway_regression','Regressão sobre scores PARAFAC.', 1),
+('b0000008-0000-0000-0000-000000000005','Multiway PCR','multiway_pcr','multiway_regression','regression','08_multiway_regression','PCR sobre dados multiway desdobrados.', 1),
+
+-- FAMÍLIA 09 — Classificação Multiway
+('b0000009-0000-0000-0000-000000000001','N-PLS-DA','n_pls_da','multiway_classification','classification','09_multiway_classif','N-PLS-DA para discriminação em dados multiway.', 1),
+('b0000009-0000-0000-0000-000000000002','Unfolded PLS-DA','unfolded_pls_da','multiway_classification','classification','09_multiway_classif','PLS-DA em dados multiway desdobrados.', 1),
+('b0000009-0000-0000-0000-000000000003','Tucker LDA','tucker_lda','multiway_classification','classification','09_multiway_classif','LDA sobre scores Tucker.', 1),
+('b0000009-0000-0000-0000-000000000004','PARAFAC SIMCA','parafac_simca','multiway_classification','classification','09_multiway_classif','SIMCA aplicado a scores PARAFAC por classe.', 1),
+
+-- FAMÍLIA 10 — Calibração de Ordem Superior
+('b0000010-0000-0000-0000-000000000001','Second Order Calibration','second_order_calibration','calibration','second_order','10_calibracao_ordem_superior','Calibração de segunda ordem com estimação de constituintes sem separação prévia.', 1),
+('b0000010-0000-0000-0000-000000000002','Third Order Calibration','third_order_calibration','calibration','third_order','10_calibracao_ordem_superior','Calibração de terceira ordem para dados de quarta ordem analítica.', 1),
+('b0000010-0000-0000-0000-000000000003','BLLS','blls','calibration','bilinear','10_calibracao_ordem_superior','Bilinear Least Squares — calibração bilinear de primeira ordem.', 1),
+('b0000010-0000-0000-0000-000000000004','GRAM','gram','calibration','second_order','10_calibracao_ordem_superior','Generalized Rank Annihilation Method.', 1),
+('b0000010-0000-0000-0000-000000000005','ATLD','atld','calibration','second_order','10_calibracao_ordem_superior','Alternating Trilinear Decomposition.', 1),
+
+-- FAMÍLIA 11 — Seleção de Variáveis
+('b0000011-0000-0000-0000-000000000001','UVE','uve','variable_selection','filter','11_selecao_variaveis','Uninformative Variable Elimination.', 1),
+('b0000011-0000-0000-0000-000000000002','iPLS','ipls_var','variable_selection','interval','11_selecao_variaveis','Interval PLS para seleção de regiões espectrais.', 1),
+('b0000011-0000-0000-0000-000000000003','siPLS','sipls','variable_selection','interval','11_selecao_variaveis','Synergy interval PLS — combinações de intervalos.', 1),
+('b0000011-0000-0000-0000-000000000004','CARS','cars','variable_selection','evolutionary','11_selecao_variaveis','Competitive Adaptive Reweighted Sampling.', 1),
+('b0000011-0000-0000-0000-000000000005','VIP Selection','vip','variable_selection','importance','11_selecao_variaveis','Variable Importance in Projection (corte por threshold).', 1),
+('b0000011-0000-0000-0000-000000000006','GA-PLS','ga_pls','variable_selection','evolutionary','11_selecao_variaveis','Algoritmo Genético para seleção de variáveis em PLS.', 1),
+('b0000011-0000-0000-0000-000000000007','SPA','spa','variable_selection','projection','11_selecao_variaveis','Successive Projections Algorithm.', 1),
+('b0000011-0000-0000-0000-000000000008','RF Importance','rf_importance','variable_selection','importance','11_selecao_variaveis','Importância de variáveis por Random Forest.', 1),
+('b0000011-0000-0000-0000-000000000009','Boruta','boruta','variable_selection','wrapper','11_selecao_variaveis','Seleção de variáveis por método Boruta (shadow features).', 1),
+('b0000011-0000-0000-0000-000000000010','LASSO Selection','lasso_selection','variable_selection','regularized','11_selecao_variaveis','Seleção por regularização L1 com cross-validation do lambda.', 1),
+
+-- FAMÍLIA 12 — Validação de Modelos
+('b0000012-0000-0000-0000-000000000001','Bootstrap','bootstrap','validation','resampling','12_validacao_modelos','Bootstrap .632 para estimativa de erro.', 1),
+('b0000012-0000-0000-0000-000000000002','Permutation Test','permutation_test','validation','significance','12_validacao_modelos','Teste de permutação (y-scrambling) para verificar chance correlation.', 1),
+('b0000012-0000-0000-0000-000000000003','Leverage Influence','leverage_influence','validation','diagnostics','12_validacao_modelos','Hat matrix e distância de Cook para detectar amostras influentes.', 1),
+
+-- FAMÍLIA 13 — Transferência de Aprendizado
+('b0000013-0000-0000-0000-000000000001','PDS','pds','other','calibration_transfer','13_transferencia_aprendizado','Piecewise Direct Standardization.', 1),
+('b0000013-0000-0000-0000-000000000002','DS','ds','other','calibration_transfer','13_transferencia_aprendizado','Direct Standardization.', 1),
+('b0000013-0000-0000-0000-000000000003','Domain Adaptation PCA','domain_adaptation_pca','other','calibration_transfer','13_transferencia_aprendizado','Alinhamento de domínios via rotação Procrustes em PCA.', 1),
+('b0000013-0000-0000-0000-000000000004','Fine Tuning PLS','fine_tuning_pls','other','calibration_transfer','13_transferencia_aprendizado','Fine-tuning de modelo PLS com amostras do novo instrumento.', 1),
+('b0000013-0000-0000-0000-000000000005','Spectral Calibration Transfer','spectral_calibration_transfer','other','calibration_transfer','13_transferencia_aprendizado','Transferência de calibração espectral genérica (SLOPE/BIAS).', 1),
+
+-- FAMÍLIA 14 — Sinais Espectrais
+('b0000014-0000-0000-0000-000000000001','Peak Detection','peak_detection','other','signal_processing','14_sinais_espectrais','Detecção de picos espectrais via scipy find_peaks.', 1),
+('b0000014-0000-0000-0000-000000000002','Peak Alignment','peak_alignment','other','signal_processing','14_sinais_espectrais','Alinhamento de picos por correlação cruzada.', 1),
+('b0000014-0000-0000-0000-000000000003','Spectrum Decomposition','spectrum_decomposition','other','signal_processing','14_sinais_espectrais','Decomposição espectral por NMF, ICA ou PCA.', 1),
+('b0000014-0000-0000-0000-000000000004','Noise Estimation','noise_estimation','other','signal_processing','14_sinais_espectrais','Estimação de ruído por derivada ou SWSC.', 1),
+('b0000014-0000-0000-0000-000000000005','Fourier Analysis','fourier_analysis','other','signal_processing','14_sinais_espectrais','Análise de Fourier (FFT) com filtragem lowpass/highpass.', 1),
+
+-- FAMÍLIA 15 — Imagens Hiperespectrais
+('b0000015-0000-0000-0000-000000000001','Hyperspectral Unmixing','hyperspectral_unmixing','other','hyperspectral','15_imagens_hiperespectrais','Desmistura espectral via VCA, N-FINDR ou FCLSU.', 1),
+('b0000015-0000-0000-0000-000000000002','Hyperspectral Classification','hyperspectral_classification','other','hyperspectral','15_imagens_hiperespectrais','Classificação pixel a pixel (SVM ou RF) em imagens hiperespectrais.', 1),
+('b0000015-0000-0000-0000-000000000003','Hyperspectral PCA','hyperspectral_pca','other','hyperspectral','15_imagens_hiperespectrais','PCA em imagem hiperespectral (entrada 2D ou 3D).', 1),
+('b0000015-0000-0000-0000-000000000004','Spectral Angle Mapper','spectral_angle_mapper','other','hyperspectral','15_imagens_hiperespectrais','SAM — classificação por ângulo espectral.', 1),
+
+-- FAMÍLIA 16 — Dados Faltantes
+('b0000016-0000-0000-0000-000000000001','KNN Imputation','knn_imputation','other','missing_data','16_dados_faltantes','Imputação por K vizinhos mais próximos.', 1),
+('b0000016-0000-0000-0000-000000000002','Iterative Imputation','iterative_imputation','other','missing_data','16_dados_faltantes','MICE — Multiple Imputation by Chained Equations.', 1),
+('b0000016-0000-0000-0000-000000000003','Matrix Completion','matrix_completion','other','missing_data','16_dados_faltantes','Completamento de matriz por SVD iterativo.', 1),
+('b0000016-0000-0000-0000-000000000004','Spectral Interpolation','spectral_interpolation','other','missing_data','16_dados_faltantes','Interpolação de regiões faltantes (linear, cúbica ou PCHIP).', 1),
+('b0000016-0000-0000-0000-000000000005','PCA Imputation','pca_imputation','other','missing_data','16_dados_faltantes','Imputação via NIPALS com dados faltantes.', 1),
+
+-- FAMÍLIA 17 — Fusão de Dados
+('b0000017-0000-0000-0000-000000000001','Low Level Fusion','low_level_fusion','other','data_fusion','17_fusao_dados','Fusão de baixo nível — concatenação de blocos de dados.', 1),
+('b0000017-0000-0000-0000-000000000002','Mid Level Fusion','mid_level_fusion','other','data_fusion','17_fusao_dados','Fusão de médio nível — PCA por bloco + concatenação de scores.', 1),
+('b0000017-0000-0000-0000-000000000003','High Level Fusion','high_level_fusion','other','data_fusion','17_fusao_dados','Fusão de alto nível — combinação de predições de modelos independentes.', 1),
+('b0000017-0000-0000-0000-000000000004','Kernel Fusion','kernel_fusion','other','data_fusion','17_fusao_dados','Fusão de kernels (MKL-style) para SVM multi-bloco.', 1),
+('b0000017-0000-0000-0000-000000000005','SOCOFUS','socofus','other','data_fusion','17_fusao_dados','Sequential Orthogonalized PLS para fusão sequencial.', 1),
+
+-- FAMÍLIA 18 — Quimiometria de Processo / SPC
+('b0000018-0000-0000-0000-000000000001','MSPC','mspc','other','spc','18_quimiometria_processo','Multivariate Statistical Process Control (T² de Hotelling + Q/SPE).', 1),
+('b0000018-0000-0000-0000-000000000002','PCA Control Chart','pca_control_chart','other','spc','18_quimiometria_processo','Carta de controle por scores PCA (±3σ por componente).', 1),
+('b0000018-0000-0000-0000-000000000003','EWMA','ewma','other','spc','18_quimiometria_processo','Exponentially Weighted Moving Average — univariado e multivariado.', 1),
+('b0000018-0000-0000-0000-000000000004','Batch PCA','batch_pca','other','spc','18_quimiometria_processo','MPCA — análise de lotes por desdobramento de tensor 3D.', 1),
+('b0000018-0000-0000-0000-000000000005','CUSUM Chart','cusum_chart','other','spc','18_quimiometria_processo','Carta CUSUM para detecção de desvios acumulados (univariada).', 1),
+
+-- FAMÍLIA 19 — Interpretabilidade
+('b0000019-0000-0000-0000-000000000001','Permutation Importance','permutation_importance','other','interpretability','19_interpretabilidade','Importância por permutação via RF ou PLS.', 1),
+('b0000019-0000-0000-0000-000000000002','Partial Dependence','partial_dependence','other','interpretability','19_interpretabilidade','Partial Dependence Plot — efeito marginal de variáveis no modelo RF.', 1),
+('b0000019-0000-0000-0000-000000000003','Sensitivity Analysis','sensitivity_analysis','other','interpretability','19_interpretabilidade','Análise de sensibilidade local (gradiente) ou global (Morris screening).', 1),
+('b0000019-0000-0000-0000-000000000004','VIP Interpretation','vip_interpretation','other','interpretability','19_interpretabilidade','VIP scores de PLS com análise de regiões mais importantes.', 1),
+('b0000019-0000-0000-0000-000000000005','LIME Explanation','lime_explanation','other','interpretability','19_interpretabilidade','LIME — aproximação linear local em torno de amostras individuais.', 1),
+
+-- FAMÍLIA 20 — Utilitários
+('b0000020-0000-0000-0000-000000000001','Metrics Aggregation','metrics_aggregation','utility',NULL,'20_utilitarios','Agrega métricas de múltiplas execuções em tabela comparativa.', 1),
+('b0000020-0000-0000-0000-000000000002','Spectrum Simulator','spectrum_simulator','utility',NULL,'20_utilitarios','Gera espectros sintéticos com picos Gaussianos e ruído controlado.', 1),
+('b0000020-0000-0000-0000-000000000003','Unit Converter','unit_converter','utility',NULL,'20_utilitarios','Converte entre unidades espectrais: nm, cm⁻¹, eV, THz, μm.', 1),
+('b0000020-0000-0000-0000-000000000004','Outlier Detection Utility','outlier_detection_utility','utility',NULL,'20_utilitarios','Detecção de outliers por Mahalanobis, Grubbs ou IQR.', 1),
+('b0000020-0000-0000-0000-000000000005','Data Export Report','data_export_report','utility',NULL,'20_utilitarios','Exporta resultados para CSV/JSON e gera relatório HTML.', 1),
+('b0000020-0000-0000-0000-000000000006','Spectral Database Search','spectral_database_search','utility',NULL,'20_utilitarios','Busca espectral por similaridade (cosine ou SAM).', 1);
 
 -- =============================================================================
 -- TECHNIQUE COMPATIBILITIES
@@ -305,7 +477,7 @@ CREATE TABLE `datasets` (
   `dimensions` json DEFAULT NULL,
   `mode_labels` json DEFAULT NULL,
   `mode_ranges` json DEFAULT NULL,
-  `sample_axis` tinyint unsigned DEFAULT '0',
+  `sample_axis` tinyint unsigned DEFAULT NULL COMMENT 'Índice (0-based) do modo em dimensions/mode_labels que representa amostras. NULL = não existe eixo de amostras.',
   `data_order` tinyint unsigned DEFAULT '1',
   `augmentation_scheme` json DEFAULT NULL,
   `file_format` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -347,6 +519,38 @@ CREATE TABLE `dataset_spectra` (
   KEY `idx_dataset_spectra_spectrum` (`spectrum_id`),
   CONSTRAINT `fk_dataset_spectra_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_dataset_spectra_spectrum` FOREIGN KEY (`spectrum_id`) REFERENCES `spectra` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- ARTICLES
+-- =============================================================================
+
+CREATE TABLE `articles` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `doi` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `title` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `abstract` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `authors` json DEFAULT NULL,
+  `journal` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `publisher` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `publication_date` date DEFAULT NULL,
+  `url` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `pdf_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `full_text_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `extraction_status` enum('pending','extracted','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
+  `metadata` json DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_articles_user` (`user_id`),
+  KEY `idx_articles_doi` (`doi`),
+  KEY `idx_articles_publication_date` (`publication_date`),
+  KEY `idx_articles_extraction` (`extraction_status`),
+  CONSTRAINT `fk_articles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
@@ -443,38 +647,6 @@ CREATE TABLE `workflow_templates` (
   KEY `idx_templates_domain` (`domain`),
   KEY `idx_templates_order` (`analytical_order`),
   CONSTRAINT `fk_templates_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================================================
--- ARTICLES
--- =============================================================================
-
-CREATE TABLE `articles` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `user_id` bigint unsigned NOT NULL,
-  `doi` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `title` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `abstract` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `authors` json DEFAULT NULL,
-  `journal` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `publisher` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `publication_date` date DEFAULT NULL,
-  `url` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `pdf_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `full_text_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `extraction_status` enum('pending','extracted','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
-  `metadata` json DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uuid` (`uuid`),
-  KEY `idx_articles_user` (`user_id`),
-  KEY `idx_articles_doi` (`doi`),
-  KEY `idx_articles_publication_date` (`publication_date`),
-  KEY `idx_articles_extraction` (`extraction_status`),
-  CONSTRAINT `fk_articles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
@@ -673,7 +845,8 @@ CREATE TABLE `projects` (
   KEY `idx_projects_visibility` (`visibility`),
   KEY `idx_projects_status` (`status`),
   CONSTRAINT `fk_projects_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Projetos de pesquisa que agrupam datasets, workflows e artigos.';
 
 -- =============================================================================
 -- PROJECT MEMBERS
@@ -683,7 +856,7 @@ CREATE TABLE `project_members` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `project_id` bigint unsigned NOT NULL,
   `user_id` bigint unsigned NOT NULL,
-  `role` enum('viewer','editor','admin') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'viewer',
+  `role` enum('viewer','editor','collaborator','admin') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'viewer',
   `joined_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_project_member` (`project_id`,`user_id`),
@@ -753,6 +926,49 @@ CREATE TABLE `project_articles` (
   CONSTRAINT `fk_project_articles_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_project_articles_user` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- PROJECT HISTORY
+-- =============================================================================
+
+CREATE TABLE `project_history` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `project_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned DEFAULT NULL,
+  `action` varchar(100) NOT NULL COMMENT 'Ex: created, renamed, dataset_added, member_invited',
+  `entity_type` varchar(100) DEFAULT NULL,
+  `entity_id` bigint unsigned DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_project_history_project` (`project_id`),
+  KEY `idx_project_history_user` (`user_id`),
+  KEY `idx_project_history_created` (`created_at`),
+  CONSTRAINT `fk_project_history_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Auditoria específica de projetos (complementa audit_logs com contexto de projeto).';
+
+-- =============================================================================
+-- WORKFLOW VERSIONS
+-- =============================================================================
+
+CREATE TABLE `workflow_versions` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `workflow_id` bigint unsigned NOT NULL,
+  `version` int unsigned NOT NULL DEFAULT 1,
+  `definition` json NOT NULL COMMENT 'Snapshot do grafo naquele momento (nós + arestas + parâmetros)',
+  `label` varchar(255) DEFAULT NULL COMMENT 'Rótulo opcional (ex: "antes do refactor", "v2 com PCA")',
+  `created_by` bigint unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_workflow_version` (`workflow_id`,`version`),
+  KEY `idx_workflow_versions_workflow` (`workflow_id`),
+  CONSTRAINT `fk_workflow_versions_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_workflow_versions_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Histórico de versões de um workflow — cada edição pode gerar um snapshot.';
 
 -- =============================================================================
 -- MODELS
@@ -841,13 +1057,12 @@ ALTER TABLE `models`
 
 -- =============================================================================
 -- EXECUTION NODES
--- Fixed: uses workflow_node_id FK (matches execution.controller.js INSERT/JOIN logic)
 -- =============================================================================
 
 CREATE TABLE `execution_nodes` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `execution_id` bigint unsigned NOT NULL,
-  `workflow_node_id` bigint unsigned NOT NULL COMMENT 'FK to workflow_nodes.id — matches controller INSERT and JOIN logic',
+  `workflow_node_id` bigint unsigned NOT NULL COMMENT 'FK to workflow_nodes.id',
   `status` enum('pending','running','completed','failed','skipped') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `parameters` json DEFAULT NULL,
   `input_data` json DEFAULT NULL,
@@ -896,7 +1111,6 @@ CREATE TABLE `metrics` (
 
 -- =============================================================================
 -- JOBS
--- Fixed: added execute_node and cancel_execution to job_type enum
 -- =============================================================================
 
 CREATE TABLE `jobs` (
@@ -907,7 +1121,8 @@ CREATE TABLE `jobs` (
     'train_model','predict','preprocess',
     'execute_workflow','execute_node',
     'analyze_article','generate_workflow',
-    'operate_dataset','export',
+    'operate_dataset','import_dataset','export',
+    'preview_dataset','slice_dataset',
     'cancel_execution','other'
   ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `model_id` bigint unsigned DEFAULT NULL,
