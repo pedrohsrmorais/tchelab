@@ -234,7 +234,18 @@ function ImportModal({ open, onClose, onImported }) {
 
 function DatasetCard({ ds }) {
   const typeColors = { spectral: 'purple', tabular: 'blue', time_series: 'green', image: 'amber' };
-  const color = typeColors[ds.type] || 'blue';
+  const dataType = ds.data_type || 'tabular';
+  const color = typeColors[dataType] || 'blue';
+
+  // Parse dimensions [n_samples, n_variables]
+  let dims = null;
+  try { dims = ds.dimensions ? (typeof ds.dimensions === 'string' ? JSON.parse(ds.dimensions) : ds.dimensions) : null; } catch {}
+  const nSamples   = dims?.[0] ?? null;
+  const nVariables = dims?.[1] ?? null;
+
+  const colorMap = { blue: 'blue', purple: 'purple', green: 'green', amber: 'amber' };
+  const badgeColor = colorMap[color] || 'blue';
+
   return (
     <Link to={`/datasets/${ds.uuid}`}>
       <motion.div whileHover={{ y: -3 }} className="card card-hover p-5 flex flex-col gap-3 group cursor-pointer h-full">
@@ -242,8 +253,8 @@ function DatasetCard({ ds }) {
           <div className={`w-10 h-10 rounded-xl bg-${color}-500/20 flex items-center justify-center`}>
             <Database className={`w-5 h-5 text-${color}-400`} />
           </div>
-          <span className={`badge badge-${color === 'blue' ? 'blue' : color === 'purple' ? 'purple' : color === 'green' ? 'green' : 'amber'}`}>
-            {ds.type ?? 'tabular'}
+          <span className={`badge badge-${badgeColor}`}>
+            {dataType}
           </span>
         </div>
         <div className="flex-1">
@@ -251,8 +262,9 @@ function DatasetCard({ ds }) {
           <p className="text-sm text-slate-400 mt-1 line-clamp-2">{ds.description || 'Sem descrição'}</p>
         </div>
         <div className="text-xs text-slate-500 flex items-center gap-3">
-          <span>{ds.rows_count ?? 0} linhas</span>
-          <span>{ds.columns_count ?? 0} colunas</span>
+          {nSamples   !== null && <span><strong className="text-slate-400">{nSamples}</strong> amostras</span>}
+          {nVariables !== null && <span><strong className="text-slate-400">{nVariables}</strong> variáveis</span>}
+          {nSamples === null && nVariables === null && <span>Sem dados</span>}
           <ArrowRight className="w-3.5 h-3.5 ml-auto text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
         </div>
       </motion.div>

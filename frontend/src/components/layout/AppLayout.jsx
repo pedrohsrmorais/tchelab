@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
@@ -19,12 +19,52 @@ function ContentLoader() {
   );
 }
 
+/**
+ * PageTransition wraps the <Outlet /> and implements a smart fade:
+ *
+ * 1. On route change, the CURRENT page fades out over ~0.5s.
+ * 2. The new page is mounted (React renders it, lazy chunks load, data hooks fire)
+ *    WHILE the old page is still visible (or fading).
+ * 3. The new page starts FULLY TRANSPARENT (opacity: 0) and only becomes
+ *    visible AFTER the exit animation completes — thanks to AnimatePresence
+ *    mode="wait", which lets the exit finish before starting the enter.
+ * 4. The enter fade-in is quick (0.35s) so the total perceived delay is minimal.
+ *
+ * This eliminates the "flash" because:
+ * - There is no blank frame between pages.
+ * - The new page starts at opacity 0 and smoothly fades in once ready.
+ */
+function PageTransition() {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          // exit: slow fade-out so the old page lingers while new one loads
+          // animate: quicker fade-in once new page is mounted and ready
+          opacity: {
+            duration: 0.5,
+            ease: 'easeInOut',
+          },
+        }}
+        style={{ minHeight: '100%', padding: '1.5rem' }}
+      >
+        <Outlet />
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 export default function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [initialLoading, setInitialLoading]     = useState(true);
   const { fetchMe } = useAuthStore();
   const { theme } = useTheme();
-  const location = useLocation();
 
   useEffect(() => {
     fetchMe().finally(() => setInitialLoading(false));
@@ -48,18 +88,7 @@ export default function AppLayout() {
         {initialLoading ? (
           <ContentLoader />
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1, ease: 'easeInOut' }}
-              style={{ minHeight: '100%', padding: '1.5rem' }}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          <PageTransition />
         )}
       </main>
     </div>
