@@ -98,19 +98,23 @@ export default function ProjectDetailPage() {
             <EmptyState icon={Database} title="Nenhum dataset" description="Adicione datasets a este projeto." action={<button onClick={() => setAddDatasetOpen(true)} className="btn-primary">Adicionar Dataset</button>} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {datasetsList.map(ds => (
-                <Link key={ds.uuid} to={`/datasets/${ds.uuid}`}>
-                  <div className="card card-hover p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                      <Database className="w-5 h-5 text-purple-400" />
+              {datasetsList.map(ds => {
+                let dims = null;
+                try { dims = ds.dimensions ? (typeof ds.dimensions === 'string' ? JSON.parse(ds.dimensions) : ds.dimensions) : null; } catch {}
+                return (
+                  <Link key={ds.uuid} to={`/datasets/${ds.uuid}`}>
+                    <div className="card card-hover p-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                        <Database className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-white truncate">{ds.name}</div>
+                        <div className="text-xs text-slate-400">{dims?.[0] ?? 0} linhas · {dims?.[1] ?? 0} colunas</div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="font-medium text-white truncate">{ds.name}</div>
-                      <div className="text-xs text-slate-400">{ds.rows_count ?? 0} linhas · {ds.columns_count ?? 0} colunas</div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

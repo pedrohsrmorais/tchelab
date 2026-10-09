@@ -23,7 +23,10 @@ async function getMembership(projectId, userId) {
 async function listProjects(req, res) {
   try {
     const [rows] = await db.query(
-      `SELECT p.* FROM projects p
+      `SELECT p.*,
+              (SELECT COUNT(*) FROM project_datasets WHERE project_id = p.id) AS dataset_count,
+              (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) AS member_count
+       FROM projects p
        JOIN project_members pm ON pm.project_id = p.id
        WHERE pm.user_id = ? AND p.deleted_at IS NULL
        ORDER BY p.created_at DESC`,

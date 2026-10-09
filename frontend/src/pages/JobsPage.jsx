@@ -6,9 +6,10 @@ import EmptyState from '../components/ui/EmptyState';
 import SkeletonCard from '../components/ui/SkeletonCard';
 
 const statusConfig = {
+  queued:    { label: 'Na fila',    color: 'slate', icon: Clock },
   pending:   { label: 'Pendente',   color: 'amber', icon: Clock },
   running:   { label: 'Executando', color: 'blue',  icon: Play },
-  completed: { label: 'Concluído',  color: 'green', icon: CheckCircle2 },
+  done:      { label: 'Concluído',  color: 'green', icon: CheckCircle2 },
   failed:    { label: 'Falhou',     color: 'red',   icon: XCircle },
   cancelled: { label: 'Cancelado',  color: 'slate', icon: AlertCircle },
 };
@@ -23,8 +24,8 @@ function JobRow({ job }) {
         <StatusIcon className={`w-4 h-4 text-${status.color}-400 ${job.status === 'running' ? 'anim-spin' : ''}`} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-white text-sm truncate">{job.name ?? `Job #${job.id}`}</div>
-        <div className="text-xs text-slate-400 mt-0.5 truncate">{job.type ?? 'execution'}</div>
+        <div className="font-medium text-white text-sm truncate">{job.name ?? `Job #${job.id ?? job.uuid?.slice(0, 8)}`}</div>
+        <div className="text-xs text-slate-400 mt-0.5 truncate">{job.job_type ?? 'execution'}</div>
       </div>
       <span className={`badge badge-${status.color} flex-shrink-0`}>{status.label}</span>
       <div className="text-xs text-slate-500 flex-shrink-0 hidden md:block">
@@ -53,7 +54,7 @@ export default function JobsPage() {
   }, [refetch]);
 
   const jobs = (data?.data ?? data ?? []).filter(j => {
-    const matchSearch = j.name?.toLowerCase().includes(search.toLowerCase()) || j.type?.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = j.name?.toLowerCase().includes(search.toLowerCase()) || j.job_type?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = !statusFilter || j.status === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -87,7 +88,7 @@ export default function JobsPage() {
         <EmptyState icon={Activity} title="Nenhum job" description={search || statusFilter ? 'Nenhum job com estes filtros.' : 'Nenhum job em execução no momento.'} />
       ) : (
         <div className="space-y-2">
-          {jobs.map(j => <JobRow key={j.id} job={j} />)}
+          {jobs.map(j => <JobRow key={j.uuid ?? j.id} job={j} />)}
         </div>
       )}
     </div>

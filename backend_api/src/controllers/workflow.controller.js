@@ -39,8 +39,9 @@ async function listWorkflows(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
-      `SELECT w.id, w.uuid, w.name, w.status, w.visibility, w.is_template,
-              w.source_article_analysis_id, w.fork_from_workflow_id, w.created_at, w.updated_at
+      `SELECT w.id, w.uuid, w.name, w.description, w.status, w.visibility, w.is_template,
+              w.source_article_analysis_id, w.fork_from_workflow_id, w.created_at, w.updated_at,
+              (SELECT COUNT(*) FROM executions e WHERE e.workflow_id = w.id) AS execution_count
        FROM workflows w WHERE ${where} ORDER BY w.updated_at DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );

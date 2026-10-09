@@ -17,7 +17,7 @@ async function listAuditLogs(req, res) {
       if (u.length) { conditions.push('al.user_id = ?'); params.push(u[0].id); }
     }
     if (action) { conditions.push('al.action LIKE ?'); params.push(`%${action}%`); }
-    if (resource_type) { conditions.push('al.resource_type = ?'); params.push(resource_type); }
+    if (resource_type) { conditions.push('al.entity_type = ?'); params.push(resource_type); }
     if (from) { conditions.push('al.created_at >= ?'); params.push(from); }
     if (to) { conditions.push('al.created_at <= ?'); params.push(to); }
 
@@ -26,8 +26,8 @@ async function listAuditLogs(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
-      `SELECT al.id, al.action, al.resource_type, al.resource_uuid,
-              al.old_value, al.new_value, al.ip_address, al.user_agent,
+      `SELECT al.id, al.action, al.entity_type, al.entity_id,
+              al.before_data, al.after_data, al.ip_address, al.user_agent,
               al.created_at, u.email AS user_email, u.uuid AS user_uuid
        FROM audit_logs al
        LEFT JOIN users u ON u.id = al.user_id
@@ -56,16 +56,28 @@ async function getAuditLog(req, res) {
 }
 
 // GET /audit-logs/resource/:type/:uuid  (admin ou dono do recurso)
+// Nota: `entity_id` em audit_logs é o id interno (bigint) da entidade, não o
+// seu uuid público — por isso resolvemos o uuid recebido na rota para o id
+// interno antes de filtrar (mesmo padrão usado nos demais controllers).
+const ENTITY_TABLES = ['datasets', 'workflows', 'projects', 'communities', 'articles', 'models', 'executions'];
+
 async function getResourceAuditLogs(req, res) {
   try {
     const { type, uuid } = req.params;
+    if (!ENTITY_TABLES.includes(type)) {
+      return R.unprocessable(res, [{ field: 'type', message: `Tipo inválido. Use: ${ENTITY_TABLES.join(', ')}.` }]);
+    }
+
+    const [entity] = await db.query(`SELECT id FROM \`${type}\` WHERE uuid = ?`, [uuid]);
+    if (!entity.length) return R.notFound(res, 'Recurso');
+    const entityId = entity[0].id;
 
     // Admin pode ver tudo; usuário normal só vê logs dos seus próprios recursos
     let userId = null;
     if (req.user.role !== 'admin') userId = req.user.id;
 
-    const conditions = ['al.resource_type = ?', 'al.resource_uuid = ?'];
-    const params = [type, uuid];
+    const conditions = ['al.entity_type = ?', 'al.entity_id = ?'];
+    const params = [type, entityId];
     if (userId) {
       conditions.push('al.user_id = ?');
       params.push(userId);
@@ -76,7 +88,7 @@ async function getResourceAuditLogs(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
-      `SELECT al.id, al.action, al.old_value, al.new_value,
+      `SELECT al.id, al.action, al.before_data, al.after_data,
               al.ip_address, al.created_at, u.email AS user_email
        FROM audit_logs al
        LEFT JOIN users u ON u.id = al.user_id
@@ -98,9 +110,9 @@ async function getAdminStats(req, res) {
     const [[datasets]] = await db.query('SELECT COUNT(*) AS total FROM datasets WHERE deleted_at IS NULL');
     const [[jobs]] = await db.query(
       `SELECT
-         SUM(status = 'pending') AS pending,
+         SUM(status IN ('queued','pending')) AS pending,
          SUM(status = 'running') AS running,
-         SUM(status = 'completed') AS completed,
+         SUM(status = 'done') AS completed,
          SUM(status = 'failed') AS failed
        FROM jobs`,
     );

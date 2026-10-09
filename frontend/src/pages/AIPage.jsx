@@ -64,7 +64,14 @@ export default function AIPage() {
   };
 
   const handleSyntheticGenerate = async () => {
-    const result = await generateSynthetic(syntheticForm);
+    // A API espera `name` (obrigatório) e `n_variables` (não `n_features`)
+    const { n_features, ...rest } = syntheticForm;
+    const payload = {
+      ...rest,
+      name: `Sintético ${syntheticForm.technique.toUpperCase()} ${new Date().toLocaleString('pt-BR')}`,
+      n_variables: n_features,
+    };
+    const result = await generateSynthetic(payload);
     if (result) toast.success('Dataset sintético gerado! Acesse a aba Datasets.');
   };
 

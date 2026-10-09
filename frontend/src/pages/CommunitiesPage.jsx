@@ -16,9 +16,9 @@ function CommunityCard({ community }) {
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
             <Users className="w-5 h-5 text-amber-400" />
           </div>
-          <span className={`badge ${community.is_public ? 'badge-green' : 'badge-blue'}`}>
-            {community.is_public ? <Globe className="w-3 h-3 inline mr-1" /> : <Lock className="w-3 h-3 inline mr-1" />}
-            {community.is_public ? 'Pública' : 'Privada'}
+          <span className={`badge ${community.visibility === 'public' ? 'badge-green' : 'badge-blue'}`}>
+            {community.visibility === 'public' ? <Globe className="w-3 h-3 inline mr-1" /> : <Lock className="w-3 h-3 inline mr-1" />}
+            {community.visibility === 'public' ? 'Pública' : 'Privada'}
           </span>
         </div>
         <div className="flex-1">
@@ -42,7 +42,8 @@ function CreateCommunityModal({ open, onClose, onCreated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) { toast.error('Nome obrigatório'); return; }
-    const result = await mutate(form);
+    const { is_public, ...rest } = form;
+    const result = await mutate({ ...rest, visibility: is_public ? 'public' : 'private' });
     if (result) {
       toast.success('Comunidade criada!');
       onCreated();

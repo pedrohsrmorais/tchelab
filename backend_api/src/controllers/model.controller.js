@@ -35,7 +35,8 @@ async function listModels(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
-      `SELECT m.uuid, m.name, m.technique_slug, m.status, m.framework,
+      `SELECT m.id, m.uuid, m.name, m.algorithm, m.technique_slug, m.status, m.framework,
+              m.metrics_cal, m.metrics_cv, m.metrics_ext,
               m.training_dataset_uuid, m.execution_uuid, m.created_at, m.updated_at
        FROM models m WHERE ${where} ORDER BY m.created_at DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset],

@@ -18,8 +18,8 @@ function ProjectCard({ project, onDelete }) {
           <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
             <FolderOpen className="w-5 h-5 text-blue-400" />
           </div>
-          <span className={`badge ${project.is_public ? 'badge-green' : 'badge-blue'}`}>
-            {project.is_public ? 'Público' : 'Privado'}
+          <span className={`badge ${project.visibility === 'public' ? 'badge-green' : 'badge-blue'}`}>
+            {project.visibility === 'public' ? 'Público' : 'Privado'}
           </span>
         </div>
         <h3 className="font-semibold text-white mb-1 truncate">{project.name}</h3>
@@ -52,7 +52,8 @@ function CreateProjectModal({ open, onClose, onCreated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) { toast.error('Nome obrigatório'); return; }
-    const result = await mutate(form);
+    const { is_public, ...rest } = form;
+    const result = await mutate({ ...rest, visibility: is_public ? 'public' : 'private' });
     if (result) { toast.success('Projeto criado!'); onCreated(result); onClose(); setForm({ name: '', description: '', is_public: false }); }
   };
 
