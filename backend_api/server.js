@@ -4,12 +4,21 @@ require('dotenv').config();
 
 const express    = require('express');
 const path       = require('path');
+const fs         = require('fs');
 const helmet     = require('helmet');
 const morgan     = require('morgan');
 const rateLimit  = require('express-rate-limit');
 const redis      = require('./src/config/redis.config');
+const storageConfig = require('./src/config/storage.config');
 
 const apiRouter  = require('./src/routes/api.routes');
+
+// ─── Ensure storage directories exist ────────────────────────────────────────
+Object.values(storageConfig).forEach((dir) => {
+  if (typeof dir === 'string') {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
 const app  = express();
 const PORT = process.env.PORT || 3003;

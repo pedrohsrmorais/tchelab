@@ -1,6 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth';
 import { PageLoader } from './components/ui/Spinner';
 
@@ -23,25 +22,6 @@ const AIPage        = lazy(() => import('./pages/AIPage'));
 const AdminPage     = lazy(() => import('./pages/AdminPage'));
 const ProfilePage   = lazy(() => import('./pages/ProfilePage'));
 
-// Page transition wrapper
-const PageTransition = ({ children }) => {
-  const location = useLocation();
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -12 }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        style={{ height: '100%' }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
 // Protected route guard
 const ProtectedRoute = ({ children, requirePlus = false, requireAdmin = false }) => {
   const { token, isPlus, isAdmin } = useAuthStore();
@@ -60,6 +40,8 @@ const PublicRoute = ({ children }) => {
 
 export default function App() {
   return (
+    // PageLoader only shows during initial JS bundle load (Suspense boundary)
+    // After that, AppLayout renders immediately and handles its own inner loader
     <Suspense fallback={<PageLoader text="Carregando TcheLab..." />}>
       <Routes>
         {/* Auth */}
@@ -67,69 +49,29 @@ export default function App() {
           <PublicRoute><LoginPage /></PublicRoute>
         } />
 
-        {/* App shell */}
+        {/* App shell — AppLayout owns page transitions internally */}
         <Route path="/" element={
           <ProtectedRoute><AppLayout /></ProtectedRoute>
         }>
-          <Route index element={
-            <PageTransition><DashboardPage /></PageTransition>
-          } />
-
-          <Route path="projects" element={
-            <PageTransition><ProjectsPage /></PageTransition>
-          } />
-          <Route path="projects/:id" element={
-            <PageTransition><ProjectDetailPage /></PageTransition>
-          } />
-
-          <Route path="datasets" element={
-            <PageTransition><DatasetsPage /></PageTransition>
-          } />
-          <Route path="datasets/:id" element={
-            <PageTransition><DatasetDetailPage /></PageTransition>
-          } />
-
-          <Route path="communities" element={
-            <PageTransition><CommunitiesPage /></PageTransition>
-          } />
-          <Route path="communities/:id" element={
-            <PageTransition><CommunityDetailPage /></PageTransition>
-          } />
-
-          <Route path="workflows" element={
-            <PageTransition><WorkflowsPage /></PageTransition>
-          } />
-          <Route path="workflows/:id" element={
-            <PageTransition><WorkflowEditorPage /></PageTransition>
-          } />
-
-          <Route path="articles" element={
-            <PageTransition><ArticlesPage /></PageTransition>
-          } />
-
-          <Route path="models" element={
-            <PageTransition><ModelsPage /></PageTransition>
-          } />
-
-          <Route path="jobs" element={
-            <PageTransition><JobsPage /></PageTransition>
-          } />
-
+          <Route index element={<DashboardPage />} />
+          <Route path="projects" element={<ProjectsPage />} />
+          <Route path="projects/:id" element={<ProjectDetailPage />} />
+          <Route path="datasets" element={<DatasetsPage />} />
+          <Route path="datasets/:id" element={<DatasetDetailPage />} />
+          <Route path="communities" element={<CommunitiesPage />} />
+          <Route path="communities/:id" element={<CommunityDetailPage />} />
+          <Route path="workflows" element={<WorkflowsPage />} />
+          <Route path="workflows/:id" element={<WorkflowEditorPage />} />
+          <Route path="articles" element={<ArticlesPage />} />
+          <Route path="models" element={<ModelsPage />} />
+          <Route path="jobs" element={<JobsPage />} />
           <Route path="ai" element={
-            <ProtectedRoute requirePlus>
-              <PageTransition><AIPage /></PageTransition>
-            </ProtectedRoute>
+            <ProtectedRoute requirePlus><AIPage /></ProtectedRoute>
           } />
-
           <Route path="admin" element={
-            <ProtectedRoute requireAdmin>
-              <PageTransition><AdminPage /></PageTransition>
-            </ProtectedRoute>
+            <ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>
           } />
-
-          <Route path="profile" element={
-            <PageTransition><ProfilePage /></PageTransition>
-          } />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
 
         {/* 404 fallback */}
