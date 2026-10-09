@@ -94,12 +94,14 @@ async function getModelMetrics(req, res) {
     if (!model) return R.notFound(res, 'Modelo');
     if (model.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
 
+    // metrics rows belong to execution_nodes; get model's execution_id → execution_nodes
     const [rows] = await db.query(
-      `SELECT m.metric_name, m.metric_value, m.split, m.computed_at
+      `SELECT m.name AS metric_name, m.value AS metric_value, m.dataset_split AS split, m.created_at AS computed_at
        FROM metrics m
-       WHERE m.model_id = ?
-       ORDER BY m.computed_at DESC`,
-      [model.id],
+       JOIN execution_nodes en ON en.id = m.execution_node_id
+       WHERE en.execution_id = ?
+       ORDER BY m.created_at DESC`,
+      [model.execution_id],
     );
     return R.ok(res, rows);
   } catch (err) { return R.serverError(res, err); }
@@ -111,8 +113,8 @@ async function exportModel(req, res) {
     const model = await resolveModel(req.params.id);
     if (!model) return R.notFound(res, 'Modelo');
     if (model.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
-    if (model.status !== 'trained') {
-      return R.unprocessable(res, [{ field: 'status', message: 'Modelo precisa estar com status "trained" para exportar.' }]);
+    if (model.status !== 'ready') {
+      return R.unprocessable(res, [{ field: 'status', message: 'Modelo precisa estar com status "ready" para exportar.' }]);
     }
 
     const { format } = req.body;

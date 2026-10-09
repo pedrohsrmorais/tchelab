@@ -61,8 +61,8 @@ async function createPrediction(req, res) {
     if (!models.length) return R.notFound(res, 'Modelo');
     const model = models[0];
 
-    if (model.status !== 'trained') {
-      return R.unprocessable(res, [{ field: 'model_id', message: 'Modelo precisa estar com status "trained".' }]);
+    if (model.status !== 'ready') {
+      return R.unprocessable(res, [{ field: 'model_id', message: 'Modelo precisa estar com status "ready".' }]);
     }
 
     const [datasets] = await db.query('SELECT * FROM datasets WHERE uuid = ? AND deleted_at IS NULL', [dataset_id]);

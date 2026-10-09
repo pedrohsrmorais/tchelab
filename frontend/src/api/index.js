@@ -24,8 +24,12 @@ export const api = {
 
   // ── User ──────────────────────────────────────────────────────────────────
   user: {
-    update:          (d)       => put('/users/me', d),
-    changePassword:  (d)       => patch('/users/me/password', d),
+    // id = UUID do usuário (disponível em useAuthStore().user.uuid)
+    update:          (id, d)   => put(`/users/${id}`, d),
+    uploadAvatar:    (id, fd)  => client.post(`/users/${id}/avatar`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    stats:           (id)      => get(`/users/${id}/stats`),
+    // Troca de senha deve ser feita via POST /auth/reset-password (token por e-mail)
+    // Não há rota PATCH /users/:id/password — use auth.forgotPassword para iniciar o fluxo
   },
 
   // ── Projects ──────────────────────────────────────────────────────────────
@@ -62,8 +66,8 @@ export const api = {
 
   // ── Communities ──────────────────────────────────────────────────────────
   communities: {
+    // GET /communities já retorna as comunidades do usuário autenticado
     list:            (p)       => get('/communities', p),
-    listMine:        (p)       => get('/communities/mine', p),
     create:          (d)       => post('/communities', d),
     get:             (id)      => get(`/communities/${id}`),
     update:          (id, d)   => put(`/communities/${id}`, d),
@@ -106,7 +110,7 @@ export const api = {
     update:          (id, d)   => put(`/workflows/${id}`, d),
     delete:          (id)      => del(`/workflows/${id}`),
     fork:            (id)      => post(`/workflows/${id}/fork`),
-    snapshot:        (id)      => post(`/workflows/${id}/snapshots`),
+    snapshot:        (id, d)   => post(`/workflows/${id}/snapshot`, d),
     versions:        (id)      => get(`/workflows/${id}/versions`),
 
     nodes:           (id)      => get(`/workflows/${id}/nodes`),
@@ -135,10 +139,11 @@ export const api = {
 
   // ── Article Analyses ──────────────────────────────────────────────────────
   analyses: {
-    list:            (p)       => get('/analyses', p),
-    create:          (d)       => post('/analyses', d),
-    get:             (id)      => get(`/analyses/${id}`),
-    delete:          (id)      => del(`/analyses/${id}`),
+    list:            (p)       => get('/article-analyses', p),
+    get:             (id)      => get(`/article-analyses/${id}`),
+    techniques:      (id)      => get(`/article-analyses/${id}/techniques`),
+    generateWorkflow: (id)     => post(`/article-analyses/${id}/generate-workflow`),
+    delete:          (id)      => del(`/article-analyses/${id}`),
   },
 
   // ── Techniques ───────────────────────────────────────────────────────────
@@ -195,8 +200,10 @@ export const api = {
 
   // ── Synthetic datasets ────────────────────────────────────────────────────
   synthetic: {
-    list:            ()        => get('/synthetic'),
-    generate:        (d)       => post('/synthetic/generate', d),
+    list:            (p)       => get('/synthetic-datasets', p),
+    create:          (d)       => post('/synthetic-datasets', d),
+    get:             (id)      => get(`/synthetic-datasets/${id}`),
+    delete:          (id)      => del(`/synthetic-datasets/${id}`),
   },
 
   // ── Audit ─────────────────────────────────────────────────────────────────
@@ -218,9 +225,9 @@ export const api = {
 
   // ── Execution comparisons ─────────────────────────────────────────────────
   comparisons: {
-    list:            (p)       => get('/comparisons', p),
-    create:          (d)       => post('/comparisons', d),
-    get:             (id)      => get(`/comparisons/${id}`),
-    delete:          (id)      => del(`/comparisons/${id}`),
+    list:            (p)       => get('/execution-comparisons', p),
+    create:          (d)       => post('/execution-comparisons', d),
+    get:             (id)      => get(`/execution-comparisons/${id}`),
+    delete:          (id)      => del(`/execution-comparisons/${id}`),
   },
 };

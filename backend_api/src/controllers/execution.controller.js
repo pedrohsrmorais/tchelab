@@ -95,7 +95,7 @@ async function dispatchExecution(req, res) {
     const [execResult] = await db.query(
       `INSERT INTO executions
          (uuid, workflow_id, user_id, status, parameters_override, triggered_by, created_at, updated_at)
-       VALUES (?, ?, ?, 'pending', ?, 'user', NOW(), NOW())`,
+       VALUES (?, ?, ?, 'queued', ?, 'user', NOW(), NOW())`,
       [execUuid, workflow.id, req.user.id, JSON.stringify(parameters_override)],
     );
     const executionId = execResult.insertId;
@@ -171,7 +171,7 @@ async function cancelExecution(req, res) {
     if (!execution) return R.notFound(res, 'Execução');
     if (execution.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
 
-    if (!['pending', 'running'].includes(execution.status)) {
+    if (!['queued', 'running'].includes(execution.status)) {
       return R.unprocessable(res, [{ field: 'status', message: `Não é possível cancelar uma execução com status "${execution.status}".` }]);
     }
 

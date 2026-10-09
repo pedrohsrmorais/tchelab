@@ -76,19 +76,19 @@ async function getComparison(req, res) {
       const [exec] = await db.query('SELECT id FROM executions WHERE uuid = ?', [execUuid]);
       if (!exec.length) { metricsData[execUuid] = []; continue; }
 
-      const conditions = ['m.execution_id = ?'];
+      const conditions = ['en.execution_id = ?'];
       const params = [exec[0].id];
       if (metricNames.length) {
-        conditions.push(`m.metric_name IN (${metricNames.map(() => '?').join(', ')})`);
+        conditions.push(`mt.name IN (${metricNames.map(() => '?').join(', ')})`);
         params.push(...metricNames);
       }
 
       const [metrics] = await db.query(
-        `SELECT m.metric_name, m.metric_value, m.split, wn.node_key
-         FROM metrics m
-         LEFT JOIN execution_nodes en ON en.id = m.execution_node_id
+        `SELECT mt.name AS metric_name, mt.value AS metric_value, mt.dataset_split AS split, wn.node_key
+         FROM metrics mt
+         JOIN execution_nodes en ON en.id = mt.execution_node_id
          LEFT JOIN workflow_nodes wn ON wn.id = en.workflow_node_id
-         WHERE ${conditions.join(' AND ')} ORDER BY wn.node_key, m.metric_name`,
+         WHERE ${conditions.join(' AND ')} ORDER BY wn.node_key, mt.name`,
         params,
       );
       metricsData[execUuid] = metrics;
