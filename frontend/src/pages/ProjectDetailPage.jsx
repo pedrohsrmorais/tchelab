@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ArrowLeft, Database, Cpu, Users, Plus, Calendar, Globe, Lock, History } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApi, useMutation } from '../hooks/useApi';
@@ -59,7 +58,7 @@ export default function ProjectDetailPage() {
         <Link to="/projects" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm mb-4">
           <ArrowLeft className="w-4 h-4" /> Voltar aos Projetos
         </Link>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-6">
+        <div className="card p-6">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -75,7 +74,7 @@ export default function ProjectDetailPage() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -101,7 +100,7 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {datasetsList.map(ds => (
                 <Link key={ds.uuid} to={`/datasets/${ds.uuid}`}>
-                  <motion.div whileHover={{ y: -2 }} className="card card-hover p-4 flex items-center gap-4">
+                  <div className="card card-hover p-4 flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
                       <Database className="w-5 h-5 text-purple-400" />
                     </div>
@@ -109,7 +108,7 @@ export default function ProjectDetailPage() {
                       <div className="font-medium text-white truncate">{ds.name}</div>
                       <div className="text-xs text-slate-400">{ds.rows_count ?? 0} linhas · {ds.columns_count ?? 0} colunas</div>
                     </div>
-                  </motion.div>
+                  </div>
                 </Link>
               ))}
             </div>

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { useTheme } from '../../context/ThemeContext';
@@ -44,10 +43,9 @@ export function Sidebar({ collapsed, onToggle }) {
   const currentLang = LANGS.find(l => l.code === i18n.language) || LANGS[0];
 
   return (
-    <motion.aside
-      animate={{ width: collapsed ? 68 : 240 }}
-      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+    <aside
       style={{
+        width: collapsed ? 68 : 240,
         minHeight: '100vh',
         background: isDark ? 'rgba(10,15,30,0.97)' : 'rgba(248,250,252,0.98)',
         borderRight: `1px solid var(--border)`,
@@ -55,6 +53,7 @@ export function Sidebar({ collapsed, onToggle }) {
         flexShrink: 0, position: 'sticky', top: 0,
         overflow: 'hidden',
         backdropFilter: 'blur(20px)',
+        transition: 'width 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* ── Logo / Collapse toggle ──────────────────────────────────────────── */}
@@ -78,24 +77,18 @@ export function Sidebar({ collapsed, onToggle }) {
           <TcheLabLogo size={18} />
         </div>
 
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -6 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -6 }}
-              transition={{ duration: 0.2 }}
-              style={{ overflow: 'hidden', flex: 1 }}
-            >
-              <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-primary)', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
-                TcheLab
-              </p>
-              <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.1em', marginTop: 1 }}>
-                QUIMIOMETRIA
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {!collapsed && (
+          <div
+            style={{ overflow: 'hidden', flex: 1 }}
+          >
+            <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-primary)', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+              TcheLab
+            </p>
+            <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.1em', marginTop: 1 }}>
+              QUIMIOMETRIA
+            </p>
+          </div>
+        )}
 
         <ChevronRight
           size={13}
@@ -207,85 +200,73 @@ export function Sidebar({ collapsed, onToggle }) {
             )}
           </button>
 
-          <AnimatePresence>
-            {langOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                transition={{ duration: 0.16 }}
-                style={{
-                  position: 'absolute',
-                  bottom: '100%',
-                  left: 0,
-                  right: 0,
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  boxShadow: 'var(--shadow)',
-                  overflow: 'hidden',
-                  zIndex: 50,
-                  marginBottom: 4,
-                }}
-              >
-                {LANGS.map(l => (
-                  <button
-                    key={l.code}
-                    onClick={() => handleLang(l.code)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 0.75rem',
-                      background: i18n.language === l.code ? 'var(--bg-hover)' : 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: i18n.language === l.code ? 'var(--text-accent)' : 'var(--text-secondary)',
-                      fontSize: '0.8rem',
-                      fontWeight: i18n.language === l.code ? 600 : 400,
-                      textAlign: 'left',
-                      transition: 'background 0.12s',
-                    }}
-                    onMouseEnter={e => { if (i18n.language !== l.code) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                    onMouseLeave={e => { if (i18n.language !== l.code) e.currentTarget.style.background = 'none'; }}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {langOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow)',
+                overflow: 'hidden',
+                zIndex: 50,
+                marginBottom: 4,
+              }}
+            >
+              {LANGS.map(l => (
+                <button
+                  key={l.code}
+                  onClick={() => handleLang(l.code)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    background: i18n.language === l.code ? 'var(--bg-hover)' : 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: i18n.language === l.code ? 'var(--text-accent)' : 'var(--text-secondary)',
+                    fontSize: '0.8rem',
+                    fontWeight: i18n.language === l.code ? 600 : 400,
+                    textAlign: 'left',
+                    transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={e => { if (i18n.language !== l.code) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                  onMouseLeave={e => { if (i18n.language !== l.code) e.currentTarget.style.background = 'none'; }}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── User ────────────────────────────────────────────────────────────── */}
       <div style={{ padding: '0.625rem 0.5rem', borderTop: `1px solid var(--border)` }}>
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              style={{
-                padding: '0.625rem',
-                borderRadius: 'var(--radius)',
-                background: 'var(--bg-hover)',
-                marginBottom: '0.375rem',
-                display: 'flex', alignItems: 'center', gap: '0.625rem',
-              }}
-            >
-              <Avatar name={user?.name || user?.email} size={30} />
-              <div style={{ overflow: 'hidden', flex: 1 }}>
-                <p style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {user?.name || 'Usuário'}
-                </p>
-                <p style={{ fontSize: '0.64rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {user?.email}
-                </p>
-              </div>
-              {isPlus() && <span className="badge badge-plus" style={{ fontSize: '0.55rem' }}>PLUS</span>}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {!collapsed && (
+          <div
+            style={{
+              padding: '0.625rem',
+              borderRadius: 'var(--radius)',
+              background: 'var(--bg-hover)',
+              marginBottom: '0.375rem',
+              display: 'flex', alignItems: 'center', gap: '0.625rem',
+            }}
+          >
+            <Avatar name={user?.name || user?.email} size={30} />
+            <div style={{ overflow: 'hidden', flex: 1 }}>
+              <p style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.name || 'Usuário'}
+              </p>
+              <p style={{ fontSize: '0.64rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.email}
+              </p>
+            </div>
+            {isPlus() && <span className="badge badge-plus" style={{ fontSize: '0.55rem' }}>PLUS</span>}
+          </div>
+        )}
 
         <button
           onClick={handleLogout}
@@ -313,7 +294,7 @@ export function Sidebar({ collapsed, onToggle }) {
           {!collapsed && <span>{t('nav.logout')}</span>}
         </button>
       </div>
-    </motion.aside>
+    </aside>
   );
 }
 
@@ -366,19 +347,13 @@ function NavItem({ to, icon: Icon, label, collapsed, accent }) {
 
           <Icon size={16} style={{ flexShrink: 0 }} />
 
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0, x: -4 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -4 }}
-                transition={{ duration: 0.18 }}
-                style={{ fontSize: '0.8125rem', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap', flex: 1 }}
-              >
-                {label}
-              </motion.span>
-            )}
-          </AnimatePresence>
+          {!collapsed && (
+            <span
+              style={{ fontSize: '0.8125rem', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap', flex: 1 }}
+            >
+              {label}
+            </span>
+          )}
         </div>
       )}
     </NavLink>

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Brain, Search, Activity, CheckCircle2, XCircle, Clock, ArrowRight } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
@@ -17,7 +16,7 @@ function ModelCard({ model }) {
   const status = statusConfig[model.status] || statusConfig.draft;
   const StatusIcon = status.icon;
   return (
-    <motion.div whileHover={{ y: -3 }} className="card card-hover p-5 flex flex-col gap-4 group cursor-pointer">
+    <div className="card card-hover p-5 flex flex-col gap-4 group cursor-pointer">
       <div className="flex items-start justify-between">
         <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
           <Brain className="w-5 h-5 text-green-400" />
@@ -38,7 +37,7 @@ function ModelCard({ model }) {
         <span>{new Date(model.created_at).toLocaleDateString('pt-BR')}</span>
         <ArrowRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-green-400 group-hover:translate-x-1 transition-all" />
       </div>
-    </motion.div>
+    </div>
   );
 }
 

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ArrowLeft, Users, MessageSquare, FolderOpen, Plus, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApi, useMutation } from '../hooks/useApi';
@@ -70,7 +69,7 @@ export default function CommunityDetailPage() {
         <Link to="/communities" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm mb-4">
           <ArrowLeft className="w-4 h-4" /> Voltar às Comunidades
         </Link>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-6">
+        <div className="card p-6">
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white">{community.name}</h1>
@@ -83,7 +82,7 @@ export default function CommunityDetailPage() {
               <Plus className="w-3.5 h-3.5" /> Vincular Projeto
             </button>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -102,7 +101,7 @@ export default function CommunityDetailPage() {
             ) : messagesList.map((msg, i) => {
               const isMe = msg.user_uuid === user?.uuid;
               return (
-                <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
+                <div key={msg.id}
                   className={`flex items-start gap-2.5 ${isMe ? 'flex-row-reverse' : ''}`}>
                   <Avatar name={msg.user_name || msg.user_email} />
                   <div className={`max-w-xs lg:max-w-md ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
@@ -112,7 +111,7 @@ export default function CommunityDetailPage() {
                     </div>
                     <span className="text-xs text-slate-600">{new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
-                </motion.div>
+                </div>
               );
             })}
             <div ref={messagesEndRef} />
@@ -120,10 +119,10 @@ export default function CommunityDetailPage() {
           <div className="border-t border-white/10 p-3">
             <form onSubmit={handleSend} className="flex items-center gap-2">
               <input className="input-field flex-1" placeholder="Escreva uma mensagem..." value={message} onChange={e => setMessage(e.target.value)} />
-              <motion.button type="submit" disabled={sending || !message.trim()} whileTap={{ scale: 0.95 }}
+              <button type="submit" disabled={sending || !message.trim()}
                 className="btn-primary p-2.5 flex-shrink-0">
                 <Send className="w-4 h-4" />
-              </motion.button>
+              </button>
             </form>
           </div>
         </div>
@@ -135,10 +134,10 @@ export default function CommunityDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {community.projects.map(p => (
                 <Link key={p.uuid} to={`/projects/${p.uuid}`}>
-                  <motion.div whileHover={{ y: -2 }} className="card card-hover p-4 flex items-center gap-4">
+                  <div className="card card-hover p-4 flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center"><FolderOpen className="w-5 h-5 text-blue-400" /></div>
                     <div><div className="font-medium text-white">{p.name}</div><div className="text-xs text-slate-400">{p.description}</div></div>
-                  </motion.div>
+                  </div>
                 </Link>
               ))}
             </div>

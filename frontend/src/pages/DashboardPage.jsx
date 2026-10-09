@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   FlaskConical, FolderOpen, Database, Users, Cpu, BookOpen,
@@ -11,14 +10,6 @@ import { api } from '../api';
 import StatCard from '../components/ui/StatCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 
-const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
-};
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { ease: [0.16, 1, 0.3, 1], duration: 0.5 } },
-};
 
 export default function DashboardPage() {
   const { user, isPlus, isAdmin } = useAuthStore();
@@ -38,9 +29,9 @@ export default function DashboardPage() {
   ];
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-8">
+    <div className="space-y-8">
       {/* Header */}
-      <motion.div variants={item} className="flex items-start justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white mb-1">
             {greeting}, <span className="text-blue-400">{firstName}</span> 👋
@@ -52,11 +43,11 @@ export default function DashboardPage() {
             <Zap className="w-3 h-3" /> PLUS
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* Admin stats */}
       {isAdmin() && (
-        <motion.div variants={item}>
+        <div>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Visão Geral do Sistema</h2>
           {loading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -70,19 +61,17 @@ export default function DashboardPage() {
               <StatCard icon={Activity} label="Jobs Ativos" value={stats.jobs?.running ?? '–'} sub={`${stats.jobs?.pending ?? 0} pendentes`} color="amber" />
             </div>
           ) : null}
-        </motion.div>
+        </div>
       )}
 
       {/* Quick access */}
-      <motion.div variants={item}>
+      <div>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Acesso Rápido</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {quickLinks.map(({ to, icon: Icon, label, color, desc, plus }) => (
             <Link key={to} to={to}>
-              <motion.div
+              <div
                 className="card card-hover p-5 flex flex-col gap-3 group cursor-pointer"
-                whileHover={{ y: -3 }}
-                whileTap={{ scale: 0.98 }}
               >
                 <div className="flex items-center justify-between">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-${color === 'brand' ? 'blue' : color}-500/20`}>
@@ -95,14 +84,14 @@ export default function DashboardPage() {
                   <div className="text-xs text-slate-400 mt-0.5">{desc}</div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
-              </motion.div>
+              </div>
             </Link>
           ))}
         </div>
-      </motion.div>
+      </div>
 
       {/* Activity feed placeholder */}
-      <motion.div variants={item}>
+      <div>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Atividade Recente</h2>
         <div className="card p-6">
           <div className="space-y-4">
@@ -111,12 +100,9 @@ export default function DashboardPage() {
               { icon: FlaskConical, text: 'Bem-vindo ao TcheLab', time: 'hoje', color: 'blue' },
               { icon: TrendingUp, text: 'Plataforma pronta para análises', time: 'hoje', color: 'purple' },
             ].map((a, i) => (
-              <motion.div
+              <div
                 key={i}
                 className="flex items-start gap-3"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + i * 0.1 }}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${a.color}-500/20 flex-shrink-0`}>
                   <a.icon className={`w-4 h-4 text-${a.color}-400`} />
@@ -127,11 +113,11 @@ export default function DashboardPage() {
                     <Clock className="w-3 h-3" /> {a.time}
                   </p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

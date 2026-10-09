@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Send, Sparkles, Brain, FlaskConical, BarChart2, Database, Cpu, MessageSquare, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMutation } from '../hooks/useApi';
@@ -17,9 +16,7 @@ const SUGGESTIONS = [
 function Message({ msg }) {
   const isUser = msg.role === 'user';
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
       className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
     >
       <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${isUser ? 'bg-blue-600' : 'bg-purple-600'}`}>
@@ -35,7 +32,7 @@ function Message({ msg }) {
           <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -74,16 +71,14 @@ export default function AIPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden card p-6">
+      <div className="relative overflow-hidden card p-6">
         <div className="absolute inset-0 opacity-10" style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)' }} />
         <div className="relative flex items-center gap-4">
-          <motion.div
+          <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)' }}
-            animate={{ boxShadow: ['0 0 20px rgba(124,58,237,0.4)', '0 0 40px rgba(124,58,237,0.7)', '0 0 20px rgba(124,58,237,0.4)'] }}
-            transition={{ duration: 2.5, repeat: Infinity }}>
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)' }}>
             <Zap className="w-7 h-7 text-white" />
-          </motion.div>
+          </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-white">TcheLab AI</h1>
@@ -92,7 +87,7 @@ export default function AIPage() {
             <p className="text-purple-300 text-sm">Assistente especializado em quimiometria</p>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -145,11 +140,11 @@ export default function AIPage() {
                   onChange={e => setInput(e.target.value)}
                   disabled={thinking}
                 />
-                <motion.button type="submit" disabled={thinking || !input.trim()} whileTap={{ scale: 0.95 }}
+                <button type="submit" disabled={thinking || !input.trim()}
                   className="btn-primary p-2.5 flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)' }}>
                   <Send className="w-4 h-4" />
-                </motion.button>
+                </button>
               </form>
             </div>
           </div>
@@ -186,12 +181,12 @@ export default function AIPage() {
                 <input type="number" className="input-field" min={0} max={1} step={0.01} value={syntheticForm.noise_level} onChange={e => setSyntheticForm(f => ({ ...f, noise_level: +e.target.value }))} />
               </div>
             </div>
-            <motion.button onClick={handleSyntheticGenerate} disabled={generating} whileTap={{ scale: 0.97 }}
+            <button onClick={handleSyntheticGenerate} disabled={generating}
               className="btn-primary w-full flex items-center justify-center gap-2"
               style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)' }}>
               <Sparkles className="w-4 h-4" />
               {generating ? 'Gerando...' : 'Gerar Dataset Sintético'}
-            </motion.button>
+            </button>
           </div>
         </div>
       )}

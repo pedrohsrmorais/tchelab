@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, FlaskConical, Mail, Lock, User, ArrowRight, Sparkles, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/auth';
@@ -14,16 +13,9 @@ const INVITE_CODE = 'intellsn';
 // Floating particle
 function Particle({ x, y, size, delay, duration }) {
   return (
-    <motion.div
+    <div
       className="absolute rounded-full bg-blue-400 opacity-20"
       style={{ left: `${x}%`, top: `${y}%`, width: size, height: size }}
-      animate={{
-        y: [0, -40, 0],
-        x: [0, 15, -15, 0],
-        opacity: [0.1, 0.4, 0.1],
-        scale: [1, 1.3, 1],
-      }}
-      transition={{ duration, delay, repeat: Infinity, ease: 'easeInOut' }}
     />
   );
 }
@@ -31,7 +23,7 @@ function Particle({ x, y, size, delay, duration }) {
 // Orbit ring
 function OrbitRing({ radius, duration, delay, dotCount = 3, color = 'blue' }) {
   return (
-    <motion.div
+    <div
       className="absolute rounded-full border border-blue-500/20"
       style={{
         width: radius * 2,
@@ -41,8 +33,6 @@ function OrbitRing({ radius, duration, delay, dotCount = 3, color = 'blue' }) {
         marginLeft: -radius,
         marginTop: -radius,
       }}
-      animate={{ rotate: 360 }}
-      transition={{ duration, delay, repeat: Infinity, ease: 'linear' }}
     >
       {Array.from({ length: dotCount }).map((_, i) => {
         const angle = (360 / dotCount) * i;
@@ -57,7 +47,7 @@ function OrbitRing({ radius, duration, delay, dotCount = 3, color = 'blue' }) {
           />
         );
       })}
-    </motion.div>
+    </div>
   );
 }
 
@@ -153,42 +143,31 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <motion.div
+      <div
         className="relative z-10 w-full max-w-md mx-4"
-        initial={{ opacity: 0, y: 40, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       >
         {/* Logo area */}
         <div className="text-center mb-8">
-          <motion.div
+          <div
             className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4"
             style={{ background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', boxShadow: '0 0 40px rgba(59,130,246,0.5)' }}
-            animate={{ boxShadow: ['0 0 30px rgba(59,130,246,0.4)', '0 0 60px rgba(59,130,246,0.7)', '0 0 30px rgba(59,130,246,0.4)'] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           >
             <FlaskConical className="w-10 h-10 text-white" />
-          </motion.div>
-          <motion.h1
+          </div>
+          <h1
             className="text-3xl font-bold text-white"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
           >
             TcheLab
-          </motion.h1>
-          <motion.p
+          </h1>
+          <p
             className="text-blue-300 mt-1 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.35 }}
           >
             Plataforma de Análises Quimiométricas
-          </motion.p>
+          </p>
         </div>
 
         {/* Card body */}
-        <motion.div
+        <div
           className="rounded-2xl p-8"
           style={{
             background: 'rgba(15, 23, 42, 0.8)',
@@ -215,182 +194,170 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <AnimatePresence mode="wait">
-            {tab === 'login' ? (
-              <motion.form
-                key="login"
-                onSubmit={handleLogin}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                    <input
-                      type="email"
-                      value={loginForm.email}
-                      onChange={e => setLoginForm(f => ({ ...f, email: e.target.value }))}
-                      className="input-field"
-                      style={iconInput}
-                      placeholder="seu@email.com"
-                      autoComplete="email"
-                    />
-                  </div>
+          {tab === 'login' ? (
+            <form
+              key="login"
+              onSubmit={handleLogin}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                  <input
+                    type="email"
+                    value={loginForm.email}
+                    onChange={e => setLoginForm(f => ({ ...f, email: e.target.value }))}
+                    className="input-field"
+                    style={iconInput}
+                    placeholder="seu@email.com"
+                    autoComplete="email"
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                    <input
-                      type={showPass ? 'text' : 'password'}
-                      value={loginForm.password}
-                      onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
-                      className="input-field"
-                      style={iconInputRight}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                    />
-                    <button type="button" onClick={() => setShowPass(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300 transition-colors">
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={loginForm.password}
+                    onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
+                    className="input-field"
+                    style={iconInputRight}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                  />
+                  <button type="button" onClick={() => setShowPass(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300 transition-colors">
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
+              </div>
 
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="anim-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                      Entrando...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      Entrar <ArrowRight className="w-4 h-4" />
-                    </span>
-                  )}
-                </motion.button>
-              </motion.form>
-            ) : (
-              <motion.form
-                key="register"
-                onSubmit={handleRegister}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4"
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
               >
-                <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={regForm.name}
-                      onChange={e => setRegForm(f => ({ ...f, name: e.target.value }))}
-                      className="input-field"
-                      style={iconInput}
-                      placeholder="Seu nome completo"
-                    />
-                  </div>
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="anim-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                    Entrando...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    Entrar <ArrowRight className="w-4 h-4" />
+                  </span>
+                )}
+              </button>
+            </form>
+          ) : (
+            <form
+              key="register"
+              onSubmit={handleRegister}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={regForm.name}
+                    onChange={e => setRegForm(f => ({ ...f, name: e.target.value }))}
+                    className="input-field"
+                    style={iconInput}
+                    placeholder="Seu nome completo"
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                    <input
-                      type="email"
-                      value={regForm.email}
-                      onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))}
-                      className="input-field"
-                      style={iconInput}
-                      placeholder="seu@email.com"
-                    />
-                  </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                  <input
+                    type="email"
+                    value={regForm.email}
+                    onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))}
+                    className="input-field"
+                    style={iconInput}
+                    placeholder="seu@email.com"
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                    <input
-                      type={showPass ? 'text' : 'password'}
-                      value={regForm.password}
-                      onChange={e => setRegForm(f => ({ ...f, password: e.target.value }))}
-                      className="input-field"
-                      style={iconInputRight}
-                      placeholder="Mín. 8 caracteres"
-                    />
-                    <button type="button" onClick={() => setShowPass(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300 transition-colors">
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={regForm.password}
+                    onChange={e => setRegForm(f => ({ ...f, password: e.target.value }))}
+                    className="input-field"
+                    style={iconInputRight}
+                    placeholder="Mín. 8 caracteres"
+                  />
+                  <button type="button" onClick={() => setShowPass(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300 transition-colors">
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Confirmar Senha</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                    <input
-                      type="password"
-                      value={regForm.confirm}
-                      onChange={e => setRegForm(f => ({ ...f, confirm: e.target.value }))}
-                      className="input-field"
-                      style={iconInput}
-                      placeholder="Repita a senha"
-                    />
-                  </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">Confirmar Senha</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                  <input
+                    type="password"
+                    value={regForm.confirm}
+                    onChange={e => setRegForm(f => ({ ...f, confirm: e.target.value }))}
+                    className="input-field"
+                    style={iconInput}
+                    placeholder="Repita a senha"
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Código de Convite</label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={regForm.inviteCode}
-                      onChange={e => setRegForm(f => ({ ...f, inviteCode: e.target.value }))}
-                      className="input-field"
-                      style={iconInput}
-                      placeholder="Código de acesso"
-                      autoComplete="off"
-                    />
-                  </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">Código de Convite</label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={regForm.inviteCode}
+                    onChange={e => setRegForm(f => ({ ...f, inviteCode: e.target.value }))}
+                    className="input-field"
+                    style={iconInput}
+                    placeholder="Código de acesso"
+                    autoComplete="off"
+                  />
                 </div>
+              </div>
 
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="anim-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                      Criando conta...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" /> Criar Conta
-                    </span>
-                  )}
-                </motion.button>
-              </motion.form>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="anim-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                    Criando conta...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Criar Conta
+                  </span>
+                )}
+              </button>
+            </form>
+          )}
+        </div>
 
         <p className="text-center text-xs text-blue-400/50 mt-6">
           TcheLab © {new Date().getFullYear()} — Análises Quimiométricas
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import React, { useState, useRef, lazy, Suspense } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Plus, Database, Search, Upload, FileSpreadsheet, FileText, ClipboardPaste, X, CheckCircle2, ArrowRight, Boxes } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -112,9 +111,9 @@ function ImportModal({ open, onClose, onImported }) {
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
+      <div>
         {step === 'method' && (
-          <motion.div key="method" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+          <div>
             <div className="grid grid-cols-2 gap-4">
               <div
                 onClick={() => { setMethod('file'); fileRef.current?.click(); }}
@@ -148,11 +147,11 @@ function ImportModal({ open, onClose, onImported }) {
                 <div className="text-xs text-slate-500">Cole direto do Excel</div>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {step === 'paste' && (
-          <motion.div key="paste" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-4">
+          <div className="space-y-4">
             <label className="block text-sm font-medium text-blue-200 mb-1.5">Cole seus dados abaixo</label>
             <textarea
               className="input-field font-mono text-xs resize-none h-48"
@@ -166,11 +165,11 @@ function ImportModal({ open, onClose, onImported }) {
                 Continuar <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {step === 'config' && (
-          <motion.div key="config" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome do Dataset *</label>
@@ -220,9 +219,9 @@ function ImportModal({ open, onClose, onImported }) {
                 {importing || creating ? 'Importando...' : 'Importar Dataset'}
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     </Modal>
   );
 }
@@ -307,9 +306,9 @@ export default function DatasetsPage() {
           <h1 className="text-2xl font-bold text-white">Datasets</h1>
           <p className="text-slate-400 text-sm mt-0.5">Seus conjuntos de dados para análise</p>
         </div>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setImportOpen(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setImportOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Importar Dados
-        </motion.button>
+        </button>
       </div>
 
       <div className="relative">

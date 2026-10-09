@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Plus, Users, Search, Globe, Lock, MessageSquare, FolderOpen, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -12,7 +11,7 @@ import Modal from '../components/ui/Modal';
 function CommunityCard({ community }) {
   return (
     <Link to={`/communities/${community.uuid}`}>
-      <motion.div whileHover={{ y: -3 }} className="card card-hover p-5 flex flex-col gap-4 group cursor-pointer h-full">
+      <div className="card card-hover p-5 flex flex-col gap-4 group cursor-pointer h-full">
         <div className="flex items-start justify-between">
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
             <Users className="w-5 h-5 text-amber-400" />
@@ -31,7 +30,7 @@ function CommunityCard({ community }) {
           <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {community.message_count ?? 0} msgs</span>
           <ArrowRight className="w-3.5 h-3.5 ml-auto text-slate-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
         </div>
-      </motion.div>
+      </div>
     </Link>
   );
 }
@@ -98,9 +97,9 @@ export default function CommunitiesPage() {
           <h1 className="text-2xl font-bold text-white">Comunidades</h1>
           <p className="text-slate-400 text-sm mt-0.5">Colabore com outros pesquisadores</p>
         </div>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setCreateOpen(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setCreateOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Nova Comunidade
-        </motion.button>
+        </button>
       </div>
 
       <div className="flex items-center gap-4">

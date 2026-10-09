@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Plus, FolderOpen, Search, Calendar, Users, Database, ChevronRight, Trash2, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -11,11 +10,7 @@ import Modal from '../components/ui/Modal';
 
 function ProjectCard({ project, onDelete }) {
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
+    <div
       className="card card-hover group"
     >
       <Link to={`/projects/${project.uuid}`} className="block p-5">
@@ -46,7 +41,7 @@ function ProjectCard({ project, onDelete }) {
           <ChevronRight className="w-4 h-4 text-slate-400" />
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -117,9 +112,9 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-bold text-white">Projetos</h1>
           <p className="text-slate-400 text-sm mt-0.5">Organize suas análises em projetos</p>
         </div>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setCreateOpen(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setCreateOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Novo Projeto
-        </motion.button>
+        </button>
       </div>
 
       {/* Search */}
@@ -138,13 +133,11 @@ export default function ProjectsPage() {
           description={search ? 'Tente outro termo de busca.' : 'Crie seu primeiro projeto para começar.'}
           action={!search && <button onClick={() => setCreateOpen(true)} className="btn-primary">Criar Projeto</button>} />
       ) : (
-        <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <AnimatePresence>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map(p => (
               <ProjectCard key={p.uuid} project={p} onDelete={setDeleteTarget} />
             ))}
-          </AnimatePresence>
-        </motion.div>
+        </div>
       )}
 
       <CreateProjectModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refetch} />

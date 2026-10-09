@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { User, Mail, Lock, Zap, Save, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/auth';
@@ -40,14 +39,12 @@ export default function ProfilePage() {
       </div>
 
       {/* Avatar section */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-6 flex items-center gap-6">
-        <motion.div
+      <div className="card p-6 flex items-center gap-6">
+        <div
           className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-3xl font-bold flex-shrink-0"
-          style={{ background: `linear-gradient(135deg, hsl(${hue},60%,40%), hsl(${hue + 40},60%,50%))` }}
-          animate={{ boxShadow: [`0 0 20px hsla(${hue},60%,50%,0.3)`, `0 0 40px hsla(${hue},60%,50%,0.5)`, `0 0 20px hsla(${hue},60%,50%,0.3)`] }}
-          transition={{ duration: 3, repeat: Infinity }}>
+          style={{ background: `linear-gradient(135deg, hsl(${hue},60%,40%), hsl(${hue + 40},60%,50%))` }}>
           {user?.name?.[0]?.toUpperCase() || 'U'}
-        </motion.div>
+        </div>
         <div>
           <div className="flex items-center gap-3">
             <div className="text-xl font-bold text-white">{user?.name}</div>
@@ -59,10 +56,10 @@ export default function ProfilePage() {
           </div>
           <div className="text-xs text-slate-500 mt-1">Plano: <span className="text-blue-400 font-medium capitalize">{user?.plan ?? 'free'}</span></div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Edit name */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card p-6">
+      <div className="card p-6">
         <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2"><User className="w-4 h-4 text-blue-400" /> Informações Pessoais</h2>
         <form onSubmit={handleNameSave} className="space-y-4">
           <div>
@@ -78,10 +75,10 @@ export default function ProfilePage() {
             <Save className="w-4 h-4" /> {saving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </form>
-      </motion.div>
+      </div>
 
       {/* Change password */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
+      <div className="card p-6">
         <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2"><Lock className="w-4 h-4 text-blue-400" /> Alterar Senha</h2>
         <form onSubmit={handlePasswordChange} className="space-y-4">
           <div>
@@ -105,7 +102,7 @@ export default function ProfilePage() {
             <Save className="w-4 h-4" /> {changingPass ? 'Alterando...' : 'Alterar Senha'}
           </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }

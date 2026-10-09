@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { Activity, Search, RefreshCw, CheckCircle2, XCircle, Clock, Play, AlertCircle } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
@@ -18,7 +17,7 @@ function JobRow({ job }) {
   const status = statusConfig[job.status] || statusConfig.pending;
   const StatusIcon = status.icon;
   return (
-    <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+    <div
       className="card px-5 py-4 flex items-center gap-4">
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-${status.color}-500/20`}>
         <StatusIcon className={`w-4 h-4 text-${status.color}-400 ${job.status === 'running' ? 'anim-spin' : ''}`} />
@@ -34,12 +33,12 @@ function JobRow({ job }) {
       {job.status === 'running' && job.progress != null && (
         <div className="w-20 flex-shrink-0">
           <div className="h-1.5 rounded-full bg-slate-700">
-            <motion.div className="h-full rounded-full bg-blue-500" initial={{ width: 0 }} animate={{ width: `${job.progress}%` }} />
+            <div className="h-full rounded-full bg-blue-500" style={{ width: `${job.progress}%` }} />
           </div>
           <div className="text-xs text-slate-500 mt-0.5 text-right">{job.progress}%</div>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -66,9 +65,9 @@ export default function JobsPage() {
           <h1 className="text-2xl font-bold text-white">Jobs</h1>
           <p className="text-slate-400 text-sm mt-0.5">Monitor de execuções em andamento e finalizadas</p>
         </div>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={refetch} className="btn-ghost flex items-center gap-2 text-sm">
+        <button onClick={refetch} className="btn-ghost flex items-center gap-2 text-sm">
           <RefreshCw className="w-4 h-4" /> Atualizar
-        </motion.button>
+        </button>
       </div>
 
       <div className="flex items-center gap-4">

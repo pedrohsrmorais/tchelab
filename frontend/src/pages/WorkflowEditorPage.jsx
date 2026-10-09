@@ -2,7 +2,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   ReactFlow,
@@ -202,10 +201,7 @@ function TechniqueCard({ tech, onAdd, lang }) {
   const outputSchema = parseSchema(tech.output_schema);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
@@ -275,13 +271,8 @@ function TechniqueCard({ tech, onAdd, lang }) {
       </div>
 
       {/* Expanded info */}
-      <AnimatePresence>
         {showInfo && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+          <div
             style={{ overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}
           >
@@ -344,10 +335,9 @@ function TechniqueCard({ tech, onAdd, lang }) {
                 + Adicionar ao canvas
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
 
@@ -614,16 +604,15 @@ export default function WorkflowEditorPage() {
           {t('workflows.save')}
         </button>
 
-        <motion.button
+        <button
           onClick={handleDispatch}
           disabled={executing}
-          whileTap={{ scale: 0.96 }}
           className="btn-primary"
           style={{ fontSize: '0.8rem', gap: 5 }}
         >
           {executing ? <Loader2 size={13} className="anim-spin" /> : <Play size={13} />}
           {executing ? t('workflows.executing') : t('workflows.execute')}
-        </motion.button>
+        </button>
       </div>
 
       {/* ── Main area ───────────────────────────────────────────────────────── */}
@@ -661,9 +650,7 @@ export default function WorkflowEditorPage() {
             {/* Empty state */}
             {nodes.length <= 1 && (
               <Panel position="top-center">
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
+                <div
                   style={{
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border)',
@@ -674,16 +661,14 @@ export default function WorkflowEditorPage() {
                 >
                   <GitBranch size={14} />
                   <span>Arraste técnicas do painel lateral para o canvas</span>
-                </motion.div>
+                </div>
               </Panel>
             )}
 
             {/* Error list */}
             {errors.length > 0 && (
               <Panel position="bottom-left">
-                <motion.div
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
+                <div
                   style={{
                     background: 'rgba(239,68,68,0.08)',
                     border: '1px solid rgba(239,68,68,0.3)',
@@ -696,21 +681,17 @@ export default function WorkflowEditorPage() {
                       <span>{e}</span>
                     </div>
                   ))}
-                </motion.div>
+                </div>
               </Panel>
             )}
           </ReactFlow>
         </div>
 
         {/* ── Painel de técnicas ──────────────────────────────────────────────── */}
-        <AnimatePresence>
           {panelOpen && (
-            <motion.aside
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 300, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            <aside
               style={{
+                width: 300,
                 background: 'var(--bg-surface)',
                 borderLeft: '1px solid var(--border)',
                 display: 'flex', flexDirection: 'column',
@@ -802,13 +783,8 @@ export default function WorkflowEditorPage() {
                       }
                     </button>
 
-                    <AnimatePresence>
                       {(familiesOpen[group.slug] || searchQuery || selectedFamily) && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
+                        <div
                           style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4 }}
                         >
                           {group.techs.map(tech => (
@@ -819,9 +795,8 @@ export default function WorkflowEditorPage() {
                               lang={lang}
                             />
                           ))}
-                        </motion.div>
+                        </div>
                       )}
-                    </AnimatePresence>
                   </div>
                 ))}
 
@@ -853,9 +828,8 @@ export default function WorkflowEditorPage() {
                   {t('workflows.datasetNode')}
                 </button>
               </div>
-            </motion.aside>
+            </aside>
           )}
-        </AnimatePresence>
       </div>
     </div>
   );

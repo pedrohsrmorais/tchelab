@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { BookOpen, Plus, Search, Upload, FileText, Cpu, Trash2, Calendar, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApi, useMutation } from '../hooks/useApi';
@@ -17,7 +16,7 @@ function ArticleCard({ article, onDelete, canAnalyze }) {
     if (ok !== null) toast.success('Análise iniciada!');
   };
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-5 flex flex-col gap-3 group">
+    <div className="card p-5 flex flex-col gap-3 group">
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
           <FileText className="w-5 h-5 text-red-400" />
@@ -41,7 +40,7 @@ function ArticleCard({ article, onDelete, canAnalyze }) {
           </button>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -138,9 +137,9 @@ export default function ArticlesPage() {
           <h1 className="text-2xl font-bold text-white">Artigos Científicos</h1>
           <p className="text-slate-400 text-sm mt-0.5">Sua base de conhecimento quimiométrico</p>
         </div>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setUploadOpen(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setUploadOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Adicionar Artigo
-        </motion.button>
+        </button>
       </div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

@@ -1,6 +1,5 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ArrowLeft, Database, GitBranch, Eye, BarChart2, Activity, Table, Boxes } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
@@ -226,7 +225,7 @@ export default function DatasetDetailPage() {
           <ArrowLeft className="w-4 h-4" /> Voltar aos Datasets
         </Link>
 
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-6">
+        <div className="card p-6">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
               <Database className="w-6 h-6 text-purple-400" />
@@ -266,7 +265,7 @@ export default function DatasetDetailPage() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Stats row */}
@@ -297,21 +296,21 @@ export default function DatasetDetailPage() {
 
       {/* Tab: Preview */}
       {tab === 'preview' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div>
           <PreviewTab meta={metadata} />
-        </motion.div>
+        </div>
       )}
 
       {/* Tab: Stats */}
       {tab === 'stats' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div>
           <StatsTab meta={metadata} />
-        </motion.div>
+        </div>
       )}
 
       {/* Tab: Informações */}
       {tab === 'info' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card p-6 space-y-1">
+        <div className="card p-6 space-y-1">
           <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Metadados</h3>
           <InfoRow label="UUID"            value={ds.uuid} />
           <InfoRow label="Tipo de dado"    value={ds.data_type} />
@@ -351,12 +350,12 @@ export default function DatasetDetailPage() {
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
       )}
 
       {/* Tab: Linhagem */}
       {tab === 'lineage' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card p-6">
+        <div className="card p-6">
           <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Linhagem do Dataset</h3>
           {lineageLoading ? (
             <SkeletonCard className="h-24" />
@@ -379,7 +378,7 @@ export default function DatasetDetailPage() {
           ) : (
             <p className="text-slate-400 text-sm">Nenhum histórico de linhagem disponível.</p>
           )}
-        </motion.div>
+        </div>
       )}
 
       {/* Multidimensional Visualization Modal */}
