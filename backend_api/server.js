@@ -64,14 +64,16 @@ app.get('/health', async (req, res) => {
 });
 
 // ─── SPA static serving (frontend dist) ─────────────────────────────────────
-const distPath = process.env.FRONTEND_DIST || path.join(__dirname, '..', 'frontend', 'dist');
+const distPath = process.env.FRONTEND_DIST
+  ? path.resolve(process.env.FRONTEND_DIST)
+  : path.resolve(__dirname, '..', 'frontend', 'dist');
 
 app.use(express.static(distPath, { index: false }));
 
 // Fallback: SPA client-side routing (não captura /api/*)
 app.get(/^(?!\/api).*/, (req, res) => {
   const indexPath = path.join(distPath, 'index.html');
-  res.sendFile(indexPath, (err) => {
+  res.sendFile(indexPath, { root: '/' }, (err) => {
     if (err) {
       // dist ainda não gerado — resposta amigável em desenvolvimento
       if (ENV !== 'production') {
@@ -99,6 +101,7 @@ app.use((err, req, res, next) => {
 // ─── Startup ─────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[TcheLab API] Listening on port ${PORT} (${ENV})`);
+  console.log(`[TcheLab API] Serving frontend from: ${distPath}`);
 });
 
 module.exports = app; // facilita testes
