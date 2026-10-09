@@ -79,4 +79,53 @@ async function listAllJobs(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-module.exports = { listJobs, getJob, listAllJobs };
+// POST /jobs/:id/cancel
+async function cancelJob(req, res) {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, status FROM jobs WHERE uuid = ? AND user_id = ?`,
+      [req.params.id, req.user.id],
+    );
+    if (!rows.length) return R.notFound(res, 'Job');
+    const job = rows[0];
+
+    if (!['pending', 'running'].includes(job.status)) {
+      return R.unprocessable(res, [{ field: 'status', message: `Não é possível cancelar um job com status "${job.status}".` }]);
+    }
+
+    await db.query(
+      `UPDATE jobs SET status = 'cancelled', finished_at = NOW() WHERE id = ?`,
+      [job.id],
+    );
+    return R.noContent(res);
+  } catch (err) { return R.serverError(res, err); }
+}
+
+// POST /jobs/:id/retry
+async function retryJob(req, res) {
+  try {
+    const [rows] = await db.query(
+      `SELECT * FROM jobs WHERE uuid = ? AND user_id = ?`,
+      [req.params.id, req.user.id],
+    );
+    if (!rows.length) return R.notFound(res, 'Job');
+    const job = rows[0];
+
+    if (!['failed', 'cancelled'].includes(job.status)) {
+      return R.unprocessable(res, [{ field: 'status', message: `Só é possível retentar jobs com status "failed" ou "cancelled".` }]);
+    }
+
+    await db.query(
+      `UPDATE jobs SET status = 'pending', started_at = NULL, finished_at = NULL, error_message = NULL, progress = 0 WHERE id = ?`,
+      [job.id],
+    );
+
+    const [updated] = await db.query(
+      `SELECT uuid, job_type, status, progress, created_at FROM jobs WHERE id = ?`,
+      [job.id],
+    );
+    return R.ok(res, updated[0]);
+  } catch (err) { return R.serverError(res, err); }
+}
+
+module.exports = { listJobs, getJob, listAllJobs, cancelJob, retryJob };

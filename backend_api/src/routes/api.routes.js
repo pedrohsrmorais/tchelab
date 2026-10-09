@@ -230,6 +230,8 @@ router.delete('/synthetic-datasets/:id',                        authenticate, sy
 router.get   ('/jobs',                                          authenticate, jobCtrl.listJobs);
 router.get   ('/jobs/admin',                                    authenticate, jobCtrl.listAllJobs);
 router.get   ('/jobs/:id',                                      authenticate, jobCtrl.getJob);
+router.post  ('/jobs/:id/cancel',                               authenticate, jobCtrl.cancelJob);
+router.post  ('/jobs/:id/retry',                                authenticate, jobCtrl.retryJob);
 
 // ─── AI INTERACTIONS ───────────────────────────────────────────────────────────
 router.get   ('/ai-interactions',                               authenticate, aiCtrl.listInteractions);
