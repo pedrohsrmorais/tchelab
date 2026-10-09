@@ -1,0 +1,1077 @@
+-- =============================================================================
+-- TcheLab — Database Initialization Script
+-- Generated: 2026-10-09
+-- Admin: admin@intellsn.com.br
+-- =============================================================================
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+-- =============================================================================
+-- DROP ORDER (reverse dependency order)
+-- =============================================================================
+
+DROP TABLE IF EXISTS `workflow_node_origins`;
+DROP TABLE IF EXISTS `article_techniques`;
+DROP TABLE IF EXISTS `article_analyses`;
+DROP TABLE IF EXISTS `metrics`;
+DROP TABLE IF EXISTS `execution_nodes`;
+DROP TABLE IF EXISTS `executions`;
+DROP TABLE IF EXISTS `execution_comparison_items`;
+DROP TABLE IF EXISTS `execution_comparisons`;
+DROP TABLE IF EXISTS `predictions`;
+DROP TABLE IF EXISTS `jobs`;
+DROP TABLE IF EXISTS `models`;
+DROP TABLE IF EXISTS `ai_interactions`;
+DROP TABLE IF EXISTS `project_articles`;
+DROP TABLE IF EXISTS `project_workflows`;
+DROP TABLE IF EXISTS `project_datasets`;
+DROP TABLE IF EXISTS `project_members`;
+DROP TABLE IF EXISTS `projects`;
+DROP TABLE IF EXISTS `community_datasets`;
+DROP TABLE IF EXISTS `community_workflows`;
+DROP TABLE IF EXISTS `community_members`;
+DROP TABLE IF EXISTS `messages`;
+DROP TABLE IF EXISTS `communities`;
+DROP TABLE IF EXISTS `workflow_edges`;
+DROP TABLE IF EXISTS `workflow_nodes`;
+DROP TABLE IF EXISTS `workflow_templates`;
+DROP TABLE IF EXISTS `workflows`;
+DROP TABLE IF EXISTS `dataset_lineage`;
+DROP TABLE IF EXISTS `dataset_spectra`;
+DROP TABLE IF EXISTS `collection_spectra`;
+DROP TABLE IF EXISTS `datasets`;
+DROP TABLE IF EXISTS `collections`;
+DROP TABLE IF EXISTS `spectra`;
+DROP TABLE IF EXISTS `technique_compatibilities`;
+DROP TABLE IF EXISTS `techniques`;
+DROP TABLE IF EXISTS `audit_logs`;
+DROP TABLE IF EXISTS `users`;
+
+-- =============================================================================
+-- USERS
+-- =============================================================================
+
+CREATE TABLE `users` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `initials` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password_hash` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `bio` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `research_area` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `institution` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `birth_date` date DEFAULT NULL,
+  `lattes_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `linkedin_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `github_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `avatar_url` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cover_color` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'gradient-primary',
+  `stat_models` int unsigned DEFAULT '0',
+  `stat_analyses` int unsigned DEFAULT '0',
+  `stat_datasets` int unsigned DEFAULT '0',
+  `stat_public_analyses` int unsigned DEFAULT '0',
+  `stat_private_analyses` int unsigned DEFAULT '0',
+  `email_verified_at` datetime DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `role` enum('user','admin','moderator') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_users_email` (`email`),
+  KEY `idx_users_uuid` (`uuid`),
+  KEY `idx_users_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed: admin user
+INSERT INTO `users`
+  (uuid, name, initials, email, password_hash, email_verified_at, is_active, role, created_at, updated_at)
+VALUES
+  ('61524c92-bea1-11f1-a672-8eaf6b4b2bf7','Pedro Henrique','PH','admin@intellsn.com.br',
+   '$2a$12$MPW/JNeu4vJlfq7D3EE4LOtpgj1VzqW18EEnhCDZrignYmbGlaVZC',
+   NOW(), 1, 'admin', NOW(), NOW());
+
+-- =============================================================================
+-- AUDIT LOGS
+-- =============================================================================
+
+CREATE TABLE `audit_logs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned DEFAULT NULL,
+  `action` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `entity_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `entity_id` bigint unsigned DEFAULT NULL,
+  `before_data` json DEFAULT NULL,
+  `after_data` json DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_user` (`user_id`),
+  KEY `idx_audit_entity` (`entity_type`,`entity_id`),
+  KEY `idx_audit_action` (`action`),
+  KEY `idx_audit_created` (`created_at`),
+  CONSTRAINT `fk_audit_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- TECHNIQUES
+-- =============================================================================
+
+CREATE TABLE `techniques` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `slug` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` enum('input','preprocessing','exploratory','regression','classification','multiway','multiway_regression','multiway_classification','calibration','interferents','deep_learning','visualization','validation','variable_selection','optimization','synthetic','utility','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'other',
+  `subcategory` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `family` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `input_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `output_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `input_schema` json DEFAULT NULL,
+  `output_schema` json DEFAULT NULL,
+  `min_order` tinyint unsigned DEFAULT NULL,
+  `max_order` tinyint unsigned DEFAULT NULL,
+  `requires_sample_axis` tinyint(1) DEFAULT NULL,
+  `parameter_schema` json DEFAULT NULL,
+  `tags` json DEFAULT NULL,
+  `version` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_beta` tinyint(1) NOT NULL DEFAULT '0',
+  `implementation` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `documentation` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  UNIQUE KEY `slug` (`slug`),
+  KEY `idx_techniques_category` (`category`),
+  KEY `idx_techniques_active` (`active`),
+  KEY `idx_techniques_slug` (`slug`),
+  KEY `idx_techniques_family` (`family`),
+  KEY `idx_techniques_subcategory` (`subcategory`),
+  KEY `idx_techniques_order` (`min_order`,`max_order`),
+  CONSTRAINT `chk_techniques_max_order` CHECK ((`max_order` IS NULL OR `max_order` BETWEEN 1 AND 20)),
+  CONSTRAINT `chk_techniques_min_order` CHECK ((`min_order` IS NULL OR `min_order` BETWEEN 1 AND 20)),
+  CONSTRAINT `chk_techniques_order_range` CHECK ((`max_order` IS NULL OR `min_order` IS NULL OR `max_order` >= `min_order`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed: technique catalog
+INSERT INTO `techniques` VALUES
+(1,'399fab36-b854-11f1-a672-8eaf6b4b2bf7','Dataset','dataset','input','importacao','01_dados','Entrada de dados para o workflow.','Dataset','Matrix',NULL,'{\"X\": {\"type\": \"matrix\"}}',1,NULL,NULL,'{}','[\"input\", \"dataset\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(2,'39a01eb1-b854-11f1-a672-8eaf6b4b2bf7','SNV','snv','preprocessing','scatter_correction','02_pre_processamento','Standard Normal Variate.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,1,1,'{}','[\"preprocessing\", \"NIR\", \"scatter\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(3,'39a02237-b854-11f1-a672-8eaf6b4b2bf7','MSC','msc','preprocessing','scatter_correction','02_pre_processamento','Multiplicative Scatter Correction.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,1,1,'{}','[\"preprocessing\", \"NIR\", \"scatter\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(4,'39a024ad-b854-11f1-a672-8eaf6b4b2bf7','Savitzky-Golay','savitzky-golay','preprocessing','smoothing_derivative','02_pre_processamento','Filtro e derivada Savitzky-Golay.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,1,NULL,'{\"window\": {\"type\": \"integer\", \"default\": 11}, \"polyorder\": {\"type\": \"integer\", \"default\": 2}, \"derivative\": {\"type\": \"integer\", \"default\": 0}}','[\"preprocessing\", \"smoothing\", \"derivative\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(5,'39a030f1-b854-11f1-a672-8eaf6b4b2bf7','Normalization','normalization','preprocessing','scaling','02_pre_processamento','Normalização dos dados.','Matrix','Matrix','{\"X\": {\"type\": \"matrix\"}}','{\"X\": {\"type\": \"matrix\"}}',1,NULL,NULL,'{}','[\"preprocessing\", \"scaling\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(6,'39a039be-b854-11f1-a672-8eaf6b4b2bf7','PCA','pca','exploratory',NULL,'03_exploratoria_1d','Principal Component Analysis.','Matrix','PCA_Result','{\"X\": {\"type\": \"matrix\"}}','{\"scores\": {\"type\": \"matrix\", \"shape\": \"(I, R)\"}, \"loadings\": {\"type\": \"matrix\", \"shape\": \"(J, R)\"}, \"explained_variance\": {\"type\": \"float\"}}',1,1,1,'{\"components\": {\"type\": \"integer\", \"default\": 2, \"minimum\": 1}}','[\"exploratory\", \"PCA\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(7,'39a03e67-b854-11f1-a672-8eaf6b4b2bf7','PLS','pls','regression',NULL,'04_regressao_1d','Partial Least Squares regression.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}, \"scores\": {\"type\": \"matrix\"}}',1,1,1,'{\"components\": {\"type\": \"integer\", \"default\": 5, \"minimum\": 1}}','[\"regression\", \"PLS\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(8,'39a04101-b854-11f1-a672-8eaf6b4b2bf7','PLS-DA','pls-da','classification',NULL,'05_classificacao_1d','Partial Least Squares Discriminant Analysis.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}}',1,1,1,'{\"components\": {\"type\": \"integer\", \"default\": 5, \"minimum\": 1}}','[\"classification\", \"PLS-DA\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(9,'39a044fb-b854-11f1-a672-8eaf6b4b2bf7','PARAFAC','parafac','multiway',NULL,'07_decomposicao_multiway','Parallel Factor Analysis para dados multiway.','Tensor','PARAFAC_Result','{\"X\": {\"type\": \"tensor\"}}','{\"scores\": {\"type\": \"matrix\", \"shape\": \"(I, R)\"}, \"loadings\": {\"type\": \"array\"}, \"residuals\": {\"type\": \"tensor\"}, \"core_consistency\": {\"type\": \"float\"}, \"explained_variance\": {\"type\": \"float\"}}',2,NULL,NULL,'{\"max_iter\": {\"type\": \"integer\", \"default\": 2500}, \"tolerance\": {\"type\": \"number\", \"default\": 0.000001}, \"components\": {\"type\": \"integer\", \"default\": 3, \"minimum\": 1}, \"non_negative\": {\"type\": \"boolean\", \"default\": true}, \"initialization\": {\"type\": \"string\", \"default\": \"svd\", \"options\": [\"svd\", \"random\", \"dtld\"]}}','[\"multiway\", \"PARAFAC\", \"N-way\", \"EEM\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(10,'39a04a1b-b854-11f1-a672-8eaf6b4b2bf7','Tucker3','tucker3','multiway',NULL,'07_decomposicao_multiway','Tucker3 tensor decomposition.','Tensor','Tucker_Result','{\"X\": {\"type\": \"tensor\"}}','{\"core\": {\"type\": \"tensor\"}, \"loadings\": {\"type\": \"array\"}, \"explained_variance\": {\"type\": \"float\"}}',2,NULL,NULL,'{\"rank\": {\"type\": \"array\"}}','[\"multiway\", \"Tucker3\", \"N-way\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(11,'39a04d28-b854-11f1-a672-8eaf6b4b2bf7','Random Forest','random-forest','classification',NULL,'05_classificacao_1d','Random Forest.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}}',1,1,1,'{\"n_estimators\": {\"type\": \"integer\", \"default\": 100}}','[\"classification\", \"random-forest\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(12,'39a04fa5-b854-11f1-a672-8eaf6b4b2bf7','RNN','rnn','deep_learning',NULL,'06_deep_learning_1d','Recurrent Neural Network.','Matrix','Model','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"model\": {\"type\": \"model\"}}',1,1,1,'{\"epochs\": {\"type\": \"integer\", \"default\": 100}, \"hidden_units\": {\"type\": \"integer\", \"default\": 64}, \"hidden_layers\": {\"type\": \"integer\", \"default\": 2}}','[\"deep_learning\", \"RNN\"]','1.0',0,NULL,NULL,1,NOW(),NOW()),
+(13,'39a052c3-b854-11f1-a672-8eaf6b4b2bf7','Cross Validation','cross-validation','validation',NULL,'14_validacao','Validação cruzada.','Matrix','Metrics','{\"X\": {\"type\": \"matrix\"}, \"y\": {\"type\": \"matrix\"}}','{\"metrics\": {\"type\": \"object\"}}',NULL,NULL,1,'{\"folds\": {\"type\": \"integer\", \"default\": 10, \"minimum\": 2}}','[\"validation\", \"cross-validation\"]','1.0',0,NULL,NULL,1,NOW(),NOW());
+
+-- =============================================================================
+-- TECHNIQUE COMPATIBILITIES
+-- =============================================================================
+
+CREATE TABLE `technique_compatibilities` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `source_technique_id` bigint unsigned NOT NULL,
+  `target_technique_id` bigint unsigned NOT NULL,
+  `source_port` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `target_port` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `condition` json DEFAULT NULL,
+  `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `is_valid` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_compat` (`source_technique_id`,`target_technique_id`,`source_port`,`target_port`),
+  KEY `idx_compat_source` (`source_technique_id`),
+  KEY `idx_compat_target` (`target_technique_id`),
+  KEY `idx_compat_valid` (`is_valid`),
+  CONSTRAINT `fk_compat_source` FOREIGN KEY (`source_technique_id`) REFERENCES `techniques` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_compat_target` FOREIGN KEY (`target_technique_id`) REFERENCES `techniques` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- SPECTRA
+-- =============================================================================
+
+CREATE TABLE `spectra` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `sample_class` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `technique` enum('NIR','Raman','FTIR','UV-Vis','NMR','Fluorescence','Other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Other',
+  `x_unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `y_unit` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `x_values` json NOT NULL,
+  `y_values` json NOT NULL,
+  `x_points` int unsigned NOT NULL,
+  `x_min` double DEFAULT NULL,
+  `x_max` double DEFAULT NULL,
+  `reference_value` double DEFAULT NULL,
+  `reference_values` json DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `source` enum('file','paste','api') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'file',
+  `source_filename` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `visibility` enum('public','private') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_spectra_user` (`user_id`),
+  KEY `idx_spectra_technique` (`technique`),
+  KEY `idx_spectra_visibility` (`visibility`),
+  KEY `idx_spectra_created` (`created_at`),
+  CONSTRAINT `fk_spectra_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- COLLECTIONS
+-- =============================================================================
+
+CREATE TABLE `collections` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `visibility` enum('public','private') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
+  `spectra_count` int unsigned DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_collections_user` (`user_id`),
+  CONSTRAINT `fk_collections_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- COLLECTION SPECTRA (junction)
+-- =============================================================================
+
+CREATE TABLE `collection_spectra` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `collection_id` bigint unsigned NOT NULL,
+  `spectrum_id` bigint unsigned NOT NULL,
+  `added_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_collection_spectrum` (`collection_id`,`spectrum_id`),
+  KEY `idx_collection_spectra_collection` (`collection_id`),
+  KEY `idx_collection_spectra_spectrum` (`spectrum_id`),
+  CONSTRAINT `fk_collection_spectra_collection` FOREIGN KEY (`collection_id`) REFERENCES `collections` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_collection_spectra_spectrum` FOREIGN KEY (`spectrum_id`) REFERENCES `spectra` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- DATASETS
+-- =============================================================================
+
+CREATE TABLE `datasets` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `visibility` enum('public','private') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
+  `data_type` enum('matrix','tensor') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'matrix',
+  `technique` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `x_unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `y_unit` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `spectra_count` int unsigned DEFAULT '0',
+  `x_points` int unsigned DEFAULT NULL,
+  `x_min` double DEFAULT NULL,
+  `x_max` double DEFAULT NULL,
+  `reference_labels` json DEFAULT NULL,
+  `dimensions` json DEFAULT NULL,
+  `mode_labels` json DEFAULT NULL,
+  `mode_ranges` json DEFAULT NULL,
+  `sample_axis` tinyint unsigned DEFAULT '0',
+  `data_order` tinyint unsigned DEFAULT '1',
+  `augmentation_scheme` json DEFAULT NULL,
+  `file_format` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `storage_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `parent_dataset_id` bigint unsigned DEFAULT NULL,
+  `derived_from_operation` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `derived_parameters` json DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_datasets_user` (`user_id`),
+  KEY `idx_datasets_type` (`data_type`),
+  KEY `idx_datasets_visibility` (`visibility`),
+  KEY `idx_datasets_order` (`data_order`),
+  KEY `idx_datasets_parent` (`parent_dataset_id`),
+  CONSTRAINT `fk_datasets_parent` FOREIGN KEY (`parent_dataset_id`) REFERENCES `datasets` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_datasets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_datasets_order` CHECK (`data_order` BETWEEN 1 AND 20),
+  CONSTRAINT `chk_datasets_sample_axis` CHECK (`sample_axis` IS NULL OR `sample_axis` <= 20)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- DATASET SPECTRA (junction)
+-- =============================================================================
+
+CREATE TABLE `dataset_spectra` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `dataset_id` bigint unsigned NOT NULL,
+  `spectrum_id` bigint unsigned NOT NULL,
+  `position` int unsigned NOT NULL,
+  `added_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_dataset_spectrum` (`dataset_id`,`spectrum_id`),
+  UNIQUE KEY `uq_dataset_position` (`dataset_id`,`position`),
+  KEY `idx_dataset_spectra_dataset` (`dataset_id`),
+  KEY `idx_dataset_spectra_spectrum` (`spectrum_id`),
+  CONSTRAINT `fk_dataset_spectra_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dataset_spectra_spectrum` FOREIGN KEY (`spectrum_id`) REFERENCES `spectra` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- WORKFLOWS
+-- =============================================================================
+
+CREATE TABLE `workflows` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `visibility` enum('public','private') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
+  `status` enum('draft','ready','archived') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `source_article_analysis_id` bigint unsigned DEFAULT NULL,
+  `fork_from_workflow_id` bigint unsigned DEFAULT NULL,
+  `tags` json DEFAULT NULL,
+  `is_template` tinyint(1) NOT NULL DEFAULT '0',
+  `definition` json NOT NULL DEFAULT ('{}'),
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_workflows_user` (`user_id`),
+  KEY `idx_workflows_visibility` (`visibility`),
+  KEY `idx_workflows_status` (`status`),
+  KEY `idx_workflows_source_article` (`source_article_analysis_id`),
+  KEY `idx_workflows_template` (`is_template`),
+  KEY `idx_workflows_fork` (`fork_from_workflow_id`),
+  CONSTRAINT `fk_workflows_fork` FOREIGN KEY (`fork_from_workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_workflows_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- WORKFLOW NODES
+-- =============================================================================
+
+CREATE TABLE `workflow_nodes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `workflow_id` bigint unsigned NOT NULL,
+  `node_key` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `technique_id` bigint unsigned DEFAULT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `parameters` json DEFAULT NULL,
+  `position_x` double DEFAULT '0',
+  `position_y` double DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_workflow_node_key` (`workflow_id`,`node_key`),
+  KEY `idx_workflow_nodes_workflow` (`workflow_id`),
+  KEY `idx_workflow_nodes_technique` (`technique_id`),
+  CONSTRAINT `fk_workflow_nodes_technique` FOREIGN KEY (`technique_id`) REFERENCES `techniques` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_workflow_nodes_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- WORKFLOW EDGES
+-- =============================================================================
+
+CREATE TABLE `workflow_edges` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `workflow_id` bigint unsigned NOT NULL,
+  `source_node_key` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `target_node_key` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `source_port` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `target_port` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_edge` (`workflow_id`,`source_node_key`,`target_node_key`,`source_port`,`target_port`),
+  KEY `idx_workflow_edges_workflow` (`workflow_id`),
+  KEY `idx_workflow_edges_source` (`source_node_key`),
+  KEY `idx_workflow_edges_target` (`target_node_key`),
+  CONSTRAINT `fk_workflow_edges_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- WORKFLOW TEMPLATES
+-- =============================================================================
+
+CREATE TABLE `workflow_templates` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `workflow_id` bigint unsigned NOT NULL,
+  `domain` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `data_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `analytical_order` tinyint unsigned DEFAULT NULL,
+  `use_case` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `thumbnail_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `usage_count` int unsigned DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_template_workflow` (`workflow_id`),
+  KEY `idx_templates_domain` (`domain`),
+  KEY `idx_templates_order` (`analytical_order`),
+  CONSTRAINT `fk_templates_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- ARTICLES
+-- =============================================================================
+
+CREATE TABLE `articles` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `doi` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `title` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `abstract` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `authors` json DEFAULT NULL,
+  `journal` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `publisher` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `publication_date` date DEFAULT NULL,
+  `url` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `pdf_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `full_text_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `extraction_status` enum('pending','extracted','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
+  `metadata` json DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_articles_user` (`user_id`),
+  KEY `idx_articles_doi` (`doi`),
+  KEY `idx_articles_publication_date` (`publication_date`),
+  KEY `idx_articles_extraction` (`extraction_status`),
+  CONSTRAINT `fk_articles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- ARTICLE ANALYSES
+-- =============================================================================
+
+CREATE TABLE `article_analyses` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `article_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `status` enum('pending','processing','completed','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `summary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `methodology` json DEFAULT NULL,
+  `raw_response` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `generated_workflow_id` bigint unsigned DEFAULT NULL,
+  `data_type_detected` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dimensionality_detected` tinyint unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_article_analyses_article` (`article_id`),
+  KEY `idx_article_analyses_user` (`user_id`),
+  KEY `idx_article_analyses_status` (`status`),
+  KEY `idx_article_analyses_workflow` (`generated_workflow_id`),
+  CONSTRAINT `fk_article_analyses_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_article_analyses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_article_analyses_workflow` FOREIGN KEY (`generated_workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add FK for workflows.source_article_analysis_id (deferred because article_analyses depends on workflows)
+ALTER TABLE `workflows`
+  ADD CONSTRAINT `fk_workflows_article_analysis`
+  FOREIGN KEY (`source_article_analysis_id`) REFERENCES `article_analyses` (`id`) ON DELETE SET NULL;
+
+-- =============================================================================
+-- ARTICLE TECHNIQUES
+-- =============================================================================
+
+CREATE TABLE `article_techniques` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `article_analysis_id` bigint unsigned NOT NULL,
+  `technique_id` bigint unsigned NOT NULL,
+  `step_order` int unsigned DEFAULT NULL,
+  `parameters` json DEFAULT NULL,
+  `evidence` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `confidence` float DEFAULT NULL,
+  `raw_text` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `mapping_notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_article_techniques_analysis` (`article_analysis_id`),
+  KEY `idx_article_techniques_technique` (`technique_id`),
+  CONSTRAINT `fk_article_techniques_analysis` FOREIGN KEY (`article_analysis_id`) REFERENCES `article_analyses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_article_techniques_technique` FOREIGN KEY (`technique_id`) REFERENCES `techniques` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- WORKFLOW NODE ORIGINS
+-- =============================================================================
+
+CREATE TABLE `workflow_node_origins` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `workflow_node_id` bigint unsigned NOT NULL,
+  `article_technique_id` bigint unsigned NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wno` (`workflow_node_id`,`article_technique_id`),
+  KEY `fk_wno_node` (`workflow_node_id`),
+  KEY `fk_wno_technique` (`article_technique_id`),
+  CONSTRAINT `fk_wno_node` FOREIGN KEY (`workflow_node_id`) REFERENCES `workflow_nodes` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_wno_technique` FOREIGN KEY (`article_technique_id`) REFERENCES `article_techniques` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- COMMUNITIES
+-- =============================================================================
+
+CREATE TABLE `communities` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `owner_id` bigint unsigned NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `visibility` enum('public','private') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_communities_owner` (`owner_id`),
+  KEY `idx_communities_visibility` (`visibility`),
+  CONSTRAINT `fk_communities_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- COMMUNITY MEMBERS
+-- =============================================================================
+
+CREATE TABLE `community_members` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `community_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `role` enum('member','moderator','admin') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'member',
+  `joined_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_community_member` (`community_id`,`user_id`),
+  KEY `idx_community_members_community` (`community_id`),
+  KEY `idx_community_members_user` (`user_id`),
+  CONSTRAINT `fk_community_members_community` FOREIGN KEY (`community_id`) REFERENCES `communities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_community_members_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- COMMUNITY DATASETS
+-- =============================================================================
+
+CREATE TABLE `community_datasets` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `community_id` bigint unsigned NOT NULL,
+  `dataset_id` bigint unsigned NOT NULL,
+  `shared_by` bigint unsigned NOT NULL,
+  `shared_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_community_dataset` (`community_id`,`dataset_id`),
+  KEY `fk_community_datasets_user` (`shared_by`),
+  KEY `idx_community_datasets_community` (`community_id`),
+  KEY `idx_community_datasets_dataset` (`dataset_id`),
+  CONSTRAINT `fk_community_datasets_community` FOREIGN KEY (`community_id`) REFERENCES `communities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_community_datasets_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_community_datasets_user` FOREIGN KEY (`shared_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- COMMUNITY WORKFLOWS
+-- =============================================================================
+
+CREATE TABLE `community_workflows` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `community_id` bigint unsigned NOT NULL,
+  `workflow_id` bigint unsigned NOT NULL,
+  `shared_by` bigint unsigned NOT NULL,
+  `shared_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_community_workflow` (`community_id`,`workflow_id`),
+  KEY `fk_community_workflows_user` (`shared_by`),
+  KEY `idx_community_workflows_community` (`community_id`),
+  KEY `idx_community_workflows_workflow` (`workflow_id`),
+  CONSTRAINT `fk_community_workflows_community` FOREIGN KEY (`community_id`) REFERENCES `communities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_community_workflows_user` FOREIGN KEY (`shared_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_community_workflows_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- MESSAGES
+-- =============================================================================
+
+CREATE TABLE `messages` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `community_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_messages_community` (`community_id`),
+  KEY `idx_messages_user` (`user_id`),
+  KEY `idx_messages_created` (`created_at`),
+  CONSTRAINT `fk_messages_community` FOREIGN KEY (`community_id`) REFERENCES `communities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_messages_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- PROJECTS
+-- =============================================================================
+
+CREATE TABLE `projects` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL COMMENT 'Owner/creator',
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `visibility` enum('public','private') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
+  `status` enum('active','archived','closed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_projects_user` (`user_id`),
+  KEY `idx_projects_visibility` (`visibility`),
+  KEY `idx_projects_status` (`status`),
+  CONSTRAINT `fk_projects_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- PROJECT MEMBERS
+-- =============================================================================
+
+CREATE TABLE `project_members` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `project_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `role` enum('viewer','editor','admin') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'viewer',
+  `joined_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_project_member` (`project_id`,`user_id`),
+  KEY `idx_project_members_project` (`project_id`),
+  KEY `idx_project_members_user` (`user_id`),
+  CONSTRAINT `fk_project_members_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_members_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- PROJECT DATASETS
+-- =============================================================================
+
+CREATE TABLE `project_datasets` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `project_id` bigint unsigned NOT NULL,
+  `dataset_id` bigint unsigned NOT NULL,
+  `purpose` enum('training','validation','test','calibration','prediction','reference','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'other',
+  `added_by` bigint unsigned DEFAULT NULL,
+  `added_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_project_dataset` (`project_id`,`dataset_id`),
+  KEY `idx_project_datasets_project` (`project_id`),
+  KEY `idx_project_datasets_dataset` (`dataset_id`),
+  KEY `idx_project_datasets_added_by` (`added_by`),
+  CONSTRAINT `fk_project_datasets_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_datasets_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_datasets_user` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- PROJECT WORKFLOWS
+-- =============================================================================
+
+CREATE TABLE `project_workflows` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `project_id` bigint unsigned NOT NULL,
+  `workflow_id` bigint unsigned NOT NULL,
+  `added_by` bigint unsigned DEFAULT NULL,
+  `added_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_project_workflow` (`project_id`,`workflow_id`),
+  KEY `idx_project_workflows_project` (`project_id`),
+  KEY `idx_project_workflows_workflow` (`workflow_id`),
+  KEY `idx_project_workflows_added_by` (`added_by`),
+  CONSTRAINT `fk_project_workflows_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_workflows_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_workflows_user` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- PROJECT ARTICLES
+-- =============================================================================
+
+CREATE TABLE `project_articles` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `project_id` bigint unsigned NOT NULL,
+  `article_id` bigint unsigned NOT NULL,
+  `added_by` bigint unsigned DEFAULT NULL,
+  `added_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_project_article` (`project_id`,`article_id`),
+  KEY `idx_project_articles_project` (`project_id`),
+  KEY `idx_project_articles_article` (`article_id`),
+  KEY `idx_project_articles_added_by` (`added_by`),
+  CONSTRAINT `fk_project_articles_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_articles_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_articles_user` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- MODELS
+-- =============================================================================
+
+CREATE TABLE `models` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `dataset_id` bigint unsigned DEFAULT NULL,
+  `execution_id` bigint unsigned DEFAULT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `algorithm` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `model_type` enum('regression','classification','exploratory','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'other',
+  `hyperparameters` json DEFAULT NULL,
+  `preprocessing` json DEFAULT NULL,
+  `selected_vars` json DEFAULT NULL,
+  `model_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `model_size_kb` bigint unsigned DEFAULT NULL,
+  `status` enum('pending','training','ready','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `metrics_cal` json DEFAULT NULL,
+  `metrics_cv` json DEFAULT NULL,
+  `metrics_ext` json DEFAULT NULL,
+  `train_samples` int unsigned DEFAULT NULL,
+  `test_samples` int unsigned DEFAULT NULL,
+  `cv_folds` int unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_models_user` (`user_id`),
+  KEY `idx_models_dataset` (`dataset_id`),
+  KEY `idx_models_algorithm` (`algorithm`),
+  KEY `idx_models_status` (`status`),
+  CONSTRAINT `fk_models_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_models_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- EXECUTIONS
+-- =============================================================================
+
+CREATE TABLE `executions` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `workflow_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `dataset_id` bigint unsigned DEFAULT NULL,
+  `collection_id` bigint unsigned DEFAULT NULL,
+  `parent_execution_id` bigint unsigned DEFAULT NULL,
+  `comparison_group` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `label` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('queued','running','completed','failed','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `parameters` json DEFAULT NULL,
+  `results` json DEFAULT NULL,
+  `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `random_seed` bigint DEFAULT NULL,
+  `code_version` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `environment` json DEFAULT NULL,
+  `started_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_executions_workflow` (`workflow_id`),
+  KEY `idx_executions_user` (`user_id`),
+  KEY `idx_executions_dataset` (`dataset_id`),
+  KEY `idx_executions_collection` (`collection_id`),
+  KEY `idx_executions_status` (`status`),
+  KEY `idx_executions_created` (`created_at`),
+  KEY `idx_executions_parent` (`parent_execution_id`),
+  KEY `idx_executions_comparison_group` (`comparison_group`),
+  CONSTRAINT `fk_executions_collection` FOREIGN KEY (`collection_id`) REFERENCES `collections` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_executions_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_executions_parent` FOREIGN KEY (`parent_execution_id`) REFERENCES `executions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_executions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_executions_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add deferred FK on models.execution_id
+ALTER TABLE `models`
+  ADD KEY `idx_models_execution` (`execution_id`),
+  ADD CONSTRAINT `fk_models_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE SET NULL;
+
+-- =============================================================================
+-- EXECUTION NODES
+-- Fixed: uses workflow_node_id FK (matches execution.controller.js INSERT/JOIN logic)
+-- =============================================================================
+
+CREATE TABLE `execution_nodes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `execution_id` bigint unsigned NOT NULL,
+  `workflow_node_id` bigint unsigned NOT NULL COMMENT 'FK to workflow_nodes.id — matches controller INSERT and JOIN logic',
+  `status` enum('pending','running','completed','failed','skipped') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `parameters` json DEFAULT NULL,
+  `input_data` json DEFAULT NULL,
+  `input_metadata` json DEFAULT NULL,
+  `output_data` json DEFAULT NULL,
+  `output_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `output_shape` json DEFAULT NULL,
+  `output_dtype` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `output_storage_path` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `output_storage_type` enum('json','numpy','pickle','hdf5','csv','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `metrics` json DEFAULT NULL,
+  `runtime_ms` bigint unsigned DEFAULT NULL,
+  `logs` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `started_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_execution_node` (`execution_id`,`workflow_node_id`),
+  KEY `idx_execution_nodes_execution` (`execution_id`),
+  KEY `idx_execution_nodes_workflow_node` (`workflow_node_id`),
+  KEY `idx_execution_nodes_status` (`status`),
+  CONSTRAINT `fk_execution_nodes_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_execution_nodes_workflow_node` FOREIGN KEY (`workflow_node_id`) REFERENCES `workflow_nodes` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- METRICS
+-- =============================================================================
+
+CREATE TABLE `metrics` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `execution_node_id` bigint unsigned NOT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `value` double NOT NULL,
+  `dataset_split` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `unit` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_metrics_execution_node` (`execution_node_id`),
+  KEY `idx_metrics_name` (`name`),
+  CONSTRAINT `fk_metrics_execution_node` FOREIGN KEY (`execution_node_id`) REFERENCES `execution_nodes` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- JOBS
+-- Fixed: added execute_node and cancel_execution to job_type enum
+-- =============================================================================
+
+CREATE TABLE `jobs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `job_type` enum(
+    'train_model','predict','preprocess',
+    'execute_workflow','execute_node',
+    'analyze_article','generate_workflow',
+    'operate_dataset','export',
+    'cancel_execution','other'
+  ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `model_id` bigint unsigned DEFAULT NULL,
+  `dataset_id` bigint unsigned DEFAULT NULL,
+  `workflow_id` bigint unsigned DEFAULT NULL,
+  `execution_id` bigint unsigned DEFAULT NULL,
+  `celery_task_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `queue_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'default',
+  `payload` json DEFAULT NULL,
+  `status` enum('queued','running','done','failed','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `progress` decimal(5,2) DEFAULT '0.00',
+  `result` json DEFAULT NULL,
+  `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `error_traceback` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `queued_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `started_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `fk_jobs_model` (`model_id`),
+  KEY `fk_jobs_dataset` (`dataset_id`),
+  KEY `idx_jobs_user` (`user_id`),
+  KEY `idx_jobs_status` (`status`),
+  KEY `idx_jobs_type` (`job_type`),
+  KEY `idx_jobs_workflow` (`workflow_id`),
+  KEY `idx_jobs_execution` (`execution_id`),
+  CONSTRAINT `fk_jobs_dataset` FOREIGN KEY (`dataset_id`) REFERENCES `datasets` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_jobs_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_jobs_model` FOREIGN KEY (`model_id`) REFERENCES `models` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_jobs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_jobs_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- PREDICTIONS
+-- =============================================================================
+
+CREATE TABLE `predictions` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `model_id` bigint unsigned NOT NULL,
+  `job_id` bigint unsigned DEFAULT NULL,
+  `source_dataset_id` bigint unsigned DEFAULT NULL,
+  `source_filename` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `results` json NOT NULL,
+  `sample_count` int unsigned DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `fk_predictions_job` (`job_id`),
+  KEY `idx_predictions_user` (`user_id`),
+  KEY `idx_predictions_model` (`model_id`),
+  KEY `idx_predictions_dataset` (`source_dataset_id`),
+  CONSTRAINT `fk_predictions_dataset` FOREIGN KEY (`source_dataset_id`) REFERENCES `datasets` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_predictions_model` FOREIGN KEY (`model_id`) REFERENCES `models` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_predictions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- EXECUTION COMPARISONS
+-- =============================================================================
+
+CREATE TABLE `execution_comparisons` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `conclusion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_comparisons_user` (`user_id`),
+  CONSTRAINT `fk_comparisons_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- EXECUTION COMPARISON ITEMS
+-- =============================================================================
+
+CREATE TABLE `execution_comparison_items` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `comparison_id` bigint unsigned NOT NULL,
+  `execution_id` bigint unsigned NOT NULL,
+  `label` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `position` int unsigned NOT NULL DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_comparison_execution` (`comparison_id`,`execution_id`),
+  KEY `idx_comparison_items_comparison` (`comparison_id`),
+  KEY `idx_comparison_items_execution` (`execution_id`),
+  CONSTRAINT `fk_comp_items_comparison` FOREIGN KEY (`comparison_id`) REFERENCES `execution_comparisons` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_comp_items_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- AI INTERACTIONS
+-- =============================================================================
+
+CREATE TABLE `ai_interactions` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `type` enum('article_analysis','workflow_generation','workflow_assistance','result_analysis','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `article_id` bigint unsigned DEFAULT NULL,
+  `workflow_id` bigint unsigned DEFAULT NULL,
+  `execution_id` bigint unsigned DEFAULT NULL,
+  `input_context` json DEFAULT NULL,
+  `output` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_ai_user` (`user_id`),
+  KEY `idx_ai_type` (`type`),
+  KEY `idx_ai_article` (`article_id`),
+  KEY `idx_ai_workflow` (`workflow_id`),
+  KEY `idx_ai_execution` (`execution_id`),
+  CONSTRAINT `fk_ai_interactions_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_ai_interactions_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_ai_interactions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ai_interactions_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- DATASET LINEAGE
+-- =============================================================================
+
+CREATE TABLE `dataset_lineage` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `source_dataset_id` bigint unsigned NOT NULL,
+  `target_dataset_id` bigint unsigned NOT NULL,
+  `operation` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `parameters` json DEFAULT NULL,
+  `workflow_id` bigint unsigned DEFAULT NULL,
+  `workflow_node_id` bigint unsigned DEFAULT NULL,
+  `execution_id` bigint unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_lineage` (`source_dataset_id`,`target_dataset_id`,`operation`),
+  KEY `idx_lineage_source` (`source_dataset_id`),
+  KEY `idx_lineage_target` (`target_dataset_id`),
+  KEY `idx_lineage_workflow` (`workflow_id`),
+  KEY `idx_lineage_node` (`workflow_node_id`),
+  KEY `idx_lineage_execution` (`execution_id`),
+  CONSTRAINT `fk_lineage_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_lineage_source` FOREIGN KEY (`source_dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_lineage_target` FOREIGN KEY (`target_dataset_id`) REFERENCES `datasets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_lineage_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_lineage_workflow_node` FOREIGN KEY (`workflow_node_id`) REFERENCES `workflow_nodes` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- End of TcheLab init.mysql

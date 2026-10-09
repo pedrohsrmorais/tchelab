@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, FlaskConical, Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, FlaskConical, Mail, Lock, User, ArrowRight, Sparkles, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/auth';
+
+// Utility style for inputs with left icon — ensures text never overlaps the icon
+const iconInput = { paddingLeft: '2.5rem' };
+const iconInputRight = { paddingLeft: '2.5rem', paddingRight: '2.75rem' };
+
+const INVITE_CODE = 'intellsn';
 
 // Floating particle
 function Particle({ x, y, size, delay, duration }) {
@@ -74,7 +80,7 @@ export default function LoginPage() {
   // Login form
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   // Register form
-  const [regForm, setRegForm] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [regForm, setRegForm] = useState({ name: '', email: '', password: '', confirm: '', inviteCode: '' });
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -92,8 +98,12 @@ export default function LoginPage() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!regForm.name || !regForm.email || !regForm.password) {
+    if (!regForm.name || !regForm.email || !regForm.password || !regForm.inviteCode) {
       toast.error('Preencha todos os campos.');
+      return;
+    }
+    if (regForm.inviteCode.trim() !== INVITE_CODE) {
+      toast.error('Código de convite inválido.');
       return;
     }
     if (regForm.password !== regForm.confirm) {
@@ -219,12 +229,13 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                     <input
                       type="email"
                       value={loginForm.email}
                       onChange={e => setLoginForm(f => ({ ...f, email: e.target.value }))}
-                      className="input-field pl-10"
+                      className="input-field"
+                      style={iconInput}
                       placeholder="seu@email.com"
                       autoComplete="email"
                     />
@@ -233,12 +244,13 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                     <input
                       type={showPass ? 'text' : 'password'}
                       value={loginForm.password}
                       onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
-                      className="input-field pl-10 pr-10"
+                      className="input-field"
+                      style={iconInputRight}
                       placeholder="••••••••"
                       autoComplete="current-password"
                     />
@@ -280,12 +292,13 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                     <input
                       type="text"
                       value={regForm.name}
                       onChange={e => setRegForm(f => ({ ...f, name: e.target.value }))}
-                      className="input-field pl-10"
+                      className="input-field"
+                      style={iconInput}
                       placeholder="Seu nome completo"
                     />
                   </div>
@@ -293,12 +306,13 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                     <input
                       type="email"
                       value={regForm.email}
                       onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))}
-                      className="input-field pl-10"
+                      className="input-field"
+                      style={iconInput}
                       placeholder="seu@email.com"
                     />
                   </div>
@@ -306,12 +320,13 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                     <input
                       type={showPass ? 'text' : 'password'}
                       value={regForm.password}
                       onChange={e => setRegForm(f => ({ ...f, password: e.target.value }))}
-                      className="input-field pl-10 pr-10"
+                      className="input-field"
+                      style={iconInputRight}
                       placeholder="Mín. 8 caracteres"
                     />
                     <button type="button" onClick={() => setShowPass(v => !v)}
@@ -323,13 +338,29 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-blue-200 mb-1.5">Confirmar Senha</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                     <input
                       type="password"
                       value={regForm.confirm}
                       onChange={e => setRegForm(f => ({ ...f, confirm: e.target.value }))}
-                      className="input-field pl-10"
+                      className="input-field"
+                      style={iconInput}
                       placeholder="Repita a senha"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Código de Convite</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={regForm.inviteCode}
+                      onChange={e => setRegForm(f => ({ ...f, inviteCode: e.target.value }))}
+                      className="input-field"
+                      style={iconInput}
+                      placeholder="Código de acesso"
+                      autoComplete="off"
                     />
                   </div>
                 </div>
