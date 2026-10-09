@@ -37,7 +37,7 @@ async function listDatasets(req, res) {
 
     const [rows] = await db.query(
       `SELECT d.id, d.uuid, d.name, d.data_type, d.data_order, d.sample_axis,
-              d.dimensions, d.mode_labels, d.dtype, d.visibility, d.created_at
+              d.dimensions, d.mode_labels, d.visibility, d.created_at
        FROM datasets d WHERE ${where} ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );
@@ -65,9 +65,9 @@ async function createDataset(req, res) {
     const [result] = await db.query(
       `INSERT INTO datasets
          (uuid, user_id, name, description, data_type, technique, dimensions, mode_labels,
-          mode_ranges, sample_axis, data_order, augmentation_scheme, dtype, file_format,
+          mode_ranges, sample_axis, data_order, augmentation_scheme, file_format,
           storage_path, visibility, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         uuid, req.user.id, name, description || null, data_type || null,
         technique || null,
@@ -77,7 +77,7 @@ async function createDataset(req, res) {
         sample_axis !== undefined ? sample_axis : null,
         data_order || 1,
         JSON.stringify(augmentation_scheme || null),
-        dtype || null, file_format || null, storage_path || null,
+        file_format || null, storage_path || null,
         visibility || 'private',
       ],
     );

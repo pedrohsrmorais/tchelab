@@ -34,9 +34,14 @@ import {
 // Custom node: Dataset (nó de entrada)
 // ────────────────────────────────────────────────────────────────────────────────
 function DatasetNode({ data, selected }) {
+  const { data: dsRaw } = useApi(api.datasets.list, []);
+  const datasets = (dsRaw?.data ?? dsRaw ?? []);
+
+  const selectedDs = datasets.find(d => d.uuid === data.datasetUuid);
+
   return (
     <div style={{
-      minWidth: 180,
+      minWidth: 200,
       background: selected ? 'rgba(37,99,235,0.18)' : 'rgba(10,15,30,0.95)',
       border: `2px solid ${selected ? 'var(--accent)' : 'rgba(37,99,235,0.5)'}`,
       borderRadius: 12,
@@ -44,7 +49,7 @@ function DatasetNode({ data, selected }) {
       boxShadow: selected ? '0 0 0 3px rgba(37,99,235,0.2)' : 'var(--shadow)',
       transition: 'all 0.2s',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
         <div style={{
           width: 24, height: 24, borderRadius: 6,
           background: 'rgba(37,99,235,0.2)',
@@ -56,14 +61,43 @@ function DatasetNode({ data, selected }) {
           Dataset
         </span>
       </div>
-      <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-        {data.label || 'Dataset de entrada'}
-      </p>
-      {data.shape && (
-        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>
-          {data.shape}
+
+      {/* Seletor de dataset */}
+      <select
+        value={data.datasetUuid || ''}
+        onChange={e => data.onChange && data.onChange(e.target.value, datasets.find(d => d.uuid === e.target.value))}
+        className="nodrag"
+        style={{
+          width: '100%',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(37,99,235,0.35)',
+          borderRadius: 6,
+          color: data.datasetUuid ? 'var(--text-primary)' : 'var(--text-muted)',
+          fontSize: '0.78rem',
+          padding: '4px 8px',
+          cursor: 'pointer',
+          outline: 'none',
+          marginBottom: 4,
+        }}
+      >
+        <option value="">— Selecionar dataset —</option>
+        {datasets.map(d => (
+          <option key={d.uuid} value={d.uuid}>{d.name}</option>
+        ))}
+      </select>
+
+      {/* Info do dataset selecionado */}
+      {selectedDs && (
+        <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+          {selectedDs.data_type || 'matrix'}{selectedDs.dimensions ? ` · ${JSON.stringify(selectedDs.dimensions)}` : ''}
         </p>
       )}
+      {!data.datasetUuid && (
+        <p style={{ fontSize: '0.68rem', color: '#fbbf24', margin: '2px 0 0' }}>
+          ⚠ Nenhum dataset selecionado
+        </p>
+      )}
+
       {/* Só tem saída */}
       <Handle type="source" position={Position.Right}
         style={{ background: '#3b82f6', width: 10, height: 10, border: '2px solid var(--bg-surface)' }}
@@ -392,12 +426,27 @@ export default function WorkflowEditorPage() {
   }, [edgesRaw]);
 
   // ── Dataset starter node ─────────────────────────────────────────────────────
+  // Usamos uma ref para o callback para evitar recriar os nodes a cada render
+  const onDatasetChangeRef = useRef(null);
+  onDatasetChangeRef.current = (uuid, dsObj) => {
+    setNodes(prev => prev.map(n =>
+      n.id === 'dataset-0'
+        ? { ...n, data: { ...n.data, datasetUuid: uuid, label: dsObj?.name || 'Dataset de entrada' } }
+        : n
+    ));
+  };
+
   function datasetStarterNode() {
     return [{
       id:       'dataset-0',
       type:     'dataset',
       position: { x: 40, y: 180 },
-      data:     { label: 'Dataset de entrada', outputType: ARRAY_TYPES.DATASET },
+      data: {
+        label: 'Dataset de entrada',
+        outputType: ARRAY_TYPES.DATASET,
+        datasetUuid: '',
+        onChange: (uuid, dsObj) => onDatasetChangeRef.current?.(uuid, dsObj),
+      },
     }];
   }
 

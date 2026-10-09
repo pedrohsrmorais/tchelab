@@ -73,7 +73,15 @@ function ImportModal({ open, onClose, onImported }) {
       fd.append('separator', separator);
       result = await importDs(fd);
     } else {
-      result = await createDs({ name, description, raw_data: pasteContent, separator });
+      // Conteúdo colado: envia como arquivo para o worker processar
+      const blob = new Blob([pasteContent], { type: 'text/plain' });
+      const pasteFile = new File([blob], `${name || 'dataset'}.csv`, { type: 'text/csv' });
+      const fd = new FormData();
+      fd.append('file', pasteFile);
+      fd.append('name', name);
+      fd.append('description', description);
+      fd.append('separator', separator);
+      result = await importDs(fd);
     }
     if (result) {
       toast.success('Dataset importado com sucesso!');
