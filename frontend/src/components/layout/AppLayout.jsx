@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
@@ -20,24 +20,29 @@ function ContentLoader() {
 }
 
 /**
- * PageTransition — cross-fade entre rotas sem animação de entrada redundante.
+ * PageTransition — fade suave entre rotas.
  *
- * Comportamento desejado:
- *   Clicou no link → página atual faz fade-out (0.35s)
- *                  → nova página aparece imediatamente (opacity=1, sem fade-in)
+ * Funcionamento correto (após AppLayout virar import estático em App.jsx):
  *
- * Por que NÃO usar initial={{ opacity: 0 }} + animate={{ opacity: 1 }}:
- *   Isso causaria "página aparece → fade-out → fade-in dela mesma" porque
- *   o AnimatePresence mode="wait" primeiro completa o exit da página anterior
- *   e SÓ ENTÃO monta a nova. Com initial=0, a nova página aparece do zero
- *   fazendo fade-in — o usuário vê a tela piscar.
+ *   1. Usuário clica em um link → React Router muda location.pathname
+ *   2. AnimatePresence detecta a mudança de key → dispara exit na página atual
+ *   3. Após o exit (0.22s), desmonta a página antiga e monta a nova
+ *   4. A nova página entra com initial={{ opacity: 0 }} → anima para opacity: 1
  *
- * Solução: a nova página entra com opacity=1 (sem animação de entrada).
- *   Apenas a saída anima. Isso dá a sensação de troca suave sem flash.
+ * O resultado é um fade out da página antiga e um fade in da nova — suave,
+ * sem flash, sem "aparece → some → reaparece".
  *
- * Suspense fallback=null: mantém o motion.div montado mesmo quando o chunk
- * lazy ainda está carregando, impedindo que o Suspense externo substitua
- * o motion.div e quebre a animação de saída.
+ * Por que funcionava errado antes:
+ *   AppLayout era lazy(). O Suspense externo do App.jsx, ao detectar um chunk
+ *   ainda não carregado, desmontava o motion.div inteiro e exibia o PageLoader.
+ *   Quando o chunk carregava, o motion.div remontava e animava do zero —
+ *   causando o efeito "página aparece → some → reaparece".
+ *
+ * Agora AppLayout é estático → o Suspense externo nunca o desmonta →
+ * AnimatePresence fica sempre montado e gerencia o ciclo corretamente.
+ *
+ * O Suspense interno (fallback={null}) é um safety net para chunks ainda
+ * carregando. Com o prefetch em App.jsx, raramente fica pendente.
  */
 function PageTransition() {
   const location = useLocation();
@@ -46,10 +51,10 @@ function PageTransition() {
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={location.pathname}
-        initial={{ opacity: 1 }}   // nova página já visível ao montar
-        animate={{ opacity: 1 }}   // nenhuma animação de entrada
-        exit={{ opacity: 0 }}      // página antiga faz fade-out ao sair
-        transition={{ opacity: { duration: 0.3, ease: 'easeOut' } }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.22, ease: 'easeInOut' }}
         style={{ minHeight: '100%', padding: '1.5rem' }}
       >
         <Suspense fallback={null}>

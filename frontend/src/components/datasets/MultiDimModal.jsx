@@ -10,7 +10,7 @@
 import React, {
   useState, useEffect, useRef, useMemo, useCallback, Suspense
 } from 'react';
-import { X, ChevronDown, Info, Layers } from 'lucide-react';
+import { X, ChevronDown, Info, Layers, Download } from 'lucide-react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -124,9 +124,15 @@ function sliceTo3D(tensor, dims, fixedAxes) {
 
 const CELL_MAX = 80; // max canvas dimension in cells before down-sampling
 
-function HeatMap2D({ matrix, rows, cols, axisLabels }) {
+function HeatMap2D({ matrix, rows, cols, axisLabels, exportRef }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
+
+  // Expose canvas ref to parent for export
+  useEffect(() => {
+    if (exportRef) exportRef.current = canvasRef.current;
+    return () => { if (exportRef) exportRef.current = null; };
+  }, [exportRef]);
 
   // Cell size fitted to canvas container
   const [canvasSize, setCanvasSize] = useState({ w: 600, h: 400 });
@@ -346,7 +352,17 @@ function VoxelCloud({ values, sizes, gMin, gMax, maxVoxels = 2000 }) {
   );
 }
 
-function CubeScene({ values, sizes, gMin, gMax }) {
+/** Captures the WebGL renderer reference for export */
+function GlCapture({ glRef }) {
+  const { gl } = useThree();
+  useEffect(() => {
+    if (glRef) glRef.current = gl;
+    return () => { if (glRef) glRef.current = null; };
+  }, [gl, glRef]);
+  return null;
+}
+
+function CubeScene({ values, sizes, gMin, gMax, glRef }) {
   const { camera } = useThree();
   useEffect(() => {
     const maxDim = Math.max(...sizes);
@@ -361,22 +377,24 @@ function CubeScene({ values, sizes, gMin, gMax }) {
       <VoxelCloud values={values} sizes={sizes} gMin={gMin} gMax={gMax} />
       <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
       <axesHelper args={[Math.max(...sizes) * 0.6]} />
+      <GlCapture glRef={glRef} />
     </>
   );
 }
 
-function Heatmap3D({ values, sizes, gMin, gMax }) {
+function Heatmap3D({ values, sizes, gMin, gMax, glRef }) {
   const [hovered, setHovered] = useState(null);
 
   return (
     <div className="relative w-full" style={{ height: 440 }}>
       <Canvas
         camera={{ fov: 45, near: 0.1, far: 1000 }}
+        gl={{ preserveDrawingBuffer: true }}
         style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', borderRadius: 8 }}
         onPointerMissed={() => setHovered(null)}
       >
         <Suspense fallback={null}>
-          <CubeScene values={values} sizes={sizes} gMin={gMin} gMax={gMax} />
+          <CubeScene values={values} sizes={sizes} gMin={gMin} gMax={gMax} glRef={glRef} />
         </Suspense>
       </Canvas>
 
@@ -450,7 +468,123 @@ function AxisSelector({ dims, fixedAxes, onChange, freeCount }) {
 // MAIN MODAL
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// EXPORT HELPERS
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts a canvas data-URL (PNG or any) to a JPEG-embedded PDF and
+ * triggers a browser download. No external library needed.
+ *
+ * Strategy:
+ *  1. Draw the source image onto a temp canvas → get JPEG data URL (DCT-compressed)
+ *  2. Decode the JPEG bytes
+ *  3. Build a minimal valid PDF 1.4 with one /XObject /Image using /DCTDecode
+ *  4. Trigger download via a blob URL
+ */
+function canvasToPDF(dataUrl, filename) {
+  const img = new Image();
+  img.onload = () => {
+    const w = img.naturalWidth  || 800;
+    const h = img.naturalHeight || 600;
+
+    // Re-encode as JPEG (DCTDecode — natively supported in PDF)
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width  = w;
+    tmpCanvas.height = h;
+    const ctx = tmpCanvas.getContext('2d');
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0);
+    const jpegDataUrl = tmpCanvas.toDataURL('image/jpeg', 0.92);
+    const base64Data  = jpegDataUrl.split(',')[1];
+    const imgBytes    = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+    // PDF content stream: place image filling the page
+    const stream      = `q ${w} 0 0 ${h} 0 0 cm /Im1 Do Q`;
+    const enc         = new TextEncoder();
+    const streamBytes = enc.encode(stream);
+
+    // Build PDF text objects
+    const obj1 = '1 0 obj<</Type /Catalog /Pages 2 0 R>>endobj\n';
+    const obj2 = '2 0 obj<</Type /Pages /Kids[3 0 R]/Count 1>>endobj\n';
+    const obj3 = `3 0 obj<</Type /Page /Parent 2 0 R /MediaBox[0 0 ${w} ${h}] /Contents 4 0 R /Resources<</XObject<</Im1 5 0 R>>>>>>endobj\n`;
+    const obj4 = `4 0 obj<</Length ${streamBytes.length}>>\nstream\n${stream}\nendstream\nendobj\n`;
+    const obj5hdr = `5 0 obj<</Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imgBytes.length}>>\nstream\n`;
+    const obj5end = '\nendstream\nendobj\n';
+
+    const header = enc.encode('%PDF-1.4\n');
+
+    // Compute byte offsets for xref
+    let offset = header.length;
+    const offsets = [];
+
+    const parts = [obj1, obj2, obj3, obj4].map(enc.encode.bind(enc));
+    const obj5hdrBytes = enc.encode(obj5hdr);
+    const obj5endBytes = enc.encode(obj5end);
+
+    offsets.push(offset); offset += parts[0].length;
+    offsets.push(offset); offset += parts[1].length;
+    offsets.push(offset); offset += parts[2].length;
+    offsets.push(offset); offset += parts[3].length;
+    offsets.push(offset); // obj5
+
+    const xrefOffset = offset + obj5hdrBytes.length + imgBytes.length + obj5endBytes.length;
+
+    const xref = enc.encode(
+      `xref\n0 6\n` +
+      `0000000000 65535 f \n` +
+      offsets.map(o => String(o).padStart(10, '0') + ' 00000 n ').join('\n') + '\n' +
+      `trailer<</Size 6 /Root 1 0 R>>\n` +
+      `startxref\n${xrefOffset}\n%%EOF`
+    );
+
+    const blob = new Blob(
+      [header, ...parts, obj5hdrBytes, imgBytes, obj5endBytes, xref],
+      { type: 'application/pdf' }
+    );
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+  };
+  img.src = dataUrl;
+}
+
 export default function MultiDimModal({ dataset, onClose }) {
+  // Refs for export
+  const canvas2DRef = useRef(null);  // populated by HeatMap2D
+  const glRef       = useRef(null);  // populated by GlCapture inside Heatmap3D
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(() => {
+    setExporting(true);
+    try {
+      const safeFilename = (dataset?.name ?? 'dataset').replace(/[^a-z0-9]/gi, '_');
+
+      // 2D: grab from canvas ref
+      if (canvas2DRef.current) {
+        const dataUrl = canvas2DRef.current.toDataURL('image/png');
+        canvasToPDF(dataUrl, `${safeFilename}_heatmap.pdf`);
+        return;
+      }
+
+      // 3D: grab from Three.js renderer (preserveDrawingBuffer keeps last frame)
+      if (glRef.current) {
+        const dataUrl = glRef.current.domElement.toDataURL('image/png');
+        canvasToPDF(dataUrl, `${safeFilename}_3d.pdf`);
+        return;
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  }, [dataset]);
+
   // Parse tensor from metadata
   const { dims, tensor } = useMemo(() => {
     const meta = dataset?.metadata;
@@ -570,6 +704,23 @@ export default function MultiDimModal({ dataset, onClose }) {
                 )}
               </div>
             )}
+            {/* PDF Export button */}
+            {hasData && (
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                style={{
+                  background: 'rgba(16,185,129,0.12)',
+                  color: '#34d399',
+                  border: '1px solid rgba(16,185,129,0.25)',
+                }}
+                title="Salvar visualização como PDF"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {exporting ? 'Exportando…' : 'Salvar PDF'}
+              </button>
+            )}
             <button
               onClick={onClose}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
@@ -634,6 +785,7 @@ export default function MultiDimModal({ dataset, onClose }) {
                 rows={displayData.rows}
                 cols={displayData.cols}
                 axisLabels={axisLabels}
+                exportRef={canvas2DRef}
               />
             </div>
           )}
@@ -657,6 +809,7 @@ export default function MultiDimModal({ dataset, onClose }) {
                 sizes={displayData.sizes}
                 gMin={gMin}
                 gMax={gMax}
+                glRef={glRef}
               />
             </div>
           )}

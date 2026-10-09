@@ -1,13 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Plus, Database, Search, Upload, FileSpreadsheet, FileText, ClipboardPaste, X, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Plus, Database, Search, Upload, FileSpreadsheet, FileText, ClipboardPaste, X, CheckCircle2, ArrowRight, Boxes } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApi, useMutation } from '../hooks/useApi';
 import { api } from '../api';
 import EmptyState from '../components/ui/EmptyState';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import Modal from '../components/ui/Modal';
+
+const MultiDimModal = lazy(() => import('../components/datasets/MultiDimModal'));
 
 // Smart import modal
 function ImportModal({ open, onClose, onImported }) {
@@ -73,7 +75,6 @@ function ImportModal({ open, onClose, onImported }) {
       fd.append('separator', separator);
       result = await importDs(fd);
     } else {
-      // Conteúdo colado: envia como arquivo para o worker processar
       const blob = new Blob([pasteContent], { type: 'text/plain' });
       const pasteFile = new File([blob], `${name || 'dataset'}.csv`, { type: 'text/csv' });
       const fd = new FormData();
@@ -92,14 +93,11 @@ function ImportModal({ open, onClose, onImported }) {
   };
 
   const resetState = () => { setStep('method'); setMethod(null); setFile(null); setPasteContent(''); setName(''); setDescription(''); setPreviewRows([]); setPreviewHeaders([]); };
-
   const handleClose = () => { onClose(); resetState(); };
-
-  const stepLabel = { method: 'Escolha o método', config: 'Configurar importação', preview: 'Pré-visualização' };
+  const stepLabel = { method: 'Escolha o método', config: 'Configurar importação' };
 
   return (
     <Modal open={open} onClose={handleClose} title="Importar Dataset" size="lg">
-      {/* Step indicator */}
       <div className="flex items-center gap-2 mb-6">
         {['method', 'config'].map((s, i) => (
           <React.Fragment key={s}>
@@ -118,7 +116,6 @@ function ImportModal({ open, onClose, onImported }) {
         {step === 'method' && (
           <motion.div key="method" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             <div className="grid grid-cols-2 gap-4">
-              {/* File upload */}
               <div
                 onClick={() => { setMethod('file'); fileRef.current?.click(); }}
                 className="card card-hover p-6 flex flex-col items-center gap-3 cursor-pointer text-center group"
@@ -137,7 +134,6 @@ function ImportModal({ open, onClose, onImported }) {
               </div>
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden" onChange={e => { if (e.target.files[0]) { setMethod('file'); handleFileSelect(e.target.files[0]); } }} />
 
-              {/* Paste */}
               <div
                 onClick={() => { setMethod('paste'); setStep('paste'); }}
                 className="card card-hover p-6 flex flex-col items-center gap-3 cursor-pointer text-center group"
@@ -195,7 +191,6 @@ function ImportModal({ open, onClose, onImported }) {
               <input className="input-field" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição opcional..." />
             </div>
 
-            {/* Preview */}
             {previewHeaders.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-blue-200 mb-1.5">Pré-visualização</label>
@@ -232,49 +227,73 @@ function ImportModal({ open, onClose, onImported }) {
   );
 }
 
-function DatasetCard({ ds }) {
+function DatasetCard({ ds, onVisualize }) {
   const typeColors = { spectral: 'purple', tabular: 'blue', time_series: 'green', image: 'amber' };
   const dataType = ds.data_type || 'tabular';
   const color = typeColors[dataType] || 'blue';
 
-  // Parse dimensions [n_samples, n_variables]
   let dims = null;
   try { dims = ds.dimensions ? (typeof ds.dimensions === 'string' ? JSON.parse(ds.dimensions) : ds.dimensions) : null; } catch {}
   const nSamples   = dims?.[0] ?? null;
   const nVariables = dims?.[1] ?? null;
+  const ndim = Array.isArray(dims) ? dims.length : null;
 
   const colorMap = { blue: 'blue', purple: 'purple', green: 'green', amber: 'amber' };
   const badgeColor = colorMap[color] || 'blue';
 
   return (
-    <Link to={`/datasets/${ds.uuid}`}>
-      <motion.div whileHover={{ y: -3 }} className="card card-hover p-5 flex flex-col gap-3 group cursor-pointer h-full">
-        <div className="flex items-start justify-between">
-          <div className={`w-10 h-10 rounded-xl bg-${color}-500/20 flex items-center justify-center`}>
-            <Database className={`w-5 h-5 text-${color}-400`} />
-          </div>
-          <span className={`badge badge-${badgeColor}`}>
-            {dataType}
-          </span>
+    <div className="card card-hover p-5 flex flex-col gap-3 group h-full relative">
+      <div className="flex items-start justify-between">
+        <div className={`w-10 h-10 rounded-xl bg-${color}-500/20 flex items-center justify-center`}>
+          <Database className={`w-5 h-5 text-${color}-400`} />
         </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-white truncate">{ds.name}</h3>
-          <p className="text-sm text-slate-400 mt-1 line-clamp-2">{ds.description || 'Sem descrição'}</p>
-        </div>
-        <div className="text-xs text-slate-500 flex items-center gap-3">
-          {nSamples   !== null && <span><strong className="text-slate-400">{nSamples}</strong> amostras</span>}
-          {nVariables !== null && <span><strong className="text-slate-400">{nVariables}</strong> variáveis</span>}
-          {nSamples === null && nVariables === null && <span>Sem dados</span>}
-          <ArrowRight className="w-3.5 h-3.5 ml-auto text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
-        </div>
-      </motion.div>
-    </Link>
+        <span className={`badge badge-${badgeColor}`}>
+          {dataType}
+        </span>
+      </div>
+
+      <div className="flex-1">
+        <h3 className="font-semibold text-white truncate">{ds.name}</h3>
+        <p className="text-sm text-slate-400 mt-1 line-clamp-2">{ds.description || 'Sem descrição'}</p>
+      </div>
+
+      <div className="text-xs text-slate-500 flex items-center gap-3">
+        {nSamples   !== null && <span><strong className="text-slate-400">{nSamples}</strong> amostras</span>}
+        {nVariables !== null && <span><strong className="text-slate-400">{nVariables}</strong> variáveis</span>}
+        {nSamples === null && nVariables === null && <span>Sem dados</span>}
+      </div>
+
+      {/* Ações */}
+      <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+        {/* Botão de visualização multidimensional */}
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onVisualize(ds); }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center"
+          style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}
+          title="Visualização multidimensional"
+        >
+          <Boxes className="w-3.5 h-3.5" />
+          Visualizar{ndim ? ` (${ndim}D)` : ''}
+        </button>
+
+        {/* Link para detalhes */}
+        <Link
+          to={`/datasets/${ds.uuid}`}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center"
+          style={{ background: 'rgba(59,130,246,0.08)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.15)' }}
+        >
+          Detalhes
+          <ArrowRight className="w-3 h-3" />
+        </Link>
+      </div>
+    </div>
   );
 }
 
 export default function DatasetsPage() {
   const [search, setSearch] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const [vizDataset, setVizDataset] = useState(null); // dataset sendo visualizado
   const { data, loading, refetch } = useApi(api.datasets.list, []);
 
   const datasets = (data?.data ?? data ?? []).filter(d =>
@@ -308,11 +327,20 @@ export default function DatasetsPage() {
           action={!search && <button onClick={() => setImportOpen(true)} className="btn-primary">Importar Dados</button>} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {datasets.map(ds => <DatasetCard key={ds.uuid} ds={ds} />)}
+          {datasets.map(ds => (
+            <DatasetCard key={ds.uuid} ds={ds} onVisualize={setVizDataset} />
+          ))}
         </div>
       )}
 
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={refetch} />
+
+      {/* Modal de visualização multidimensional */}
+      {vizDataset && (
+        <Suspense fallback={null}>
+          <MultiDimModal dataset={vizDataset} onClose={() => setVizDataset(null)} />
+        </Suspense>
+      )}
     </div>
   );
 }

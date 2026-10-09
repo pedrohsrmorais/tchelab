@@ -3,36 +3,37 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth';
 import { PageLoader } from './components/ui/Spinner';
 
-// Lazy-loaded pages
-// Using /* @vite-ignore */ to suppress unused-import warnings for prefetch hints.
-// All route chunks are eagerly prefetched after the main bundle loads so that
-// navigations never trigger a Suspense fallback (which would cause flicker inside
-// AnimatePresence). The Suspense boundary in AppLayout uses fallback={null} as a
-// safety net, but ideally the chunks are already cached.
-const LoginPage     = lazy(() => import('./pages/auth/LoginPage'));
-const AppLayout     = lazy(() => import('./components/layout/AppLayout'));
-const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const ProjectsPage  = lazy(() => import('./pages/ProjectsPage'));
-const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
-const DatasetsPage  = lazy(() => import('./pages/DatasetsPage'));
-const DatasetDetailPage = lazy(() => import('./pages/DatasetDetailPage'));
-const CommunitiesPage = lazy(() => import('./pages/CommunitiesPage'));
-const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
-const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
-const WorkflowEditorPage = lazy(() => import('./pages/WorkflowEditorPage'));
-const ArticlesPage  = lazy(() => import('./pages/ArticlesPage'));
-const ModelsPage    = lazy(() => import('./pages/ModelsPage'));
-const JobsPage      = lazy(() => import('./pages/JobsPage'));
-const AIPage        = lazy(() => import('./pages/AIPage'));
-const AdminPage     = lazy(() => import('./pages/AdminPage'));
-const ProfilePage   = lazy(() => import('./pages/ProfilePage'));
+// AppLayout é importado de forma ESTÁTICA — nunca pode ser lazy.
+//
+// Motivo: se AppLayout fosse lazy, o Suspense externo desmontaria o motion.div
+// gerenciado pelo AnimatePresence toda vez que um chunk de página ainda não
+// tivesse carregado, causando o efeito "aparece → some → reaparece".
+// Com AppLayout estático, o shell fica sempre montado e o AnimatePresence
+// gerencia o ciclo exit → enter corretamente.
+import AppLayout from './components/layout/AppLayout';
 
-// Prefetch all route chunks immediately after the main bundle loads.
-// This means navigations will almost never trigger a Suspense suspension,
-// so AnimatePresence transitions stay smooth with no blank-frame flicker.
+// Páginas carregadas de forma lazy — o shell permanece montado enquanto
+// os chunks carregam no fundo.
+const LoginPage          = lazy(() => import('./pages/auth/LoginPage'));
+const DashboardPage      = lazy(() => import('./pages/DashboardPage'));
+const ProjectsPage       = lazy(() => import('./pages/ProjectsPage'));
+const ProjectDetailPage  = lazy(() => import('./pages/ProjectDetailPage'));
+const DatasetsPage       = lazy(() => import('./pages/DatasetsPage'));
+const DatasetDetailPage  = lazy(() => import('./pages/DatasetDetailPage'));
+const CommunitiesPage    = lazy(() => import('./pages/CommunitiesPage'));
+const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
+const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
+const WorkflowEditorPage = lazy(() => import('./pages/WorkflowEditorPage'));
+const ArticlesPage       = lazy(() => import('./pages/ArticlesPage'));
+const ModelsPage         = lazy(() => import('./pages/ModelsPage'));
+const JobsPage           = lazy(() => import('./pages/JobsPage'));
+const AIPage             = lazy(() => import('./pages/AIPage'));
+const AdminPage          = lazy(() => import('./pages/AdminPage'));
+const ProfilePage        = lazy(() => import('./pages/ProfilePage'));
+
+// Pré-carrega todos os chunks após a renderização inicial para que
+// navegações subsequentes nunca acionem o Suspense interno.
 if (typeof window !== 'undefined') {
-  // Use requestIdleCallback (or setTimeout fallback) so we don't block
-  // the initial render / paint.
   const prefetch = () => {
     import('./pages/DashboardPage');
     import('./pages/ProjectsPage');
@@ -53,11 +54,11 @@ if (typeof window !== 'undefined') {
   if ('requestIdleCallback' in window) {
     requestIdleCallback(prefetch);
   } else {
-    setTimeout(prefetch, 200);
+    setTimeout(prefetch, 300);
   }
 }
 
-// Protected route guard
+// Guards de rota
 const ProtectedRoute = ({ children, requirePlus = false, requireAdmin = false }) => {
   const { token, isPlus, isAdmin } = useAuthStore();
   if (!token) return <Navigate to="/login" replace />;
@@ -66,7 +67,6 @@ const ProtectedRoute = ({ children, requirePlus = false, requireAdmin = false })
   return children;
 };
 
-// Public route (redirect if already authenticated)
 const PublicRoute = ({ children }) => {
   const { token } = useAuthStore();
   if (token) return <Navigate to="/" replace />;
@@ -75,16 +75,15 @@ const PublicRoute = ({ children }) => {
 
 export default function App() {
   return (
-    // PageLoader only shows during initial JS bundle load (Suspense boundary)
-    // After that, AppLayout renders immediately and handles its own inner loader
+    // O Suspense externo cobre apenas o LoginPage (e o carregamento inicial
+    // das páginas internas, que são lazy). O AppLayout em si nunca suspende.
     <Suspense fallback={<PageLoader text="Carregando TcheLab..." />}>
       <Routes>
-        {/* Auth */}
         <Route path="/login" element={
           <PublicRoute><LoginPage /></PublicRoute>
         } />
 
-        {/* App shell — AppLayout owns page transitions internally */}
+        {/* Shell da aplicação — AppLayout é estático, nunca suspende */}
         <Route path="/" element={
           <ProtectedRoute><AppLayout /></ProtectedRoute>
         }>
@@ -109,7 +108,6 @@ export default function App() {
           <Route path="profile" element={<ProfilePage />} />
         </Route>
 
-        {/* 404 fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
