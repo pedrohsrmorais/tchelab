@@ -307,11 +307,11 @@ function View3D({ values, sizes, gMin, gMax, exportRef }) {
     // Axes
     scene.add(new THREE.AxesHelper(maxDim * 0.6));
 
-    // Bounding box wireframe
+    // Bounding box wireframe (added to the rotating group below, not to the
+    // scene directly — otherwise we'd get a second, non-rotating outline).
     const boxGeo = new THREE.BoxGeometry(sizes[0], sizes[1], sizes[2]);
     const edges  = new THREE.EdgesGeometry(boxGeo);
     const lineMat = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.5 });
-    scene.add(new THREE.LineSegments(edges, lineMat));
 
     // Voxels (instanced for performance)
     const MAX_VOXELS = 2000;
@@ -337,14 +337,13 @@ function View3D({ values, sizes, gMin, gMax, exportRef }) {
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    scene.add(mesh);
 
-    // Group for rotation
+    // Group for rotation — mesh and wireframe both live here, nowhere else,
+    // so they stay in sync when the group is rotated.
     const group = new THREE.Group();
     group.add(mesh);
     group.add(new THREE.LineSegments(edges, lineMat));
     scene.add(group);
-    mesh.removeFromParent(); // remove standalone, already in group
 
     // State for drag-rotation
     const state = { renderer, scene, camera, animId: null, isDragging: false, lastX: 0, lastY: 0, rotX: 0, rotY: 0, group };
