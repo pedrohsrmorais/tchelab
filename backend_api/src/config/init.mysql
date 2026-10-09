@@ -40,6 +40,7 @@ DROP TABLE IF EXISTS `project_datasets`;
 DROP TABLE IF EXISTS `project_members`;
 DROP TABLE IF EXISTS `projects`;
 DROP TABLE IF EXISTS `community_datasets`;
+DROP TABLE IF EXISTS `community_projects`;
 DROP TABLE IF EXISTS `community_workflows`;
 DROP TABLE IF EXISTS `community_members`;
 DROP TABLE IF EXISTS `messages`;
@@ -121,6 +122,8 @@ CREATE TABLE `audit_logs` (
   `before_data` json DEFAULT NULL,
   `after_data` json DEFAULT NULL,
   `metadata` json DEFAULT NULL,
+  `ip_address` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_agent` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_audit_user` (`user_id`),
@@ -155,6 +158,8 @@ CREATE TABLE `techniques` (
   `version` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_beta` tinyint(1) NOT NULL DEFAULT '0',
   `is_custom` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Script definido pelo usuário fora do catálogo oficial',
+  `user_id` bigint unsigned DEFAULT NULL COMMENT 'Dono da técnica customizada (NULL para técnicas nativas do catálogo)',
+  `custom_definition` json DEFAULT NULL COMMENT 'Sequência de operações (slugs do catálogo) que compõem a técnica customizada',
   `implementation` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `documentation` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `active` tinyint(1) NOT NULL DEFAULT '1',
@@ -169,9 +174,11 @@ CREATE TABLE `techniques` (
   KEY `idx_techniques_family` (`family`),
   KEY `idx_techniques_subcategory` (`subcategory`),
   KEY `idx_techniques_order` (`min_order`,`max_order`),
+  KEY `idx_techniques_user` (`user_id`),
   CONSTRAINT `chk_techniques_max_order` CHECK ((`max_order` IS NULL OR `max_order` BETWEEN 1 AND 20)),
   CONSTRAINT `chk_techniques_min_order` CHECK ((`min_order` IS NULL OR `min_order` BETWEEN 1 AND 20)),
-  CONSTRAINT `chk_techniques_order_range` CHECK ((`max_order` IS NULL OR `min_order` IS NULL OR `max_order` >= `min_order`))
+  CONSTRAINT `chk_techniques_order_range` CHECK ((`max_order` IS NULL OR `min_order` IS NULL OR `max_order` >= `min_order`)),
+  CONSTRAINT `fk_techniques_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed: core technique catalog (13 base techniques with corrected slugs and families)
@@ -805,6 +812,26 @@ CREATE TABLE `community_workflows` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
+-- COMMUNITY PROJECTS
+-- =============================================================================
+
+CREATE TABLE `community_projects` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `community_id` bigint unsigned NOT NULL,
+  `project_id` bigint unsigned NOT NULL,
+  `shared_by` bigint unsigned NOT NULL,
+  `shared_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_community_project` (`community_id`,`project_id`),
+  KEY `fk_community_projects_user` (`shared_by`),
+  KEY `idx_community_projects_community` (`community_id`),
+  KEY `idx_community_projects_project` (`project_id`),
+  CONSTRAINT `fk_community_projects_community` FOREIGN KEY (`community_id`) REFERENCES `communities` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_community_projects_user` FOREIGN KEY (`shared_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_community_projects_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
 -- MESSAGES
 -- =============================================================================
 
@@ -1142,7 +1169,7 @@ CREATE TABLE `jobs` (
     'operate_dataset','import_dataset','export','export_model',
     'preview_dataset','slice_dataset',
     'cancel_execution','extract_pdf',
-    'run_prediction','generate_synthetic','other'
+    'run_prediction','generate_synthetic','ai_interaction','other'
   ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `model_id` bigint unsigned DEFAULT NULL,
   `dataset_id` bigint unsigned DEFAULT NULL,
@@ -1269,25 +1296,25 @@ CREATE TABLE `ai_interactions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` bigint unsigned NOT NULL,
-  `type` enum('article_analysis','workflow_generation','workflow_assistance','result_analysis','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `article_id` bigint unsigned DEFAULT NULL,
-  `workflow_id` bigint unsigned DEFAULT NULL,
-  `execution_id` bigint unsigned DEFAULT NULL,
-  `input_context` json DEFAULT NULL,
-  `output` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `context_type` enum('workflow','dataset','technique','execution','article_analysis','general') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'general',
+  `context_uuid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'UUID polimórfico do recurso referido por context_type (sem FK, pois aponta para tabelas diferentes)',
+  `interaction_type` enum('question','suggestion','explanation','recommendation','review') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `prompt` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `response_summary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT 'Preenchido pelo worker após a IA responder',
+  `tokens_used` int unsigned DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `status` enum('pending','completed','failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `feedback_rating` tinyint unsigned DEFAULT NULL,
+  `feedback_comment` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
   KEY `idx_ai_user` (`user_id`),
-  KEY `idx_ai_type` (`type`),
-  KEY `idx_ai_article` (`article_id`),
-  KEY `idx_ai_workflow` (`workflow_id`),
-  KEY `idx_ai_execution` (`execution_id`),
-  CONSTRAINT `fk_ai_interactions_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_ai_interactions_execution` FOREIGN KEY (`execution_id`) REFERENCES `executions` (`id`) ON DELETE SET NULL,
+  KEY `idx_ai_context` (`context_type`,`context_uuid`),
+  KEY `idx_ai_interaction_type` (`interaction_type`),
+  KEY `idx_ai_status` (`status`),
   CONSTRAINT `fk_ai_interactions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_ai_interactions_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `workflows` (`id`) ON DELETE SET NULL
+  CONSTRAINT `chk_ai_feedback_rating` CHECK (`feedback_rating` IS NULL OR `feedback_rating` BETWEEN 1 AND 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
