@@ -1,6 +1,6 @@
 import React, { useState, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Database, Search, Upload, FileSpreadsheet, FileText, ClipboardPaste, X, CheckCircle2, ArrowRight, Boxes } from 'lucide-react';
+import { Plus, Database, Search, Upload, FileSpreadsheet, FileText, ClipboardPaste, X, CheckCircle2, ArrowRight, Boxes, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApi, useMutation } from '../hooks/useApi';
 import { api } from '../api';
@@ -226,7 +226,7 @@ function ImportModal({ open, onClose, onImported }) {
   );
 }
 
-function DatasetCard({ ds, onVisualize }) {
+function DatasetCard({ ds, onVisualize, visualizingUuid }) {
   const typeColors = { spectral: 'purple', tabular: 'blue', time_series: 'green', image: 'amber' };
   const dataType = ds.data_type || 'tabular';
   const color = typeColors[dataType] || 'blue';
@@ -239,6 +239,7 @@ function DatasetCard({ ds, onVisualize }) {
 
   const colorMap = { blue: 'blue', purple: 'purple', green: 'green', amber: 'amber' };
   const badgeColor = colorMap[color] || 'blue';
+  const isLoading = visualizingUuid === ds.uuid;
 
   return (
     <div className="card card-hover p-5 flex flex-col gap-3 group h-full relative">
@@ -267,12 +268,13 @@ function DatasetCard({ ds, onVisualize }) {
         {/* Botão de visualização multidimensional */}
         <button
           onClick={e => { e.preventDefault(); e.stopPropagation(); onVisualize(ds); }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center"
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center disabled:opacity-60"
           style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}
           title="Visualização multidimensional"
         >
-          <Boxes className="w-3.5 h-3.5" />
-          Visualizar{ndim ? ` (${ndim}D)` : ''}
+          {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Boxes className="w-3.5 h-3.5" />}
+          {isLoading ? 'Carregando…' : `Visualizar${ndim ? ` (${ndim}D)` : ''}`}
         </button>
 
         {/* Link para detalhes */}
@@ -292,12 +294,30 @@ function DatasetCard({ ds, onVisualize }) {
 export default function DatasetsPage() {
   const [search, setSearch] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-  const [vizDataset, setVizDataset] = useState(null); // dataset sendo visualizado
+  const [vizDataset, setVizDataset] = useState(null); // dataset completo sendo visualizado
+  const [visualizingUuid, setVisualizingUuid] = useState(null); // uuid em carregamento
   const { data, loading, refetch } = useApi(api.datasets.list, []);
 
   const datasets = (data?.data ?? data ?? []).filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // A listagem de datasets não traz `metadata` (payload pesado com a matriz de
+  // dados) por motivos de performance. Antes de abrir o modal de visualização
+  // multidimensional, buscamos o dataset completo via GET /datasets/:id —
+  // só então os dados numéricos (tensor/matriz) ficam disponíveis.
+  const handleVisualize = async (ds) => {
+    setVisualizingUuid(ds.uuid);
+    try {
+      const res = await api.datasets.get(ds.uuid);
+      const full = res.data?.data ?? res.data;
+      setVizDataset(full || ds);
+    } catch {
+      toast.error('Não foi possível carregar os dados do dataset.');
+    } finally {
+      setVisualizingUuid(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -327,7 +347,7 @@ export default function DatasetsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {datasets.map(ds => (
-            <DatasetCard key={ds.uuid} ds={ds} onVisualize={setVizDataset} />
+            <DatasetCard key={ds.uuid} ds={ds} onVisualize={handleVisualize} visualizingUuid={visualizingUuid} />
           ))}
         </div>
       )}

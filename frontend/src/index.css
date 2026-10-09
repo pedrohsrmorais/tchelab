@@ -323,6 +323,18 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
 
+/* Transição de página (fade-out ao sair / fade-in ao entrar), sem libs externas */
+@keyframes pageFadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-transition--out { animation: pageFadeOut 0.15s ease-in both; }
+.page-transition--in  { animation: pageFadeIn 0.22s cubic-bezier(0.16,1,0.3,1) both; }
+
 .anim-fade-up   { animation: fadeInUp 0.4s cubic-bezier(0.16,1,0.3,1) both; }
 .anim-scale-in  { animation: scaleIn 0.32s cubic-bezier(0.16,1,0.3,1) both; }
 .anim-slide-r   { animation: slideInRight 0.36s cubic-bezier(0.16,1,0.3,1) both; }

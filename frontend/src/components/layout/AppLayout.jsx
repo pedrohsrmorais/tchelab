@@ -1,5 +1,5 @@
-import React, { useState, useEffect, Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useOutlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useAuthStore } from '../../store/auth';
 import { useTheme } from '../../context/ThemeContext';
@@ -24,6 +24,38 @@ export default function AppLayout() {
   const { fetchMe } = useAuthStore();
   const { theme } = useTheme();
 
+  const location = useLocation();
+  const outlet    = useOutlet(); // elemento da rota atualmente casada (via <Outlet/>)
+
+  // ── Transição suave entre páginas (fade-out → fade-in), 100% CSS ──────────
+  // Sem framer-motion: a troca de conteúdo só acontece depois que a animação
+  // de saída termina, então nunca existe um frame "em branco" entre páginas,
+  // e nenhuma lib externa fica no caminho do render (o que já causou crash
+  // com React 19 + R3F no passado).
+  const [displayOutlet, setDisplayOutlet] = useState(outlet);
+  const [displayPath, setDisplayPath]     = useState(location.pathname);
+  const [stage, setStage]                 = useState('in'); // 'in' | 'out'
+  const pendingRef = useRef({ outlet, pathname: location.pathname });
+
+  useEffect(() => {
+    pendingRef.current = { outlet, pathname: location.pathname };
+  });
+
+  useEffect(() => {
+    if (location.pathname !== displayPath) {
+      setStage('out');
+    }
+  }, [location.pathname, displayPath]);
+
+  const handleAnimationEnd = (e) => {
+    if (e.target !== e.currentTarget) return; // ignora bubbling de filhos
+    if (stage === 'out') {
+      setDisplayOutlet(pendingRef.current.outlet);
+      setDisplayPath(pendingRef.current.pathname);
+      setStage('in');
+    }
+  };
+
   useEffect(() => {
     fetchMe().finally(() => setInitialLoading(false));
   }, []);
@@ -46,9 +78,14 @@ export default function AppLayout() {
         {initialLoading ? (
           <ContentLoader />
         ) : (
-          <div style={{ minHeight: '100%', padding: '1.5rem' }}>
-            <Suspense fallback={null}>
-              <Outlet />
+          <div
+            key={displayPath}
+            className={`page-transition page-transition--${stage}`}
+            onAnimationEnd={handleAnimationEnd}
+            style={{ minHeight: '100%', padding: '1.5rem' }}
+          >
+            <Suspense fallback={<ContentLoader />}>
+              {displayOutlet}
             </Suspense>
           </div>
         )}
