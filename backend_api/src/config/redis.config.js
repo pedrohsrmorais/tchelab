@@ -6,7 +6,8 @@ const client = new Redis({
   host: process.env.REDIS_HOST || '127.0.0.1',
   port: parseInt(process.env.REDIS_PORT || '6379', 10),
   password: process.env.REDIS_PASSWORD || undefined,
-  db: parseInt(process.env.REDIS_DB || '0', 10),
+  // DB=1 para não colidir com outros serviços — deve coincidir com REDIS_URL do worker_api/config.py
+  db: parseInt(process.env.REDIS_DB || '1', 10),
   lazyConnect: true,
   enableReadyCheck: true,
   retryStrategy(times) {

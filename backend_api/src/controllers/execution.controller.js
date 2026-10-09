@@ -41,45 +41,104 @@ async function listExecutions(req, res) {
 }
 
 // POST /workflows/:wid/executions
+//
+// O worker Python processa um job por vez com o schema JobPayload:
+//   { job_id, execution_id, node_id, slug, inputs, params }
+// Por isso o backend decompõe o workflow em N jobs — um por nó —
+// na ordem topológica (nós sem arestas de entrada primeiro).
+// O worker executa cada job independentemente; a orquestração de
+// dependências é resolvida aqui no momento do dispatch.
 async function dispatchExecution(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
     if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
 
-    // Verifica se workflow tem nós
-    const [[{ nodeCount }]] = await db.query(
-      'SELECT COUNT(*) AS nodeCount FROM workflow_nodes WHERE workflow_id = ?',
+    // Carrega nós e arestas
+    const [nodes] = await db.query(
+      `SELECT wn.id, wn.node_key, wn.parameters, t.slug AS technique_slug
+       FROM workflow_nodes wn
+       JOIN techniques t ON t.id = wn.technique_id
+       WHERE wn.workflow_id = ?`,
       [workflow.id],
     );
-    if (nodeCount === 0) {
+    if (nodes.length === 0) {
       return R.unprocessable(res, [{ field: 'workflow', message: 'O workflow não possui nós.' }]);
     }
+    const [edges] = await db.query(
+      'SELECT source_node_key, target_node_key FROM workflow_edges WHERE workflow_id = ?',
+      [workflow.id],
+    );
 
-    const { parameters_override, dataset_bindings } = req.body;
+    // Ordena topologicamente (Kahn)
+    const inDegree = Object.fromEntries(nodes.map((n) => [n.node_key, 0]));
+    for (const e of edges) { inDegree[e.target_node_key] = (inDegree[e.target_node_key] || 0) + 1; }
+    const queue = nodes.filter((n) => inDegree[n.node_key] === 0).map((n) => n.node_key);
+    const sorted = [];
+    while (queue.length) {
+      const key = queue.shift();
+      sorted.push(key);
+      for (const e of edges) {
+        if (e.source_node_key === key) {
+          inDegree[e.target_node_key] -= 1;
+          if (inDegree[e.target_node_key] === 0) queue.push(e.target_node_key);
+        }
+      }
+    }
+    if (sorted.length !== nodes.length) {
+      return R.unprocessable(res, [{ field: 'workflow', message: 'Ciclo detectado no workflow.' }]);
+    }
+
+    const { parameters_override = {}, dataset_bindings = {} } = req.body;
     const execUuid = uuidv4();
 
-    const [result] = await db.query(
+    const [execResult] = await db.query(
       `INSERT INTO executions
          (uuid, workflow_id, user_id, status, parameters_override, triggered_by, created_at, updated_at)
        VALUES (?, ?, ?, 'pending', ?, 'user', NOW(), NOW())`,
-      [execUuid, workflow.id, req.user.id, JSON.stringify(parameters_override || {})],
+      [execUuid, workflow.id, req.user.id, JSON.stringify(parameters_override)],
     );
+    const executionId = execResult.insertId;
 
-    const { id: jobId, uuid: jobUuid } = await jobService.createJob({
-      job_type: 'run_workflow',
-      user_id: req.user.id,
-      workflow_id: workflow.id,
-      execution_id: result.insertId,
-      payload: {
-        execution_uuid: execUuid,
-        workflow_uuid: workflow.uuid,
-        parameters_override: parameters_override || {},
-        dataset_bindings: dataset_bindings || {},
-      },
-    });
+    // Cria execution_nodes e enfileira um job por nó na ordem topológica
+    const nodeMap = Object.fromEntries(nodes.map((n) => [n.node_key, n]));
+    const jobUuids = [];
+    for (const nodeKey of sorted) {
+      const node = nodeMap[nodeKey];
+      const nodeParams = {
+        ...(node.parameters ? JSON.parse(node.parameters) : {}),
+        ...(parameters_override[nodeKey] || {}),
+      };
+      const inputs = dataset_bindings[nodeKey] || {};
 
-    return R.accepted(res, { execution_id: execUuid, job_id: jobUuid });
+      // Registra nó de execução com status pending
+      const [enResult] = await db.query(
+        `INSERT INTO execution_nodes (execution_id, workflow_node_id, status, created_at, updated_at)
+         VALUES (?, ?, 'pending', NOW(), NOW())`,
+        [executionId, node.id],
+      );
+
+      const { uuid: jobUuid } = await jobService.createJob({
+        job_type: 'execute_node',
+        user_id: req.user.id,
+        execution_id: executionId,
+        workflow_id: workflow.id,
+        payload: {
+          // Campos obrigatórios do JobPayload do worker Python
+          execution_id: execUuid,
+          node_id: nodeKey,
+          slug: node.technique_slug,
+          inputs,
+          params: nodeParams,
+          // Metadados extras para rastreabilidade
+          execution_node_id: enResult.insertId,
+          workflow_uuid: workflow.uuid,
+        },
+      });
+      jobUuids.push(jobUuid);
+    }
+
+    return R.accepted(res, { execution_id: execUuid, job_ids: jobUuids });
   } catch (err) { return R.serverError(res, err); }
 }
 

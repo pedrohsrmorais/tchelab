@@ -202,12 +202,14 @@ async function listCommunityProjects(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-// POST /communities/:id/projects/:pid
+// POST /communities/:id/projects  — UUID do projeto vem no body (project_id)
 async function linkProject(req, res) {
   try {
     const community = await resolveCommunity(req.params.id);
     if (!community) return R.notFound(res, 'Comunidade');
-    const [projects] = await db.query('SELECT id FROM projects WHERE uuid = ?', [req.params.pid]);
+    const { project_id: projectUuid } = req.body;
+    if (!projectUuid) return R.unprocessable(res, [{ field: 'project_id', message: 'Obrigatório.' }]);
+    const [projects] = await db.query('SELECT id FROM projects WHERE uuid = ?', [projectUuid]);
     if (!projects.length) return R.notFound(res, 'Projeto');
 
     await db.query(
@@ -245,12 +247,14 @@ async function listCommunityDatasets(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-// POST /communities/:id/datasets/:did
+// POST /communities/:id/datasets  — UUID do dataset vem no body (dataset_id)
 async function shareDataset(req, res) {
   try {
     const community = await resolveCommunity(req.params.id);
     if (!community) return R.notFound(res, 'Comunidade');
-    const [datasets] = await db.query('SELECT id FROM datasets WHERE uuid = ?', [req.params.did]);
+    const { dataset_id: datasetUuid } = req.body;
+    if (!datasetUuid) return R.unprocessable(res, [{ field: 'dataset_id', message: 'Obrigatório.' }]);
+    const [datasets] = await db.query('SELECT id FROM datasets WHERE uuid = ?', [datasetUuid]);
     if (!datasets.length) return R.notFound(res, 'Dataset');
     await db.query(
       `INSERT IGNORE INTO community_datasets (community_id, dataset_id, shared_by, shared_at) VALUES (?, ?, ?, NOW())`,
@@ -287,12 +291,14 @@ async function listCommunityWorkflows(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-// POST /communities/:id/workflows/:wid
+// POST /communities/:id/workflows  — UUID do workflow vem no body (workflow_id)
 async function shareWorkflow(req, res) {
   try {
     const community = await resolveCommunity(req.params.id);
     if (!community) return R.notFound(res, 'Comunidade');
-    const [workflows] = await db.query('SELECT id FROM workflows WHERE uuid = ?', [req.params.wid]);
+    const { workflow_id: workflowUuid } = req.body;
+    if (!workflowUuid) return R.unprocessable(res, [{ field: 'workflow_id', message: 'Obrigatório.' }]);
+    const [workflows] = await db.query('SELECT id FROM workflows WHERE uuid = ?', [workflowUuid]);
     if (!workflows.length) return R.notFound(res, 'Workflow');
     await db.query(
       `INSERT IGNORE INTO community_workflows (community_id, workflow_id, shared_by, shared_at) VALUES (?, ?, ?, NOW())`,
