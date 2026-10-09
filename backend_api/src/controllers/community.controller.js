@@ -21,7 +21,10 @@ async function resolveCommunity(uuid) {
 async function listMyCommunities(req, res) {
   try {
     const [rows] = await db.query(
-      `SELECT c.* FROM communities c
+      `SELECT c.*,
+              (SELECT COUNT(*) FROM community_members WHERE community_id = c.id) AS member_count,
+              (SELECT COUNT(*) FROM messages WHERE community_id = c.id) AS message_count
+       FROM communities c
        JOIN community_members cm ON cm.community_id = c.id
        WHERE cm.user_id = ?
        ORDER BY c.created_at DESC`,
@@ -39,7 +42,10 @@ async function listPublicCommunities(req, res) {
       "SELECT COUNT(*) AS total FROM communities WHERE visibility = 'public'",
     );
     const [rows] = await db.query(
-      "SELECT * FROM communities WHERE visibility = 'public' ORDER BY created_at DESC LIMIT ? OFFSET ?",
+      `SELECT c.*,
+              (SELECT COUNT(*) FROM community_members WHERE community_id = c.id) AS member_count,
+              (SELECT COUNT(*) FROM messages WHERE community_id = c.id) AS message_count
+       FROM communities c WHERE c.visibility = 'public' ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
       [limit, offset],
     );
     return R.ok(res, rows, { ...meta, total });

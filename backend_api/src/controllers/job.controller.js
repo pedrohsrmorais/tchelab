@@ -18,7 +18,7 @@ async function listJobs(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
-      `SELECT j.uuid, j.job_type, j.status, j.progress, j.created_at, j.started_at, j.finished_at
+      `SELECT j.id, j.uuid, j.job_type, j.status, j.progress, j.created_at, j.started_at, j.finished_at
        FROM jobs j WHERE ${where} ORDER BY j.created_at DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );
@@ -68,7 +68,7 @@ async function listAllJobs(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
-      `SELECT j.uuid, j.job_type, j.status, j.progress, j.created_at, j.started_at, j.finished_at,
+      `SELECT j.id, j.uuid, j.job_type, j.status, j.progress, j.created_at, j.started_at, j.finished_at,
               u.email AS user_email
        FROM jobs j
        LEFT JOIN users u ON u.id = j.user_id

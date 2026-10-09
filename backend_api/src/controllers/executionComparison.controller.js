@@ -68,8 +68,9 @@ async function getComparison(req, res) {
     const comp = rows[0];
 
     // Carrega métricas de cada execução para resposta enriquecida
-    const executionUuids = JSON.parse(comp.execution_uuids);
-    const metricNames = JSON.parse(comp.metric_names);
+    // (mysql2 já desserializa colunas `json` automaticamente — não fazer JSON.parse de novo)
+    const executionUuids = comp.execution_uuids || [];
+    const metricNames = comp.metric_names || [];
     const metricsData = {};
 
     for (const execUuid of executionUuids) {

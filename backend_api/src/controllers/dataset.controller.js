@@ -150,7 +150,7 @@ async function listDatasets(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
-      `SELECT d.id, d.uuid, d.name, d.data_type, d.data_order, d.sample_axis,
+      `SELECT d.id, d.uuid, d.name, d.description, d.data_type, d.data_order, d.sample_axis,
               d.dimensions, d.mode_labels, d.visibility, d.created_at
        FROM datasets d WHERE ${where} ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset],

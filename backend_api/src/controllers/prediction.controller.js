@@ -122,9 +122,10 @@ async function getPredictionResults(req, res) {
     }
 
     // results armazenado como JSON no campo result_data ou apontando para um dataset de saída
+    // (mysql2 já desserializa colunas `json` automaticamente — não fazer JSON.parse de novo)
     return R.ok(res, {
       prediction_uuid: prediction.uuid,
-      result_data: prediction.result_data ? JSON.parse(prediction.result_data) : null,
+      result_data: prediction.result_data ?? null,
       output_dataset_uuid: prediction.output_dataset_uuid || null,
     });
   } catch (err) { return R.serverError(res, err); }

@@ -10,7 +10,7 @@ import Modal from '../components/ui/Modal';
 
 const statusConfig = {
   draft: { label: 'Rascunho', color: 'blue', icon: Clock },
-  published: { label: 'Publicado', color: 'green', icon: CheckCircle2 },
+  ready: { label: 'Pronto', color: 'green', icon: CheckCircle2 },
   archived: { label: 'Arquivado', color: 'amber', icon: Clock },
 };
 

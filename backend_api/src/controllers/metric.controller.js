@@ -12,7 +12,9 @@ async function getExecutionMetrics(req, res) {
     if (execution.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
 
     const { node_key, metric_name, split } = req.query;
-    const conditions = ['m.execution_id = ?'];
+    // metrics não tem execution_id direto — é normalizado via execution_node_id,
+    // então todo filtro por execução passa por um IN (SELECT ... execution_nodes).
+    const conditions = [`m.execution_node_id IN (SELECT en.id FROM execution_nodes en WHERE en.execution_id = ?)`];
     const params = [execution.id];
 
     if (node_key) {
@@ -24,18 +26,18 @@ async function getExecutionMetrics(req, res) {
       )`);
       params.push(execution.id, node_key);
     }
-    if (metric_name) { conditions.push('m.metric_name = ?'); params.push(metric_name); }
-    if (split) { conditions.push('m.split = ?'); params.push(split); }
+    if (metric_name) { conditions.push('m.name = ?'); params.push(metric_name); }
+    if (split) { conditions.push('m.dataset_split = ?'); params.push(split); }
 
     const where = conditions.join(' AND ');
     const [rows] = await db.query(
-      `SELECT m.id, m.metric_name, m.metric_value, m.split, m.computed_at,
+      `SELECT m.id, m.name AS metric_name, m.value AS metric_value, m.dataset_split AS split, m.created_at AS computed_at,
               en.id AS execution_node_id, wn.node_key
        FROM metrics m
        LEFT JOIN execution_nodes en ON en.id = m.execution_node_id
        LEFT JOIN workflow_nodes wn ON wn.id = en.workflow_node_id
        WHERE ${where}
-       ORDER BY m.computed_at ASC`,
+       ORDER BY m.created_at ASC`,
       params,
     );
     return R.ok(res, rows);
@@ -59,11 +61,11 @@ async function getNodeMetrics(req, res) {
     const { split } = req.query;
     const conditions = ['m.execution_node_id = ?'];
     const params = [nodes[0].id];
-    if (split) { conditions.push('m.split = ?'); params.push(split); }
+    if (split) { conditions.push('m.dataset_split = ?'); params.push(split); }
 
     const [rows] = await db.query(
-      `SELECT m.metric_name, m.metric_value, m.split, m.computed_at
-       FROM metrics m WHERE ${conditions.join(' AND ')} ORDER BY m.metric_name ASC`,
+      `SELECT m.name AS metric_name, m.value AS metric_value, m.dataset_split AS split, m.created_at AS computed_at
+       FROM metrics m WHERE ${conditions.join(' AND ')} ORDER BY m.name ASC`,
       params,
     );
     return R.ok(res, rows);
@@ -96,12 +98,12 @@ async function compareMetrics(req, res) {
     for (const exec of executions) {
       const placeholders = metric_names.map(() => '?').join(', ');
       const [metrics] = await db.query(
-        `SELECT m.metric_name, m.metric_value, m.split, wn.node_key
+        `SELECT m.name AS metric_name, m.value AS metric_value, m.dataset_split AS split, wn.node_key
          FROM metrics m
          LEFT JOIN execution_nodes en ON en.id = m.execution_node_id
          LEFT JOIN workflow_nodes wn ON wn.id = en.workflow_node_id
-         WHERE m.execution_id = ? AND m.metric_name IN (${placeholders})
-         ORDER BY wn.node_key, m.metric_name`,
+         WHERE en.execution_id = ? AND m.name IN (${placeholders})
+         ORDER BY wn.node_key, m.name`,
         [exec.id, ...metric_names],
       );
       result[exec.uuid] = metrics;

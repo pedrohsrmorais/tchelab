@@ -87,7 +87,8 @@ async function createSyntheticDataset(req, res) {
     const { id: jobId, uuid: jobUuid } = await jobService.createJob({
       job_type: 'generate_synthetic',
       user_id: req.user.id,
-      dataset_id: result.insertId,
+      // result.insertId é o id em `synthetic_datasets`, não em `datasets`
+      // (a FK jobs.dataset_id aponta para `datasets`) — não associar aqui.
       payload: {
         synthetic_uuid: synUuid,
         n_samples,

@@ -6,15 +6,17 @@ import EmptyState from '../components/ui/EmptyState';
 import SkeletonCard from '../components/ui/SkeletonCard';
 
 const statusConfig = {
-  trained: { label: 'Treinado', color: 'green', icon: CheckCircle2 },
-  training: { label: 'Treinando', color: 'blue', icon: Clock },
-  failed: { label: 'Falhou', color: 'red', icon: XCircle },
-  draft: { label: 'Rascunho', color: 'amber', icon: Clock },
+  pending:  { label: 'Pendente',  color: 'amber', icon: Clock },
+  training: { label: 'Treinando', color: 'blue',  icon: Clock },
+  ready:    { label: 'Treinado',  color: 'green', icon: CheckCircle2 },
+  failed:   { label: 'Falhou',    color: 'red',   icon: XCircle },
 };
 
 function ModelCard({ model }) {
-  const status = statusConfig[model.status] || statusConfig.draft;
+  const status = statusConfig[model.status] || statusConfig.pending;
   const StatusIcon = status.icon;
+  // metrics_cal/metrics_cv/metrics_ext são json — usa calibração como padrão de exibição
+  const metrics = model.metrics_cal ?? model.metrics_cv ?? model.metrics_ext ?? null;
   return (
     <div className="card card-hover p-5 flex flex-col gap-4 group cursor-pointer">
       <div className="flex items-start justify-between">
@@ -25,11 +27,11 @@ function ModelCard({ model }) {
       </div>
       <div className="flex-1">
         <h3 className="font-semibold text-white">{model.name}</h3>
-        <p className="text-sm text-slate-400 mt-1">{model.algorithm ?? model.type ?? 'Algoritmo não especificado'}</p>
-        {model.metrics && (
+        <p className="text-sm text-slate-400 mt-1">{model.algorithm ?? 'Algoritmo não especificado'}</p>
+        {metrics && (
           <div className="flex items-center gap-3 mt-2">
-            {model.metrics.r2 !== undefined && <span className="text-xs text-slate-500">R² <strong className="text-green-400">{Number(model.metrics.r2).toFixed(3)}</strong></span>}
-            {model.metrics.rmse !== undefined && <span className="text-xs text-slate-500">RMSE <strong className="text-blue-400">{Number(model.metrics.rmse).toFixed(4)}</strong></span>}
+            {metrics.r2 !== undefined && <span className="text-xs text-slate-500">R² <strong className="text-green-400">{Number(metrics.r2).toFixed(3)}</strong></span>}
+            {metrics.rmse !== undefined && <span className="text-xs text-slate-500">RMSE <strong className="text-blue-400">{Number(metrics.rmse).toFixed(4)}</strong></span>}
           </div>
         )}
       </div>
