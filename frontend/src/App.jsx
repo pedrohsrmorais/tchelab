@@ -3,13 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth';
 import { PageLoader } from './components/ui/Spinner';
 
-// AppLayout é importado de forma ESTÁTICA — nunca pode ser lazy.
-//
-// Motivo: se AppLayout fosse lazy, o Suspense externo desmontaria o motion.div
-// gerenciado pelo AnimatePresence toda vez que um chunk de página ainda não
-// tivesse carregado, causando o efeito "aparece → some → reaparece".
-// Com AppLayout estático, o shell fica sempre montado e o AnimatePresence
-// gerencia o ciclo exit → enter corretamente.
+// AppLayout é importado de forma ESTÁTICA (nunca lazy) para que o shell
+// fique sempre montado durante a navegação entre páginas.
 import AppLayout from './components/layout/AppLayout';
 
 // Páginas carregadas de forma lazy — o shell permanece montado enquanto

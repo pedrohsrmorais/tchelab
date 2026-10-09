@@ -35,5 +35,21 @@
     "postcss": "^8.5.28",
     "tailwindcss": "^3.4.19",
     "vite": "^8.3.0"
+  },
+  "overrides": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "@react-spring/three": {
+      "react": "^19.2.8",
+      "react-dom": "^19.2.8"
+    },
+    "@react-three/drei": {
+      "react": "^19.2.8",
+      "react-dom": "^19.2.8"
+    },
+    "@react-three/fiber": {
+      "react": "^19.2.8",
+      "react-dom": "^19.2.8"
+    }
   }
 }
