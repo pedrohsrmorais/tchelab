@@ -202,9 +202,113 @@ async function createDataset(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
+/**
+ * Infers the shape of an N-dimensional nested array, e.g.
+ * [[[1,2],[3,4]],[[5,6],[7,8]]] -> [2,2,2]. Assumes a regular (non-jagged) tensor.
+ */
+function inferTensorShape(arr) {
+  const dims = [];
+  let cur = arr;
+  while (Array.isArray(cur)) {
+    dims.push(cur.length);
+    cur = cur[0];
+  }
+  return dims;
+}
+
+/** Flattens a nested array into a single flat array of numbers. */
+function flattenTensor(arr) {
+  const out = [];
+  const walk = (v) => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else out.push(Number(v));
+  };
+  walk(arr);
+  return out;
+}
+
+/** Rebuilds a flat array of numbers into a nested array of the given shape. */
+function reshapeFlat(flat, shape) {
+  if (shape.length === 1) return flat.slice(0, shape[0]);
+  const size = shape.slice(1).reduce((a, b) => a * b, 1);
+  const out = [];
+  for (let i = 0; i < shape[0]; i++) {
+    out.push(reshapeFlat(flat.slice(i * size, (i + 1) * size), shape.slice(1)));
+  }
+  return out;
+}
+
+/**
+ * Handles POST /datasets/import when the request body is JSON describing an
+ * N-dimensional tensor (3D/4D+), produced by pasting block-delimited data in
+ * the ImportModal. Does not touch CSV parsing at all.
+ */
+async function importTensorFromJson(req, res) {
+  const { name, description, visibility, tensor, dimensions } = req.body;
+  if (!name || !String(name).trim()) return R.badRequest(res, 'Nome do dataset é obrigatório.');
+  if (!Array.isArray(tensor) || !tensor.length) {
+    return R.unprocessable(res, [{ field: 'tensor', message: 'Tensor vazio ou em formato inválido.' }]);
+  }
+
+  const inferredShape = inferTensorShape(tensor);
+  let dims = Array.isArray(dimensions) && dimensions.length ? dimensions.map(Number) : inferredShape;
+
+  let finalTensor = tensor;
+  // If the caller supplied custom dimensions that don't match the inferred
+  // shape, reshape the flattened data to honor them (e.g. collapsing 3D
+  // blocks into a user-specified 4D shape).
+  const sameShape = dims.length === inferredShape.length && dims.every((d, i) => d === inferredShape[i]);
+  if (!sameShape) {
+    const flat = flattenTensor(tensor);
+    const expected = dims.reduce((a, b) => a * b, 1);
+    if (!dims.length || dims.some(d => !Number.isFinite(d) || d <= 0) || expected !== flat.length) {
+      return R.unprocessable(res, [{ field: 'dimensions', message: `As dimensões informadas (${dims.join('x') || '?'}) não são compatíveis com os ${flat.length} valores recebidos.` }]);
+    }
+    finalTensor = reshapeFlat(flat, dims);
+  } else {
+    // Ensure values are numeric even when shape matches.
+    finalTensor = reshapeFlat(flattenTensor(tensor), dims);
+  }
+
+  const dsUuid = uuidv4();
+  const metadata = {
+    import_method: 'paste_tensor',
+    data: { tensor: finalTensor },
+  };
+
+  const [result] = await db.query(
+    `INSERT INTO datasets
+       (uuid, user_id, name, description, visibility, data_type, dimensions,
+        x_points, x_min, x_max, file_format, storage_path,
+        metadata, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'tensor', ?, NULL, NULL, NULL, 'json', NULL, ?, NOW(), NOW())`,
+    [
+      dsUuid,
+      req.user.id,
+      name,
+      description || null,
+      visibility || 'private',
+      JSON.stringify(dims),
+      JSON.stringify(metadata),
+    ],
+  );
+
+  await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [req.user.id]);
+
+  const [rows2] = await db.query('SELECT * FROM datasets WHERE id = ?', [result.insertId]);
+  return R.created(res, rows2[0]);
+}
+
 // POST /datasets/import
 async function smartImport(req, res) {
   try {
+    // New JSON-tensor path (3D/4D+ pasted data): no file is sent, the body
+    // is a JSON object carrying the already-assembled nested-array tensor.
+    // The classic multipart/form-data (CSV) flow below is untouched.
+    if (!req.file && req.is('application/json') && req.body && (req.body.data_type === 'tensor' || Array.isArray(req.body.tensor))) {
+      return importTensorFromJson(req, res);
+    }
+
     if (!req.file) return R.badRequest(res, 'Arquivo não enviado.');
     const { name, description, visibility, separator: forceSep } = req.body;
     const dsUuid = uuidv4();

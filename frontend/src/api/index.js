@@ -96,6 +96,9 @@ export const api = {
     list:            (p)       => get('/datasets', p),
     create:          (d)       => post('/datasets', d),
     import:          (fd)      => client.post('/datasets/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    // JSON path for pasted 3D/4D+ tensors (block-delimited paste): sends the
+    // already-assembled nested-array tensor instead of a CSV file.
+    importTensor:    (d)       => post('/datasets/import', d),
     get:             (id)      => get(`/datasets/${id}`),
     update:          (id, d)   => put(`/datasets/${id}`, d),
     delete:          (id)      => del(`/datasets/${id}`),

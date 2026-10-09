@@ -16,13 +16,17 @@ function ImportModal({ open, onClose, onImported }) {
   const [method, setMethod] = useState(null); // 'file' | 'paste'
   const [file, setFile] = useState(null);
   const [pasteContent, setPasteContent] = useState('');
+  const [pasteFormat, setPasteFormat] = useState('auto'); // auto | csv | json — formato da colagem
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [separator, setSeparator] = useState(',');
   const [previewRows, setPreviewRows] = useState([]);
   const [previewHeaders, setPreviewHeaders] = useState([]);
+  const [tensorInfo, setTensorInfo] = useState(null); // { tensor, shape } quando detectado tensor 3D/4D+
+  const [tensorDims, setTensorDims] = useState(''); // dimensões opcionais informadas pelo usuário, ex: "4,2,3,5"
   const fileRef = useRef();
   const { mutate: importDs, loading: importing } = useMutation(api.datasets.import);
+  const { mutate: importTensor, loading: importingTensor } = useMutation(api.datasets.importTensor);
   const { mutate: createDs, loading: creating } = useMutation(api.datasets.create);
 
   const detectSeparator = (text) => {
@@ -41,6 +45,56 @@ function ImportModal({ open, onClose, onImported }) {
     setPreviewRows(rows);
   };
 
+  // --- Detecção de tensor em blocos (3D/4D+) ---------------------------------
+  // Os blocos são separados por linhas vazias ou linhas iniciadas em "#".
+  // Cada bloco representa uma fatia 2D do tensor; todos os blocos precisam ter
+  // o mesmo shape (linhas x colunas) e valores numéricos para serem aceitos.
+  const splitBlocks = (text) => {
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
+    const blocks = [];
+    let current = [];
+    for (const raw of lines) {
+      const trimmed = raw.trim();
+      if (trimmed === '' || trimmed.startsWith('#')) {
+        if (current.length) { blocks.push(current); current = []; }
+        continue;
+      }
+      current.push(raw);
+    }
+    if (current.length) blocks.push(current);
+    return blocks;
+  };
+
+  const detectBlockTensor = (text) => {
+    const blocks = splitBlocks(text);
+    if (blocks.length < 2) return null; // precisa de >= 2 blocos para formar um tensor 3D
+    const sep = detectSeparator(blocks[0][0] || '');
+    const parsedBlocks = blocks.map(b => b.map(line => line.split(sep).map(c => c.trim().replace(/^"|"$/g, ''))));
+    const rowCount = parsedBlocks[0].length;
+    const colCount = parsedBlocks[0][0]?.length || 0;
+    if (!rowCount || !colCount) return null;
+    const sameShape = parsedBlocks.every(b => b.length === rowCount && b.every(r => r.length === colCount));
+    if (!sameShape) return null;
+    const allNumeric = parsedBlocks.every(b => b.every(r => r.every(c => c !== '' && !isNaN(Number(c)))));
+    if (!allNumeric) return null;
+    const tensor = parsedBlocks.map(b => b.map(r => r.map(Number)));
+    return { tensor, shape: [blocks.length, rowCount, colCount] };
+  };
+
+  const inferShape = (arr) => {
+    const dims = [];
+    let cur = arr;
+    while (Array.isArray(cur)) { dims.push(cur.length); cur = cur[0]; }
+    return dims;
+  };
+
+  const detectJsonTensor = (text) => {
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { return null; }
+    if (!Array.isArray(parsed) || !Array.isArray(parsed[0])) return null;
+    return { tensor: parsed, shape: inferShape(parsed) };
+  };
+
   const handleFileSelect = (f) => {
     setFile(f);
     if (!name) setName(f.name.replace(/\.[^.]+$/, ''));
@@ -57,6 +111,30 @@ function ImportModal({ open, onClose, onImported }) {
 
   const handlePasteNext = () => {
     if (!pasteContent.trim()) { toast.error('Cole o conteúdo antes de continuar'); return; }
+
+    // Formato explicitamente escolhido como JSON: espera um array aninhado.
+    if (pasteFormat === 'json') {
+      const det = detectJsonTensor(pasteContent);
+      if (!det) { toast.error('JSON inválido. Esperado um array aninhado (ex: tensor 3D).'); return; }
+      setTensorInfo(det);
+      setTensorDims('');
+      setStep('config');
+      return;
+    }
+
+    // Auto-detecção (ou formato "csv" forçado pelo usuário): tenta reconhecer
+    // um tensor em blocos primeiro; se não for o caso, cai no fluxo CSV atual.
+    if (pasteFormat !== 'csv') {
+      const det = detectBlockTensor(pasteContent);
+      if (det) {
+        setTensorInfo(det);
+        setTensorDims('');
+        setStep('config');
+        return;
+      }
+    }
+
+    setTensorInfo(null);
     const sep = detectSeparator(pasteContent);
     setSeparator(sep);
     parsePreview(pasteContent, sep);
@@ -66,7 +144,22 @@ function ImportModal({ open, onClose, onImported }) {
   const handleImport = async () => {
     if (!name.trim()) { toast.error('Nome obrigatório'); return; }
     let result;
-    if (method === 'file' && file) {
+    if (tensorInfo) {
+      const dims = tensorDims.trim()
+        ? tensorDims.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n > 0)
+        : undefined;
+      if (tensorDims.trim() && (!dims.length || dims.length < 2)) {
+        toast.error('Informe as dimensões separadas por vírgula, ex: 4,2,3,5');
+        return;
+      }
+      result = await importTensor({
+        name,
+        description,
+        data_type: 'tensor',
+        tensor: tensorInfo.tensor,
+        dimensions: dims,
+      });
+    } else if (method === 'file' && file) {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('name', name);
@@ -91,7 +184,10 @@ function ImportModal({ open, onClose, onImported }) {
     }
   };
 
-  const resetState = () => { setStep('method'); setMethod(null); setFile(null); setPasteContent(''); setName(''); setDescription(''); setPreviewRows([]); setPreviewHeaders([]); };
+  const resetState = () => {
+    setStep('method'); setMethod(null); setFile(null); setPasteContent(''); setPasteFormat('auto');
+    setName(''); setDescription(''); setPreviewRows([]); setPreviewHeaders([]); setTensorInfo(null); setTensorDims('');
+  };
   const handleClose = () => { onClose(); resetState(); };
   const stepLabel = { method: 'Escolha o método', config: 'Configurar importação' };
 
@@ -152,13 +248,37 @@ function ImportModal({ open, onClose, onImported }) {
 
         {step === 'paste' && (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-blue-200 mb-1.5">Cole seus dados abaixo</label>
-            <textarea
-              className="input-field font-mono text-xs resize-none h-48"
-              placeholder={"Col1,Col2,Col3\n1.2,3.4,5.6\n7.8,9.0,1.2"}
-              value={pasteContent}
-              onChange={e => setPasteContent(e.target.value)}
-            />
+            <div>
+              <label className="block text-sm font-medium text-blue-200 mb-1.5">Formato da colagem</label>
+              <div className="flex gap-2">
+                {[
+                  { key: 'auto', label: 'Auto-detectar' },
+                  { key: 'csv', label: 'CSV / Tabela' },
+                  { key: 'json', label: 'JSON (tensor)' },
+                ].map(opt => (
+                  <button key={opt.key} type="button" onClick={() => setPasteFormat(opt.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${pasteFormat === opt.key ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5">
+                {pasteFormat === 'json'
+                  ? 'Cole um array JSON aninhado (ex: tensor 3D [[[...]]]).'
+                  : 'Blocos CSV separados por linha vazia ou linha iniciada em "#" são detectados automaticamente como tensor 3D/4D+.'}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-blue-200 mb-1.5">Cole seus dados abaixo</label>
+              <textarea
+                className="input-field font-mono text-xs resize-none h-48"
+                placeholder={pasteFormat === 'json'
+                  ? '[[[1,2,3],[4,5,6]],[[7,8,9],[10,11,12]]]'
+                  : "Col1,Col2,Col3\n1.2,3.4,5.6\n7.8,9.0,1.2\n\n# ou, para um tensor 3D, blocos separados por linha vazia:\n1,2,3\n4,5,6\n\n7,8,9\n10,11,12"}
+                value={pasteContent}
+                onChange={e => setPasteContent(e.target.value)}
+              />
+            </div>
             <div className="flex gap-3">
               <button onClick={() => setStep('method')} className="btn-ghost flex-1">Voltar</button>
               <button onClick={handlePasteNext} className="btn-primary flex-1 flex items-center justify-center gap-2">
@@ -170,27 +290,50 @@ function ImportModal({ open, onClose, onImported }) {
 
         {step === 'config' && (
           <div className="space-y-4">
+            {tensorInfo && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 text-xs text-purple-300">
+                <Boxes className="w-4 h-4 flex-shrink-0" />
+                Tensor detectado — shape inferido <span className="font-mono text-purple-200">[{tensorInfo.shape.join(' × ')}]</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome do Dataset *</label>
                 <input className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Amostras Solo 2024" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Separador</label>
-                <select className="input-field" value={separator} onChange={e => { setSeparator(e.target.value); if (pasteContent) parsePreview(pasteContent, e.target.value); }}>
-                  <option value=",">Vírgula (,)</option>
-                  <option value=";">Ponto-vírgula (;)</option>
-                  <option value="\t">Tab</option>
-                  <option value=" ">Espaço</option>
-                </select>
-              </div>
+              {tensorInfo ? (
+                <div>
+                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Dimensões (opcional)</label>
+                  <input className="input-field font-mono" value={tensorDims} onChange={e => setTensorDims(e.target.value)} placeholder="ex: 4,2,3,5" />
+                  <p className="text-xs text-slate-500 mt-1">Deixe em branco para usar o shape 3D inferido automaticamente dos blocos.</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Separador</label>
+                  <select className="input-field" value={separator} onChange={e => { setSeparator(e.target.value); if (pasteContent) parsePreview(pasteContent, e.target.value); }}>
+                    <option value=",">Vírgula (,)</option>
+                    <option value=";">Ponto-vírgula (;)</option>
+                    <option value="\t">Tab</option>
+                    <option value=" ">Espaço</option>
+                  </select>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-blue-200 mb-1.5">Descrição</label>
               <input className="input-field" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição opcional..." />
             </div>
 
-            {previewHeaders.length > 0 && (
+            {tensorInfo ? (
+              <div>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">Pré-visualização (1ª fatia)</label>
+                <pre className="rounded-lg overflow-auto border border-white/10 p-3 text-xs text-slate-300 font-mono" style={{ maxHeight: '160px' }}>
+                  {JSON.stringify(tensorInfo.tensor[0], null, 1)}
+                </pre>
+                <p className="text-xs text-slate-500 mt-1">{tensorInfo.shape.length} dimensões detectadas · {tensorInfo.shape.join(' × ')}</p>
+              </div>
+            ) : previewHeaders.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-blue-200 mb-1.5">Pré-visualização</label>
                 <div className="rounded-lg overflow-auto border border-white/10" style={{ maxHeight: '160px' }}>
@@ -215,8 +358,8 @@ function ImportModal({ open, onClose, onImported }) {
 
             <div className="flex gap-3 pt-2">
               <button onClick={() => setStep(method === 'paste' ? 'paste' : 'method')} className="btn-ghost flex-1">Voltar</button>
-              <button onClick={handleImport} disabled={importing || creating} className="btn-primary flex-1">
-                {importing || creating ? 'Importando...' : 'Importar Dataset'}
+              <button onClick={handleImport} disabled={importing || creating || importingTensor} className="btn-primary flex-1">
+                {importing || creating || importingTensor ? 'Importando...' : 'Importar Dataset'}
               </button>
             </div>
           </div>
