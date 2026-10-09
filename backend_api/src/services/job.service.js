@@ -4,13 +4,15 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const redis = require('../config/redis.config');
 
-const REDIS_JOB_CHANNEL = 'tchelab:jobs';
+// Fila consumida pelo worker Python via BLPOP — deve coincidir com JOB_QUEUE no worker_api/config.py
+const REDIS_JOB_QUEUE = process.env.JOB_QUEUE || 'tchelab_fila';
 
 /**
- * Cria um job na tabela `jobs` e publica no canal Redis para o worker Python.
+ * Cria um job na tabela `jobs` e enfileira no Redis para o worker Python.
+ * Usa LPUSH na lista `tchelab_fila` (lida pelo worker via BLPOP).
  *
  * @param {object} params
- * @param {string}  params.job_type         Tipo do job (ex: 'execute_workflow')
+ * @param {string}  params.job_type         Tipo do job (ex: 'run_workflow')
  * @param {number}  params.user_id          Usuário que criou
  * @param {object}  params.payload          Dados enviados ao worker
  * @param {number}  [params.workflow_id]
@@ -47,11 +49,11 @@ async function createJob({
 
   const jobId = result.insertId;
 
-  // Publica no Redis para o worker Python consumir
+  // Enfileira no Redis para o worker Python consumir via BLPOP
   try {
-    await redis.publish(REDIS_JOB_CHANNEL, JSON.stringify({ job_id: jobId, uuid, job_type }));
+    await redis.lpush(REDIS_JOB_QUEUE, JSON.stringify({ job_id: jobId, uuid, job_type }));
   } catch (err) {
-    console.error('[JobService] Falha ao publicar no Redis:', err.message);
+    console.error('[JobService] Falha ao enfileirar no Redis:', err.message);
     // Job já está no banco; worker pode consultar periodicamente como fallback
   }
 

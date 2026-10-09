@@ -25,7 +25,7 @@ async function listTechniques(req, res) {
 
     const [rows] = await db.query(
       `SELECT id, uuid, slug, name, category, family, description, min_order, max_order,
-              requires_sample_axis, input_type, output_type, tags, is_beta, is_custom
+              requires_sample_axis, input_schema, output_schema, parameter_schema, tags, is_beta, is_custom
        FROM techniques WHERE ${where} ORDER BY category, family, name LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );

@@ -194,15 +194,16 @@ async function listProjectDatasets(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-// POST /projects/:id/datasets/:did
+// POST /projects/:id/datasets  — UUID do dataset vem no body (dataset_id)
 async function addDatasetToProject(req, res) {
   try {
     const project = await resolveProject(req.params.id);
     if (!project) return R.notFound(res, 'Projeto');
-    const [datasets] = await db.query('SELECT id FROM datasets WHERE uuid = ?', [req.params.did]);
+    const { dataset_id: datasetUuid, purpose } = req.body;
+    if (!datasetUuid) return R.unprocessable(res, [{ field: 'dataset_id', message: 'Obrigatório.' }]);
+    const [datasets] = await db.query('SELECT id FROM datasets WHERE uuid = ?', [datasetUuid]);
     if (!datasets.length) return R.notFound(res, 'Dataset');
 
-    const { purpose } = req.body;
     if (!PURPOSE_VALUES.includes(purpose)) {
       return R.unprocessable(res, [{ field: 'purpose', message: `Deve ser um dos: ${PURPOSE_VALUES.join(', ')}.` }]);
     }
@@ -262,12 +263,14 @@ async function listProjectWorkflows(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-// POST /projects/:id/workflows/:wid
+// POST /projects/:id/workflows  — UUID do workflow vem no body (workflow_id)
 async function addWorkflowToProject(req, res) {
   try {
     const project = await resolveProject(req.params.id);
     if (!project) return R.notFound(res, 'Projeto');
-    const [workflows] = await db.query('SELECT id FROM workflows WHERE uuid = ?', [req.params.wid]);
+    const { workflow_id: workflowUuid } = req.body;
+    if (!workflowUuid) return R.unprocessable(res, [{ field: 'workflow_id', message: 'Obrigatório.' }]);
+    const [workflows] = await db.query('SELECT id FROM workflows WHERE uuid = ?', [workflowUuid]);
     if (!workflows.length) return R.notFound(res, 'Workflow');
     await db.query(
       `INSERT IGNORE INTO project_workflows (project_id, workflow_id, added_by, added_at) VALUES (?, ?, ?, NOW())`,
@@ -304,12 +307,14 @@ async function listProjectArticles(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-// POST /projects/:id/articles/:aid
+// POST /projects/:id/articles  — UUID do artigo vem no body (article_id)
 async function addArticleToProject(req, res) {
   try {
     const project = await resolveProject(req.params.id);
     if (!project) return R.notFound(res, 'Projeto');
-    const [articles] = await db.query('SELECT id FROM articles WHERE uuid = ?', [req.params.aid]);
+    const { article_id: articleUuid } = req.body;
+    if (!articleUuid) return R.unprocessable(res, [{ field: 'article_id', message: 'Obrigatório.' }]);
+    const [articles] = await db.query('SELECT id FROM articles WHERE uuid = ?', [articleUuid]);
     if (!articles.length) return R.notFound(res, 'Artigo');
     await db.query(
       `INSERT IGNORE INTO project_articles (project_id, article_id, added_by, added_at) VALUES (?, ?, ?, NOW())`,
