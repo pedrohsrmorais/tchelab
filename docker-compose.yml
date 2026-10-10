@@ -1,0 +1,118 @@
+# TcheLab — stack completo (mysql + redis + backend_api/frontend + worker
+# Python) num compose só.
+#
+# Por quê isto existe: o bug que motivou essa refatoração (job preso em
+# "queued" para sempre) nasceu de backend_api e worker_api lendo config de
+# Redis/host de dois `.env` separados, sob pm2, sem nada garantindo que os
+# dois concordassem — e de processos "zumbi" sobrando de restarts manuais.
+# Aqui, host/porta/DB do Redis e do MySQL para os dois serviços vêm do MESMO
+# bloco YAML (ancoras `x-queue-env`/`x-mysql-env` abaixo, mescladas nos dois
+# serviços) — não tem como divergir silenciosamente. E cada `docker compose
+# up --build` sobe containers novos a partir da imagem recém-buildada; não
+# sobra processo solto de teste manual disputando a fila.
+#
+# Uso:
+#   cp .env.example .env        # preencha as senhas/segredos reais
+#   docker compose up -d --build
+#   docker compose logs -f backend worker   # acompanhar
+#
+# tchelab.intellsn.com.br já aponta para a porta 3003 do host — o serviço
+# `backend` publica exatamente nela, então nada muda do lado do proxy/DNS.
+
+x-queue-env: &queue-env
+  JOB_QUEUE: tchelab_fila
+  RESULT_CHANNEL: tchelab_resultados
+  JOB_TIMEOUT_SECONDS: "300"
+
+x-mysql-env: &mysql-env
+  DB_HOST: mysql
+  DB_PORT: "3306"
+  DB_USER: ${DB_USER}
+  DB_PASSWORD: ${DB_PASSWORD}
+  DB_NAME: ${DB_NAME}
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # docker-entrypoint-initdb.d só roda na 1ª subida (volume vazio) — é
+      # assim que "recriar o banco do zero" acontece: apague o volume
+      # mysql_data (`docker compose down -v`) e suba de novo.
+      - ./backend_api/src/config/init.mysql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./backend_api/sql/seed_kennard_stone.sql:/docker-entrypoint-initdb.d/02-seed_kennard_stone.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [tchelab]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [tchelab]
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: [*mysql-env, *queue-env]
+      PORT: "3003"
+      NODE_ENV: production
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "1"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      STORAGE_PATH: /app/storage
+    volumes:
+      - storage_data:/app/storage
+    ports:
+      - "3003:3003"
+    networks: [tchelab]
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker_api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      <<: [*queue-env]
+      REDIS_URL: redis://redis:6379/1
+      WORKER_CONCURRENCY: "4"
+      POLL_INTERVAL_SECONDS: "0.5"
+      LOG_LEVEL: INFO
+    networks: [tchelab]
+
+volumes:
+  mysql_data:
+  redis_data:
+  storage_data:
+
+networks:
+  tchelab:
+    driver: bridge

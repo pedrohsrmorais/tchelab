@@ -1,3 +1,8 @@
+# Dados de runtime do backend (uploads, datasets, modelos — ver
+# backend_api/src/config/storage.config.js). Em Docker isto vive no volume
+# nomeado `storage_data` (ver docker-compose.yml), não no repositório.
+backend_api/storage/
+
 # Logs
 logs
 *.log

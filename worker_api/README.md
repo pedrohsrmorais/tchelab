@@ -19,8 +19,10 @@ O sintoma, do ponto de vista do usuário, é exatamente "cliquei em executar e
 parece que o Robô não tá fazendo nada": os nós ficam presos em "Pendente"
 indefinidamente porque **não existe nenhum consumidor da fila**.
 
-Este repositório não tem Procfile, docker-compose ou unit do systemd — então
-é fácil esquecer de iniciar o worker junto com o backend. Este README existe
+Este repositório tem um `docker-compose.yml` na raiz (ver "Rodando em
+produção" abaixo) que já cuida de iniciar o worker junto do backend/mysql/
+redis — mas fora desse caminho (dev local, ou um deploy sem Docker) ainda é
+fácil esquecer de subir o worker junto com o backend. Este README existe
 para deixar esse requisito explícito.
 
 ## Rodando localmente (dev)
@@ -53,7 +55,31 @@ backend e o frontend estejam perfeitos.
 
 `worker.py` precisa de um supervisor que o reinicie se cair (ele trata
 SIGTERM/SIGINT para desligar graciosamente, mas não se auto-reinicia em
-crash). Três opções comuns — escolha uma de acordo com o ambiente de deploy:
+crash).
+
+### Docker (recomendado — é como este projeto roda hoje)
+
+`docker-compose.yml`, na raiz do repositório, já declara o serviço `worker`
+com `restart: unless-stopped` e as mesmas variáveis de Redis/fila/canal do
+`backend`, vindas do **mesmo bloco YAML** (âncoras `x-queue-env`), então os
+dois nunca podem divergir silenciosamente — essa divergência (backend e
+worker lendo config de Redis de dois `.env` separados sob pm2) foi a causa
+raiz do bug descrito no aviso de pm2 logo abaixo.
+
+```bash
+cp .env.example .env        # preencha as senhas/segredos reais
+docker compose up -d --build
+docker compose logs -f worker   # confirmar "Conectado ao Redis"
+```
+
+Para recriar o banco do zero (schema + seed, via
+`docker-entrypoint-initdb.d`): `docker compose down -v && docker compose up -d --build`
+(o `-v` apaga o volume `mysql_data`; só use se realmente quiser perder os
+dados atuais do MySQL).
+
+### Alternativas sem Docker
+
+Três opções comuns se o ambiente de deploy não usa Docker:
 
 **systemd** (`/etc/systemd/system/tchelab-worker.service`):
 
@@ -116,11 +142,10 @@ pm2 save
 > recupera sozinho da maioria desses casos (ver "Reconciliação" no arquivo
 > `backend_api/src/services/resultConsumer.service.js`), mas o ideal
 > continua sendo eliminar a causa do restart, não só tolerar os efeitos.
-
-**Docker**: dar ao worker seu próprio serviço/container com
-`restart: unless-stopped`, variáveis de ambiente (`REDIS_URL`, `JOB_QUEUE`,
-`RESULT_CHANNEL`, `WORKER_CONCURRENCY`) apontando para o mesmo Redis do
-`backend_api`, e `CMD ["python3", "worker.py"]`.
+>
+> Esse problema de origem (duas fontes de config que podem divergir) é
+> exatamente o que a seção "Docker" acima elimina estruturalmente — ver
+> `docker-compose.yml` na raiz do repositório.
 
 ## Como confirmar que está funcionando
 

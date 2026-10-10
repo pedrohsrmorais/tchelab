@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { X, Info, Layers, Download, Grid3X3, Box, Waves, Rows3, LineChart as LineChartIcon } from 'lucide-react';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // ---------------------------------------------------------------------------
 // UTILITIES
@@ -433,7 +434,7 @@ function HeatMap2D({ matrix, rows, cols, axisLabels, exportRef }) {
 // MATRIZ NUMÉRICA — números reais entre colchetes + comparação de linhas/colunas
 // ---------------------------------------------------------------------------
 
-const MATRIX_CELL_LIMIT = 2000;
+const MATRIX_CELL_LIMIT = 6000;
 
 function MatrixView({ matrix, rows, cols, axisLabels }) {
   const [compareMode, setCompareMode] = useState('rows'); // rows | cols
@@ -452,8 +453,47 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
     ? matrix[i] ?? []
     : matrix.map(r => r[i]);
 
-  const fmt = (v) => isNaN(v) ? '—' : Number(v).toPrecision(4);
+  // Formatação adaptativa: inteiros aparecem sem ruído decimal ("3" em vez
+  // de "3.000", que é o que `toPrecision(4)` sempre produzia antes).
+  const fmt = (v) => {
+    if (isNaN(v)) return '—';
+    const n = Number(v);
+    return Number.isInteger(n) ? String(n) : n.toPrecision(4);
+  };
   const colWidth = compareMode === 'rows' ? cols : rows;
+
+  // Rótulos reais dos eixos, com fallback pro índice puro. `axisLabels` já
+  // chegava como prop mas nunca era usado aqui — a matriz não tinha nenhum
+  // cabeçalho, só os números entre colchetes, então não dava pra saber qual
+  // coluna/amostra real cada valor representava sem contar células.
+  const colLabel = (ci) => axisLabels?.x?.[ci] != null ? String(axisLabels.x[ci]) : String(ci);
+  const rowLabel = (ri) => axisLabels?.y?.[ri] != null ? String(axisLabels.y[ri]) : String(ri);
+
+  // Sombreamento sutil por célula, mesma paleta viridis do Heatmap — ajuda a
+  // enxergar o padrão de valores de relance, sem abrir mão da precisão
+  // exata que só os números dão (o ponto de ter uma visão "Matriz").
+  const [cellMin, cellMax] = useMemo(() => {
+    const flat = matrix.flatMap(r => r).filter(v => !isNaN(v));
+    if (!flat.length) return [0, 1];
+    return [Math.min(...flat), Math.max(...flat)];
+  }, [matrix]);
+
+  const { maxCell, minCell } = useMemo(() => {
+    let max = { ri: -1, ci: -1, v: -Infinity }, min = { ri: -1, ci: -1, v: Infinity };
+    matrix.forEach((row, ri) => row.forEach((v, ci) => {
+      if (isNaN(v)) return;
+      if (v > max.v) max = { ri, ci, v };
+      if (v < min.v) min = { ri, ci, v };
+    }));
+    return { maxCell: max, minCell: min };
+  }, [matrix]);
+
+  const shade = (v) => {
+    if (isNaN(v)) return 'transparent';
+    const t = cellMax === cellMin ? 0.5 : (v - cellMin) / (cellMax - cellMin);
+    const [rr, gg, bb] = viridis(t);
+    return `rgba(${rr},${gg},${bb},0.22)`;
+  };
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -478,6 +518,13 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
             {Array.from({ length: lineCount }, (_, i) => <option key={i} value={i}>{i}</option>)}
           </select>
         </div>
+        {!tooBig && maxCell.ri !== -1 && (
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 sm:ml-auto">
+            <span style={{ color: '#fde725' }}>■</span> máx {fmt(maxCell.v)} [{rowLabel(maxCell.ri)}, {colLabel(maxCell.ci)}]
+            <span className="mx-1 text-slate-700">·</span>
+            <span style={{ color: '#a78bfa' }}>■</span> mín {fmt(minCell.v)} [{rowLabel(minCell.ri)}, {colLabel(minCell.ci)}]
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 grid grid-rows-[1fr_auto] gap-4">
@@ -487,36 +534,54 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
               Matriz grande demais ({rows}×{cols} = {rows * cols} valores) para exibir como números — use o Heatmap para esta fatia.
             </div>
           ) : (
-            <div className="inline-flex items-stretch font-mono text-xs" style={{ color: '#cbd5e1' }}>
-              <span className="flex flex-col justify-between text-slate-600" style={{ fontSize: 28, lineHeight: 1 }}>
-                <span>⎡</span><span style={{ flex: 1 }}>⎢</span><span>⎣</span>
-              </span>
-              <table className="border-collapse">
-                <tbody>
-                  {matrix.map((row, ri) => {
-                    const isA = compareMode === 'rows' && ri === idxA;
-                    const isB = compareMode === 'rows' && ri === idxB;
+            <table className="border-collapse font-mono text-xs" style={{ color: '#cbd5e1' }}>
+              <thead>
+                <tr>
+                  <th className="px-2 py-0.5 sticky top-0 left-0 z-20" style={{ background: '#0f172a' }} />
+                  {(matrix[0] ?? []).map((_, ci) => {
+                    const isAc = compareMode === 'cols' && ci === idxA;
+                    const isBc = compareMode === 'cols' && ci === idxB;
                     return (
-                      <tr key={ri} style={{ background: isA ? 'rgba(251,191,36,0.12)' : isB ? 'rgba(56,189,248,0.12)' : 'transparent' }}>
-                        {row.map((v, ci) => {
-                          const isAc = compareMode === 'cols' && ci === idxA;
-                          const isBc = compareMode === 'cols' && ci === idxB;
-                          return (
-                            <td key={ci} className="px-2 py-0.5 text-right whitespace-nowrap"
-                              style={{ background: isAc ? 'rgba(251,191,36,0.12)' : isBc ? 'rgba(56,189,248,0.12)' : 'transparent' }}>
-                              {fmt(v)}
-                            </td>
-                          );
-                        })}
-                      </tr>
+                      <th key={ci} className="px-2 py-1 text-right font-normal sticky top-0 z-10 whitespace-nowrap"
+                        style={{ background: isAc ? '#78350f' : isBc ? '#0c4a6e' : '#0f172a', color: isAc ? '#fbbf24' : isBc ? '#38bdf8' : '#64748b' }}>
+                        {colLabel(ci)}
+                      </th>
                     );
                   })}
-                </tbody>
-              </table>
-              <span className="flex flex-col justify-between text-slate-600" style={{ fontSize: 28, lineHeight: 1 }}>
-                <span>⎤</span><span style={{ flex: 1 }}>⎥</span><span>⎦</span>
-              </span>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {matrix.map((row, ri) => {
+                  const isA = compareMode === 'rows' && ri === idxA;
+                  const isB = compareMode === 'rows' && ri === idxB;
+                  return (
+                    <tr key={ri}>
+                      <th className="px-2 py-0.5 text-right font-normal sticky left-0 z-10 whitespace-nowrap"
+                        style={{ background: isA ? '#78350f' : isB ? '#0c4a6e' : '#0f172a', color: isA ? '#fbbf24' : isB ? '#38bdf8' : '#64748b' }}>
+                        {rowLabel(ri)}
+                      </th>
+                      {row.map((v, ci) => {
+                        const isAc = compareMode === 'cols' && ci === idxA;
+                        const isBc = compareMode === 'cols' && ci === idxB;
+                        const isMax = ri === maxCell.ri && ci === maxCell.ci;
+                        const isMin = ri === minCell.ri && ci === minCell.ci;
+                        return (
+                          <td key={ci} className="px-2 py-0.5 text-right whitespace-nowrap"
+                            style={{
+                              background: (isA || isB || isAc || isBc)
+                                ? ((isA || isAc) ? 'rgba(251,191,36,0.18)' : 'rgba(56,189,248,0.18)')
+                                : shade(v),
+                              boxShadow: isMax ? 'inset 0 0 0 1px #fde725' : isMin ? 'inset 0 0 0 1px #a78bfa' : 'none',
+                            }}>
+                            {fmt(v)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
 
@@ -530,7 +595,7 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
                 { label: `${compareMode === 'rows' ? 'Linha' : 'Coluna'} ${idxA}`, values: getLine(idxA), color: '#fbbf24' },
                 { label: `${compareMode === 'rows' ? 'Linha' : 'Coluna'} ${idxB}`, values: getLine(idxB), color: '#38bdf8' },
               ]}
-              xLabels={Array.from({ length: colWidth }, (_, i) => i)}
+              xLabels={Array.from({ length: colWidth }, (_, i) => compareMode === 'rows' ? colLabel(i) : rowLabel(i))}
             />
           </div>
         </div>
@@ -704,37 +769,40 @@ function Voxel3D({ values, sizes, gMin, gMax, exportRef }) {
       ? finite
       : finite.filter((_, i) => i % Math.ceil(finite.length / MAX_VOXELS) === 0);
 
-    const voxelGeo = new THREE_.BoxGeometry(0.85, 0.85, 0.85);
-    const voxelMat = new THREE_.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.85 });
-    const mesh = new THREE_.InstancedMesh(voxelGeo, voxelMat, Math.max(visible.length, 1));
-
-    const dummy = new THREE_.Object3D();
+    // Antes isto usava InstancedMesh + setColorAt para desenhar até 2000
+    // cubos num único draw call. Medido num harness headless isolado (fora
+    // deste componente): com InstancedMesh, `mesh.instanceColor` simplesmente
+    // não chega ao shader nesta versão do three.js (0.170) — tanto
+    // MeshBasicMaterial quanto MeshStandardMaterial com `vertexColors:true`
+    // renderizavam TODAS as instâncias em preto/cinza sólido (RGB ~0-25,
+    // sempre R=G=B, nunca a cor real), independente da intensidade de luz.
+    // Isso é a causa raiz do Voxel 3D aparecer "apagado": não era iluminação
+    // fraca, era cor de instância descartada. A mesma cena com uma única
+    // BufferGeometry mesclada (um box por voxel, com `color` por vértice,
+    // igual ao HeatMap2D/Surface3D) renderiza o gradiente viridis
+    // corretamente — confirmado lado a lado no mesmo harness. Daqui pra
+    // frente, cada voxel vira uma BoxGeometry pequena e colorida, e todas
+    // são mescladas numa única geometria (ainda um único draw call).
     const color = new THREE_.Color();
-    for (let i = 0; i < visible.length; i++) {
-      const { a, b, c, v } = visible[i];
-      dummy.position.set(a - sx / 2, b - sy / 2, c - sz / 2);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
+    const voxelGeoms = visible.map(({ a, b, c, v }) => {
+      const g = new THREE_.BoxGeometry(0.85, 0.85, 0.85);
       const t = gMax === gMin ? 0.5 : (v - gMin) / (gMax - gMin);
       const [rr, gg, bb] = viridis(t);
       color.setRGB(rr / 255, gg / 255, bb / 255);
-      mesh.setColorAt(i, color);
-    }
-    // Instâncias "sobrando" (quando visible.length === 0 forçamos 1 instância
-    // acima para o InstancedMesh não quebrar) ficam escaladas a zero —
-    // invisíveis — em vez de aparecerem na origem com uma cor qualquer.
-    if (visible.length === 0) {
-      dummy.scale.set(0, 0, 0);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(0, dummy.matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      const count = g.attributes.position.count;
+      const colors = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) color.toArray(colors, i * 3);
+      g.setAttribute('color', new THREE_.BufferAttribute(colors, 3));
+      g.translate(a - sx / 2, b - sy / 2, c - sz / 2);
+      return g;
+    });
 
-    // Mesh e wireframe vivem só dentro deste group — nada é adicionado
-    // diretamente na scene, então rotacionam juntos sem ficar órfãos.
     const group = new THREE_.Group();
-    group.add(mesh);
+    if (voxelGeoms.length > 0) {
+      const merged = mergeGeometries(voxelGeoms, false);
+      const voxelMat = new THREE_.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.88 });
+      group.add(new THREE_.Mesh(merged, voxelMat));
+    }
     group.add(new THREE_.LineSegments(edges, lineMat));
     return group;
   }, [values, sizes, gMin, gMax]);
