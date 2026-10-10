@@ -3,7 +3,7 @@ Smoke tests — Família 01: Dados e Operações
 """
 from __future__ import annotations
 import numpy as np
-from tests.helpers import smoke, run_suite, has_keys, key_equals, list_len, shape_check, list_len_ge
+from tests.helpers import smoke, run_suite, has_keys, key_equals, list_len, shape_check, list_len_ge, run_script
 
 
 def _X():
@@ -50,6 +50,56 @@ def test_selecao_variaveis():
     return smoke("selecao_variaveis", {"X": X},
         {"indices": [0, 2, 4, 6]},
         [has_keys("X_sel")])
+
+
+def _no_overlap(*index_keys):
+    def _check(out):
+        sets = [set(out[k]) for k in index_keys]
+        for i in range(len(sets)):
+            for j in range(i + 1, len(sets)):
+                assert not (sets[i] & sets[j]), (
+                    f"Overlap entre '{index_keys[i]}' e '{index_keys[j]}': {sets[i] & sets[j]}"
+                )
+    return _check
+
+
+def test_kennard_stone_train_test():
+    X = _X()  # 20 amostras
+    return smoke("kennard_stone", {"X": X}, {"n_train": 14},
+        [has_keys("train", "test", "train_indices", "test_indices"),
+         list_len("train", 14),
+         list_len("test", 6),
+         _no_overlap("train_indices", "test_indices")])
+
+
+def test_kennard_stone_train_val_test():
+    X = _X()  # 20 amostras
+    return smoke("kennard_stone", {"X": X}, {"n_train": 12, "n_validation": 4},
+        [has_keys("train", "test", "validation", "train_indices", "test_indices", "validation_indices"),
+         list_len("train", 12),
+         list_len("validation", 4),
+         list_len("test", 4),
+         _no_overlap("train_indices", "validation_indices"),
+         _no_overlap("train_indices", "test_indices"),
+         _no_overlap("validation_indices", "test_indices")])
+
+
+def test_kennard_stone_fraction_based():
+    X = _X()  # 20 amostras
+    return smoke("kennard_stone", {"X": X}, {"train_size": 0.5},
+        [has_keys("train", "test"),
+         list_len("train", 10),
+         list_len("test", 10)])
+
+
+def test_kennard_stone_rejects_insufficient_samples():
+    try:
+        run_script("kennard_stone", {"X": [[1.0, 2.0], [3.0, 4.0]]}, {})
+        return type("R", (), {"passed": False, "slug": "kennard_stone", "duration_ms": 0,
+                              "error": "Expected ValueError", "__repr__": lambda s: "[FAIL] kennard_stone_rejects_insufficient_samples"})()
+    except ValueError:
+        return type("R", (), {"passed": True, "slug": "kennard_stone", "duration_ms": 0,
+                              "error": None, "__repr__": lambda s: "[PASS] kennard_stone_rejects_insufficient_samples"})()
 
 
 def test_transpose():
@@ -179,6 +229,10 @@ def run():
         test_tratamento_missing(),
         test_selecao_amostras(),
         test_selecao_variaveis(),
+        test_kennard_stone_train_test(),
+        test_kennard_stone_train_val_test(),
+        test_kennard_stone_fraction_based(),
+        test_kennard_stone_rejects_insufficient_samples(),
         test_transpose(),
         test_reshape(),
         test_soma(),

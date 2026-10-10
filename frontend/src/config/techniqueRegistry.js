@@ -13,19 +13,29 @@
  */
 
 // ── Tipos de array possíveis ──────────────────────────────────────────────────
+// IMPORTANTE: os valores aqui são os mesmos tokens de `type` usados em
+// `techniques.input_schema`/`output_schema` no banco e verificados pelo
+// ShapeValidatorService no backend (ver docs/workflow.md — "matrix", "tensor",
+// "vector", "scalar", "model", "figures", "labels" aparecem lá como palavras
+// por extenso, nunca como "2D"/"ND"/"vetor"/"modelo"). Os valores antigos
+// deste arquivo (curtos, em português) nunca bateram com o que o backend
+// realmente compara em `srcPort.type !== tgtPort.type` — ou seja, a
+// validação de tipo no editor provavelmente nunca reconheceu um match
+// correto. A dimensionalidade (2D/3D/N-way) NÃO faz parte do tipo: ela é
+// validada à parte via `min_order`/`max_order`/`data_order` — por isso não
+// existe mais um tipo "3D" ou "ND" separado de "tensor".
 export const ARRAY_TYPES = {
-  MATRIX_2D:    '2D',       // Matriz amostras × variáveis
-  ARRAY_3D:     '3D',       // Cubo amostras × variáveis × tempo (ex: EEM, NIR-2D)
-  ARRAY_ND:     'ND',       // N-way genérico
-  VECTOR:       'vetor',    // Vetor de referência y
-  SCALAR:       'escalar',  // Valor único
-  FIGURES:      'figuras',  // Conjunto de figuras/plots
-  MODEL:        'modelo',   // Objeto modelo treinado
-  LOADINGS:     'loadings', // Matriz de loadings/scores
-  PREDICTION:   'pred',     // Vetor de predições
-  LABELS:       'labels',   // Rótulos de classe
-  DATASET:      'dataset',  // Dataset bruto (nó de entrada)
-  ANY:          '*',        // Aceita qualquer tipo
+  MATRIX:       'matrix',     // Matriz amostras × variáveis
+  TENSOR:       'tensor',     // Array N-way (qualquer ordem ≥ 2) — ex: EEM, PARAFAC
+  VECTOR:       'vector',     // Vetor (referência y, índices, autovalores reais…)
+  SCALAR:       'scalar',     // Valor único
+  FIGURES:      'figures',    // Conjunto de figuras/plots
+  MODEL:        'model',      // Objeto modelo treinado
+  LOADINGS:     'loadings',   // Matriz de loadings/scores
+  PREDICTION:   'prediction', // Vetor de predições
+  LABELS:       'labels',     // Rótulos de classe
+  DATASET:      'dataset',    // Dataset bruto (nó de entrada)
+  ANY:          '*',          // Aceita qualquer tipo
 };
 
 // ── Famílias e seus metadados visuais ────────────────────────────────────────
@@ -222,12 +232,17 @@ export function getFamiliesList(lang = 'pt') {
 }
 
 // ── Matriz de compatibilidade de tipos ───────────────────────────────────────
-// COMPAT_MATRIX[sourceType][targetType] = true → conexão válida
+// COMPAT_MATRIX[sourceType][targetType] = true → conexão válida.
+// Observação: isto é uma pré-validação só pra dar feedback imediato no
+// canvas. A validação que realmente decide é o ShapeValidatorService no
+// backend (POST /workflows/:id/edges) — se o backend rejeitar algo que
+// passou aqui, o editor deve desfazer a aresta e mostrar o erro real dele
+// (não confiar só nesta matriz do frontend).
 const ANY = ARRAY_TYPES.ANY;
-const M2D = ARRAY_TYPES.MATRIX_2D;
-const A3D = ARRAY_TYPES.ARRAY_3D;
-const AND = ARRAY_TYPES.ARRAY_ND;
+const MAT = ARRAY_TYPES.MATRIX;
+const TEN = ARRAY_TYPES.TENSOR;
 const VEC = ARRAY_TYPES.VECTOR;
+const SCL = ARRAY_TYPES.SCALAR;
 const MOD = ARRAY_TYPES.MODEL;
 const LOA = ARRAY_TYPES.LOADINGS;
 const PRE = ARRAY_TYPES.PREDICTION;
@@ -235,55 +250,94 @@ const LAB = ARRAY_TYPES.LABELS;
 const FIG = ARRAY_TYPES.FIGURES;
 const DST = ARRAY_TYPES.DATASET;
 
-// Dataset de entrada pode se conectar a qualquer técnica
-// Tipos 3D/ND não podem se conectar diretamente a técnicas 2D-only
+// Dataset de entrada pode alimentar matrix/tensor/vector diretamente
+// (a ordem/dimensionalidade é validada à parte via min_order/max_order, não
+// pelo tipo). Tipos "terminais" como figures não aceitam saída.
 export const COMPAT_MATRIX = {
-  [DST]:  { [M2D]: true, [A3D]: true, [AND]: true, [VEC]: true, [ANY]: true },
-  [M2D]:  { [M2D]: true, [VEC]: true, [MOD]: false, [LOA]: false, [ANY]: true },
-  [A3D]:  { [A3D]: true, [AND]: true, [ANY]: true },
-  [AND]:  { [AND]: true, [A3D]: true, [ANY]: true },
-  [VEC]:  { [VEC]: true, [M2D]: true, [ANY]: true },
+  [DST]:  { [MAT]: true, [TEN]: true, [VEC]: true, [ANY]: true },
+  [MAT]:  { [MAT]: true, [VEC]: true, [ANY]: true },
+  [TEN]:  { [TEN]: true, [MAT]: true, [ANY]: true }, // unfolding/slice de tensor pode virar matrix
+  [VEC]:  { [VEC]: true, [MAT]: true, [ANY]: true },
+  [SCL]:  { [SCL]: true, [FIG]: true, [ANY]: true },
   [MOD]:  { [MOD]: true, [PRE]: true, [LOA]: true, [ANY]: true },
-  [LOA]:  { [LOA]: true, [M2D]: true, [FIG]: true, [ANY]: true },
+  [LOA]:  { [LOA]: true, [MAT]: true, [FIG]: true, [ANY]: true },
   [PRE]:  { [PRE]: true, [VEC]: true, [FIG]: true, [ANY]: true },
   [LAB]:  { [LAB]: true, [VEC]: true, [FIG]: true, [ANY]: true },
   [FIG]:  {},
-  [ANY]:  { [M2D]: true, [A3D]: true, [AND]: true, [VEC]: true, [MOD]: true, [LOA]: true, [PRE]: true, [LAB]: true, [FIG]: true, [ANY]: true },
+  [ANY]:  { [MAT]: true, [TEN]: true, [VEC]: true, [SCL]: true, [MOD]: true, [LOA]: true, [PRE]: true, [LAB]: true, [FIG]: true, [ANY]: true },
 };
 
 /**
- * Verifica se uma conexão entre dois nós é válida.
- * @param {object} sourceNode  — nó de origem (data.outputType)
- * @param {object} targetNode  — nó de destino (data.inputType)
+ * Verifica se uma conexão entre duas PORTAS específicas é válida (pré-check
+ * local, espelhando a camada 4 — "tipo compatível" — do ShapeValidatorService).
+ * @param {string} srcType  — tipo declarado na porta de saída (output_schema[port].type)
+ * @param {string} tgtType  — tipo declarado na porta de entrada (input_schema[port].type)
  * @returns {{ valid: boolean, reason: string }}
  */
-export function isValidConnection(sourceNode, targetNode) {
-  const srcType = sourceNode?.data?.outputType || ANY;
-  const tgtType = targetNode?.data?.inputType  || ANY;
+export function isValidConnection(srcType, tgtType) {
+  const s = srcType || ANY;
+  const t = tgtType || ANY;
 
-  // ANY aceita tudo
-  if (srcType === ANY || tgtType === ANY) return { valid: true, reason: '' };
+  if (s === ANY || t === ANY) return { valid: true, reason: '' };
+  if (s === t) return { valid: true, reason: '' };
 
-  const row = COMPAT_MATRIX[srcType] || {};
-  if (row[tgtType] || row[ANY]) return { valid: true, reason: '' };
+  const row = COMPAT_MATRIX[s] || {};
+  if (row[t]) return { valid: true, reason: '' };
 
   return {
     valid: false,
-    reason: `Tipo de saída "${srcType}" não é compatível com entrada "${tgtType}"`,
+    reason: `Tipo de saída "${s}" não é compatível com a entrada "${t}"`,
   };
 }
 
 /**
- * Parseia o input_schema / output_schema vindo do banco (JSON string ou objeto).
- * Retorna { type, description } para exibição.
+ * Lê um input_schema/output_schema vindo do banco e retorna a lista de
+ * portas nomeadas: [{ name, type, description, shape, dtype }].
+ *
+ * O formato real gravado pelo backend é um dicionário por porta — ex:
+ * `{"X": {"type":"matrix"}, "y": {"type":"vector"}}` para uma técnica com 2
+ * entradas, ou `{"train": {...}, "test": {...}, "validation": {...}}` para
+ * uma técnica como kennard_stone com 3 saídas nomeadas (confirmado em
+ * shapeValidator.service.js, que faz `outputSchema[source_port]`, e no uso
+ * pré-existente em QuickOperationModal, que já trata input_schema como um
+ * dict e pula a primeira chave via `Object.keys(inputSchema).slice(1)`).
+ *
+ * Mantém um fallback para o formato legado de porta única
+ * `{"type": "...", "description": "..."}` sem chave de porta, caso alguma
+ * técnica antiga ainda esteja cadastrada assim — nesse caso a porta recebe
+ * o nome genérico "value".
+ */
+export function getPorts(schema) {
+  if (!schema) return [];
+  const obj = typeof schema === 'string' ? (() => { try { return JSON.parse(schema); } catch { return null; } })() : schema;
+  if (!obj || typeof obj !== 'object') return [];
+
+  // Formato legado: {type, description, ...} direto, sem porta nomeada.
+  if (typeof obj.type === 'string') {
+    return [{ name: 'value', type: obj.type, description: obj.description || '', shape: obj.shape || null, dtype: obj.dtype || null }];
+  }
+
+  return Object.entries(obj).map(([name, portSchema]) => {
+    const p = portSchema || {};
+    return {
+      name,
+      type: p.type || ARRAY_TYPES.ANY,
+      description: p.description || '',
+      shape: p.shape || null,
+      dtype: p.dtype || null,
+    };
+  });
+}
+
+/**
+ * Compat: retorna só a PRIMEIRA porta de um schema, no formato antigo
+ * { type, description, shape, dtype } — usado onde só um resumo/badge é
+ * necessário (ex: card de técnica na lista), não a conexão real do grafo.
+ * Para conectar nós, use `getPorts()` + `isValidConnection(srcType, tgtType)`.
  */
 export function parseSchema(schema) {
-  if (!schema) return { type: ARRAY_TYPES.ANY, description: '' };
-  const obj = typeof schema === 'string' ? (() => { try { return JSON.parse(schema); } catch { return {}; } })() : schema;
-  return {
-    type:        obj.type        || ARRAY_TYPES.ANY,
-    description: obj.description || '',
-    shape:       obj.shape       || null,
-    dtype:       obj.dtype       || null,
-  };
+  const ports = getPorts(schema);
+  if (!ports.length) return { type: ARRAY_TYPES.ANY, description: '' };
+  const { name, ...rest } = ports[0];
+  return rest;
 }

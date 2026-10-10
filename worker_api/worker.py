@@ -40,6 +40,7 @@ from typing import Optional
 # ------------------------------------------------------------------ #
 from config import Config
 from factory import ScriptFactory
+from jsonable import to_jsonable
 from redis_queue import dequeue_job, get_redis, publish_result
 from schemas import JobPayload, JobResult, JobStatus
 
@@ -64,6 +65,11 @@ def process_job(payload: JobPayload) -> JobResult:
         script = ScriptFactory.get(payload.slug)
         script.validate(payload.inputs, payload.params)
         outputs = script.execute(payload.inputs, payload.params)
+        # Normaliza numpy/complex para tipos nativos ANTES de montar o
+        # JobResult — sem isso, model_dump_json() falha para qualquer script
+        # que retorne ndarray cru (a maioria do catálogo), e o resultado
+        # nunca chega ao backend (ver jsonable.py para o porquê).
+        outputs = to_jsonable(outputs)
         duration_ms = (time.perf_counter() - t0) * 1000
         logger.info(
             "Job %s concluído em %.1f ms", payload.job_id, duration_ms

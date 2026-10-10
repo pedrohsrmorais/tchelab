@@ -175,6 +175,124 @@ class SelecaoVariaveis(BaseScript):
         return {"X_sel": np.take(X, idx, axis=mode_axis), "selected_indices": idx.tolist()}
 
 
+class KennardStone(BaseScript):
+    slug = "kennard_stone"
+    nome = "Separação Kennard-Stone"
+    familia = "01_dados"
+    descricao = (
+        "Divide as amostras em calibração (treino), teste e, opcionalmente, "
+        "validação, selecionando iterativamente a amostra mais distante "
+        "(distância Euclidiana) das já escolhidas — maximiza a cobertura da "
+        "variabilidade multivariada em vez de uma divisão aleatória. "
+        "Determinístico: a mesma entrada sempre produz a mesma divisão."
+    )
+
+    @staticmethod
+    def _resolve_count(params, int_key, frac_key, n, default_frac):
+        """Resolve um tamanho de subconjunto a partir de params[int_key]
+        (contagem absoluta) ou params[frac_key] (fração de n), nessa ordem
+        de prioridade."""
+        if params.get(int_key) is not None:
+            return int(params[int_key])
+        frac = params.get(frac_key, default_frac)
+        if not (0 <= frac < 1):
+            raise ValueError(f"'{frac_key}' deve estar entre 0 e 1 (exclusivo), recebido {frac}.")
+        return int(round(frac * n))
+
+    def validate(self, inputs, params):
+        X = np.asarray(self._require_key(inputs, "X"), dtype=float)
+        sample_axis = params.get("sample_axis", 0)
+        if sample_axis >= X.ndim or sample_axis < 0:
+            raise ValueError(f"sample_axis={sample_axis} inválido para array com {X.ndim} dimensões.")
+
+        n = X.shape[sample_axis]
+        if n < 3:
+            raise ValueError(f"Kennard-Stone exige pelo menos 3 amostras no eixo de amostras (recebido {n}).")
+
+        n_train = self._resolve_count(params, "n_train", "train_size", n, default_frac=0.7)
+        n_val = self._resolve_count(params, "n_validation", "validation_size", n, default_frac=0.0)
+
+        if n_train < 2:
+            raise ValueError(f"O conjunto de treino/calibração precisa ter ao menos 2 amostras (resultou em {n_train}).")
+        if n_val < 0:
+            raise ValueError("O tamanho do conjunto de validação não pode ser negativo.")
+        if n_train + n_val >= n:
+            raise ValueError(
+                f"train+validation ({n_train + n_val}) deve ser menor que o total de amostras ({n}), "
+                "para sobrar ao menos 1 amostra no conjunto de teste."
+            )
+
+    @staticmethod
+    def _ks_order(X2d):
+        """Ordem de seleção Kennard-Stone completa (do mais prioritário ao
+        menos prioritário), via farthest-point / max-min distance sobre
+        distância Euclidiana."""
+        from scipy.spatial.distance import pdist, squareform
+        n = X2d.shape[0]
+        D = squareform(pdist(X2d, metric="euclidean"))
+
+        i0, j0 = np.unravel_index(np.argmax(D), D.shape)
+        selected = [int(i0), int(j0)]
+        remaining = set(range(n)) - set(selected)
+
+        min_dist = {k: min(D[k, selected[0]], D[k, selected[1]]) for k in remaining}
+        while remaining:
+            next_idx = max(remaining, key=lambda k: min_dist[k])
+            selected.append(next_idx)
+            remaining.remove(next_idx)
+            for k in remaining:
+                d = D[k, next_idx]
+                if d < min_dist[k]:
+                    min_dist[k] = d
+        return selected
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        sample_axis = params.get("sample_axis", 0)
+        n = X.shape[sample_axis]
+
+        n_train = self._resolve_count(params, "n_train", "train_size", n, default_frac=0.7)
+        n_val = self._resolve_count(params, "n_validation", "validation_size", n, default_frac=0.0)
+
+        # Achata tudo exceto o eixo de amostras só para CALCULAR a distância —
+        # os arrays de saída preservam o shape original, apenas filtrando o
+        # eixo de amostras (igual a selecao_amostras).
+        X_moved = np.moveaxis(X, sample_axis, 0)
+        X2d = X_moved.reshape(n, -1)
+
+        order = self._ks_order(X2d)
+        train_idx = sorted(order[:n_train])
+        rest_idx = order[n_train:]
+
+        if n_val > 0:
+            # Reaplica Kennard-Stone dentro do restante, para que a validação
+            # também cubra bem a variabilidade do que sobrou — em vez de
+            # pegar os próximos da ordem global, o que tenderia a concentrar
+            # a validação perto do conjunto de treino.
+            rest_X2d = X2d[rest_idx]
+            rest_order_local = self._ks_order(rest_X2d) if len(rest_idx) >= 3 else list(range(len(rest_idx)))
+            rest_order_global = [rest_idx[i] for i in rest_order_local]
+            validation_idx = sorted(rest_order_global[:n_val])
+            test_idx = sorted(rest_order_global[n_val:])
+        else:
+            validation_idx = []
+            test_idx = sorted(rest_idx)
+
+        def _take(idx_list):
+            return np.take(X, np.asarray(idx_list, dtype=int), axis=sample_axis)
+
+        outputs = {
+            "train": _take(train_idx),
+            "test": _take(test_idx),
+            "train_indices": train_idx,
+            "test_indices": test_idx,
+        }
+        if n_val > 0:
+            outputs["validation"] = _take(validation_idx)
+            outputs["validation_indices"] = validation_idx
+        return outputs
+
+
 # ── Reshape / Transform ──────────────────────────────────────────────────────
 
 class Transpose(BaseScript):

@@ -198,6 +198,7 @@ router.get   ('/executions/:id',                                authenticate, ex
 router.post  ('/executions/:id/cancel',                         authenticate, executionCtrl.cancelExecution);
 router.get   ('/executions/:id/nodes',                          authenticate, executionCtrl.listExecutionNodes);
 router.get   ('/executions/:id/nodes/:nid',                     authenticate, executionCtrl.getExecutionNode);
+router.post  ('/executions/:id/nodes/:nid/outputs/:port',       authenticate, executionCtrl.saveNodeOutputAsDataset);
 router.get   ('/executions/:id/logs',                           authenticate, executionCtrl.getExecutionLogs);
 router.get   ('/executions/:id/metrics',                        authenticate, metricCtrl.getExecutionMetrics);
 router.get   ('/executions/:id/nodes/:nid/metrics',             authenticate, metricCtrl.getNodeMetrics);

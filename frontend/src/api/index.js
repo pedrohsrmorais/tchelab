@@ -132,7 +132,8 @@ export const api = {
     addEdge:         (id, d)   => post(`/workflows/${id}/edges`, d),
     deleteEdge:      (id, eid) => del(`/workflows/${id}/edges/${eid}`),
 
-    validate:        (id)      => get(`/workflows/${id}/validate`),
+    // Backend registra como POST (confirmado em workflowEdge.controller.js) — GET dava 404.
+    validate:        (id)      => post(`/workflows/${id}/validate`),
     executions:      (id, p)   => get(`/workflows/${id}/executions`, p),
     dispatch:        (id, d)   => post(`/workflows/${id}/executions`, d),
   },
@@ -174,6 +175,9 @@ export const api = {
     nodes:           (id)      => get(`/executions/${id}/nodes`),
     getNode:         (id, nid) => get(`/executions/${id}/nodes/${nid}`),
     logs:            (id)      => get(`/executions/${id}/logs`),
+    // "Promove" a porta de saída de um nó já executado para um dataset
+    // nomeado de verdade. Body: { name, description?, source_dataset_id? }
+    saveNodeOutput:  (id, nodeKey, port, d) => post(`/executions/${id}/nodes/${nodeKey}/outputs/${port}`, d),
   },
 
   // ── Dataset Operations (operação rápida) ───────────────────────────────────

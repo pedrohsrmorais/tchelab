@@ -112,6 +112,37 @@ Seleciona subconjunto de variáveis por índice, range ou máscara.
 
 ---
 
+## `kennard_stone`
+
+Divide as amostras em calibração (treino), teste e, opcionalmente, validação, via algoritmo de Kennard-Stone (RW Kennard & LA Stone, 1969): seleciona iterativamente a amostra mais distante (distância Euclidiana) das já escolhidas, maximizando a cobertura da variabilidade multivariada do conjunto de calibração em vez de uma divisão aleatória. Determinístico — a mesma entrada sempre produz a mesma divisão (sem `random_state`).
+
+**Inputs:** `X` (matrix ou tensor com sample_axis definido)  
+**Parâmetros:**
+- `sample_axis` (int, default `0`) — eixo de amostras
+- `n_train` (int) ou `train_size` (float em (0,1), default `0.7`) — tamanho do conjunto de treino/calibração. `n_train` tem prioridade sobre `train_size` quando ambos são informados
+- `n_validation` (int) ou `validation_size` (float em (0,1), default `0`) — tamanho do conjunto de validação (opcional). Quando `0`, nenhum conjunto de validação é gerado e tudo que não for treino vira teste
+
+**Outputs:**
+- `train`, `test` (matrix ou tensor — mesmo shape de `X` exceto no eixo de amostras)
+- `validation` (presente apenas quando `n_validation`/`validation_size` > 0)
+- `train_indices`, `test_indices`, `validation_indices` (listas de índices originais em `X`, ordenadas)
+
+**Restrições:**
+- exige ao menos 3 amostras no `sample_axis`
+- `n_train` ≥ 2 (o algoritmo precisa de um par inicial)
+- `n_train + n_validation` < número total de amostras (sempre sobra ao menos 1 amostra de teste)
+
+**Algoritmo:**
+1. Calcula a matriz de distâncias Euclidianas entre todas as amostras (sobre `X` achatado em todos os eixos exceto `sample_axis`).
+2. Seleciona o par de amostras mais distante entre si como ponto de partida.
+3. Itera: a cada passo, escolhe entre as amostras restantes a que tem a MAIOR distância mínima até o conjunto já selecionado (farthest-point / max-min distance) — amostras "isoladas" em relação ao que já foi coberto entram primeiro.
+4. As primeiras `n_train` amostras dessa ordem formam o conjunto de treino.
+5. Se `n_validation` > 0, o mesmo algoritmo é reaplicado sobre as amostras restantes, para que a validação também cubra bem a variabilidade do que sobrou (em vez de simplesmente pegar as próximas da ordem global, o que tenderia a concentrar a validação perto do conjunto de treino). O restante final vira o conjunto de teste.
+
+**Exemplo:** 100 espectros NIR de azeite → `{n_train: 70}` seleciona os 70 espectros que melhor cobrem a variabilidade espectral do conjunto para calibração, em vez de uma amostragem aleatória 70/30.
+
+---
+
 ## `transpose`
 
 Permuta os eixos do array.

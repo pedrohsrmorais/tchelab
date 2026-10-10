@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -11,7 +11,6 @@ import {
   BackgroundVariant,
   useNodesState,
   useEdgesState,
-  addEdge,
   Handle,
   Position,
   Panel,
@@ -20,27 +19,56 @@ import '@xyflow/react/dist/style.css';
 import {
   ArrowLeft, Play, Save, Search, ChevronDown, ChevronRight,
   Database as DbIcon, X, Info, AlertCircle, CheckCircle2,
-  Settings2, Trash2, GitBranch, Loader2, ZoomIn, ZoomOut,
+  Settings2, Trash2, GitBranch, Loader2, Eye, FolderDown,
+  Clock, XCircle, Sliders,
 } from 'lucide-react';
 import { api } from '../api';
-import { useApi, useMutation } from '../hooks/useApi';
+import { useApi } from '../hooks/useApi';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import MultiDimModal from '../components/datasets/MultiDimModal';
 import {
-  FAMILIES, getFamilyConfig, getFamiliesList, isValidConnection, parseSchema, ARRAY_TYPES,
+  FAMILIES, getFamilyConfig, getFamiliesList, isValidConnection, getPorts, parseSchema, ARRAY_TYPES,
 } from '../config/techniqueRegistry';
 
 // ────────────────────────────────────────────────────────────────────────────────
-// Custom node: Dataset (nó de entrada)
+// Helpers
 // ────────────────────────────────────────────────────────────────────────────────
-function DatasetNode({ data, selected }) {
+function safeJson(v, fallback) {
+  if (v == null) return fallback;
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch { return fallback; }
+}
+
+function hexToRgb(hex) {
+  if (!hex || !hex.startsWith('#')) return '100,116,139';
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '100,116,139';
+  return `${r},${g},${b}`;
+}
+
+const EXEC_STATUS_META = {
+  pending:   { color: '#64748b', Icon: Clock,        label: 'Pendente' },
+  running:   { color: '#fbbf24', Icon: Loader2,      label: 'Executando' },
+  completed: { color: '#34d399', Icon: CheckCircle2, label: 'Concluído' },
+  failed:    { color: '#f87171', Icon: XCircle,      label: 'Falhou' },
+};
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Custom node: Dataset (nó de entrada — somente local, nunca persistido no
+// backend. O grafo real (workflow_nodes/workflow_edges) só conhece técnicas;
+// a ligação Dataset→Técnica é resolvida no momento do dispatch via
+// `dataset_bindings`, igual à "operação rápida" em datasetOperation.controller.js)
+// ────────────────────────────────────────────────────────────────────────────────
+function DatasetNode({ id, data, selected }) {
   const { data: dsRaw } = useApi(api.datasets.list, []);
   const datasets = (dsRaw?.data ?? dsRaw ?? []);
-
   const selectedDs = datasets.find(d => d.uuid === data.datasetUuid);
 
   return (
     <div style={{
-      minWidth: 200,
+      minWidth: 210,
       background: selected ? 'rgba(37,99,235,0.18)' : 'rgba(10,15,30,0.95)',
       border: `2px solid ${selected ? 'var(--accent)' : 'rgba(37,99,235,0.5)'}`,
       borderRadius: 12,
@@ -56,15 +84,34 @@ function DatasetNode({ data, selected }) {
         }}>
           <DbIcon size={13} color="#60a5fa" />
         </div>
-        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <span style={{ flex: 1, fontSize: '0.7rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Dataset
         </span>
+        <button
+          className="nodrag"
+          title="Visualizar dataset"
+          onClick={() => data.onPreview && data.onPreview(data.datasetUuid)}
+          disabled={!data.datasetUuid}
+          style={{
+            background: 'none', border: 'none', cursor: data.datasetUuid ? 'pointer' : 'default',
+            color: data.datasetUuid ? '#93c5fd' : 'var(--text-muted)', padding: 2, opacity: data.datasetUuid ? 1 : 0.4,
+          }}
+        >
+          <Eye size={13} />
+        </button>
+        <button
+          className="nodrag"
+          title="Remover nó"
+          onClick={() => data.onRemove && data.onRemove(id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
+        >
+          <Trash2 size={12} />
+        </button>
       </div>
 
-      {/* Seletor de dataset */}
       <select
         value={data.datasetUuid || ''}
-        onChange={e => data.onChange && data.onChange(e.target.value, datasets.find(d => d.uuid === e.target.value))}
+        onChange={e => data.onChange && data.onChange(id, e.target.value, datasets.find(d => d.uuid === e.target.value))}
         className="nodrag"
         style={{
           width: '100%',
@@ -85,10 +132,9 @@ function DatasetNode({ data, selected }) {
         ))}
       </select>
 
-      {/* Info do dataset selecionado */}
       {selectedDs && (
         <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-          {selectedDs.data_type || 'matrix'}{selectedDs.dimensions ? ` · ${JSON.stringify(selectedDs.dimensions)}` : ''}
+          {selectedDs.data_type || 'matrix'}{selectedDs.dimensions ? ` · ${JSON.stringify(safeJson(selectedDs.dimensions, selectedDs.dimensions))}` : ''}
         </p>
       )}
       {!data.datasetUuid && (
@@ -97,8 +143,9 @@ function DatasetNode({ data, selected }) {
         </p>
       )}
 
-      {/* Só tem saída */}
-      <Handle type="source" position={Position.Right}
+      {/* Única saída — arraste até a porta de entrada desejada de uma técnica */}
+      <Handle
+        type="source" position={Position.Right} id="out"
         style={{ background: '#3b82f6', width: 10, height: 10, border: '2px solid var(--bg-surface)' }}
       />
     </div>
@@ -106,29 +153,42 @@ function DatasetNode({ data, selected }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
-// Custom node: Technique
+// Custom node: Technique — agora com 1 Handle por porta nomeada (de verdade,
+// batendo com input_schema/output_schema do banco), em vez de um único
+// Handle genérico por lado que escondia as portas reais da técnica.
 // ────────────────────────────────────────────────────────────────────────────────
-function TechniqueNode({ data, selected }) {
+function TechniqueNode({ id, data, selected }) {
   const familyCfg = getFamilyConfig(data.family);
   const color  = familyCfg?.color  || '#64748b';
   const bg     = familyCfg?.bg     || 'rgba(100,116,139,0.1)';
   const border = familyCfg?.border || 'rgba(100,116,139,0.3)';
 
+  const inputPorts  = data.inputPorts  || [];
+  const outputPorts = data.outputPorts || [];
+  const statusMeta = data.execStatus ? EXEC_STATUS_META[data.execStatus] : null;
+
   return (
     <div style={{
-      minWidth: 200,
+      minWidth: 220,
       background: selected ? `rgba(${hexToRgb(color)},0.18)` : 'rgba(10,15,30,0.96)',
-      border: `2px solid ${selected ? color : border}`,
+      border: `2px solid ${statusMeta ? statusMeta.color : (selected ? color : border)}`,
       borderRadius: 12,
       padding: '10px 14px',
       boxShadow: selected ? `0 0 0 3px rgba(${hexToRgb(color)},0.2)` : 'var(--shadow)',
       transition: 'all 0.2s',
       position: 'relative',
     }}>
-      {/* Input handle */}
-      <Handle type="target" position={Position.Left}
-        style={{ background: color, width: 10, height: 10, border: '2px solid var(--bg-surface)' }}
-      />
+      {/* Input handles — uma por porta nomeada, distribuídas na borda esquerda */}
+      {inputPorts.map((p, i) => (
+        <Handle
+          key={`in-${p.name}`}
+          type="target" position={Position.Left} id={p.name}
+          style={{
+            background: color, width: 10, height: 10, border: '2px solid var(--bg-surface)',
+            top: inputPorts.length === 1 ? '50%' : `${((i + 1) / (inputPorts.length + 1)) * 100}%`,
+          }}
+        />
+      ))}
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -137,51 +197,82 @@ function TechniqueNode({ data, selected }) {
           background: color, flexShrink: 0,
           boxShadow: `0 0 6px ${color}`,
         }} />
-        <span style={{ fontSize: '0.65rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <span style={{ flex: 1, fontSize: '0.65rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {familyCfg?.labelStr || data.family}
         </span>
+        {statusMeta && (
+          <statusMeta.Icon
+            size={12}
+            color={statusMeta.color}
+            className={data.execStatus === 'running' ? 'anim-spin' : ''}
+          />
+        )}
+        <button
+          className="nodrag"
+          title="Configurar parâmetros"
+          onClick={() => data.onConfigure && data.onConfigure(id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}
+        >
+          <Sliders size={12} />
+        </button>
+        <button
+          className="nodrag"
+          title="Remover nó"
+          onClick={() => data.onRemove && data.onRemove(id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
+        >
+          <Trash2 size={12} />
+        </button>
       </div>
 
-      {/* Name */}
       <p style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px' }}>
         {data.label}
       </p>
-
-      {/* Slug */}
       <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: 0, fontFamily: 'var(--font-mono)' }}>
         {data.slug}
       </p>
 
-      {/* I/O chips */}
-      <div style={{ display: 'flex', gap: 4, marginTop: 7, flexWrap: 'wrap' }}>
-        {data.inputType && data.inputType !== ARRAY_TYPES.ANY && (
-          <span style={{
-            fontSize: '0.62rem', fontWeight: 600,
-            padding: '1px 6px', borderRadius: 999,
-            background: 'rgba(100,116,139,0.2)',
-            color: 'var(--text-muted)',
-            border: '1px solid rgba(100,116,139,0.25)',
-          }}>
-            IN: {data.inputType}
-          </span>
+      {/* Portas nomeadas — texto, não só o tipo, já que agora pode haver várias */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 7 }}>
+        {inputPorts.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {inputPorts.map(p => (
+              <span key={p.name} style={{
+                fontSize: '0.6rem', fontWeight: 600, padding: '1px 6px', borderRadius: 999,
+                background: 'rgba(100,116,139,0.2)', color: 'var(--text-muted)',
+                border: '1px solid rgba(100,116,139,0.25)',
+              }}>
+                {p.name}: {p.type}
+              </span>
+            ))}
+          </div>
         )}
-        {data.outputType && data.outputType !== ARRAY_TYPES.ANY && (
-          <span style={{
-            fontSize: '0.62rem', fontWeight: 600,
-            padding: '1px 6px', borderRadius: 999,
-            background: `rgba(${hexToRgb(color)},0.15)`,
-            color,
-            border: `1px solid rgba(${hexToRgb(color)},0.3)`,
-          }}>
-            OUT: {data.outputType}
-          </span>
+        {outputPorts.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {outputPorts.map(p => (
+              <span key={p.name} style={{
+                fontSize: '0.6rem', fontWeight: 600, padding: '1px 6px', borderRadius: 999,
+                background: `rgba(${hexToRgb(color)},0.15)`, color,
+                border: `1px solid rgba(${hexToRgb(color)},0.3)`,
+              }}>
+                {p.name}: {p.type}
+              </span>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Output handle */}
-      <Handle type="source" position={Position.Right}
-        style={{ background: color, width: 10, height: 10, border: '2px solid var(--bg-surface)' }}
-      />
+      {/* Output handles — uma por porta nomeada */}
+      {outputPorts.map((p, i) => (
+        <Handle
+          key={`out-${p.name}`}
+          type="source" position={Position.Right} id={p.name}
+          style={{
+            background: color, width: 10, height: 10, border: '2px solid var(--bg-surface)',
+            top: outputPorts.length === 1 ? '50%' : `${((i + 1) / (outputPorts.length + 1)) * 100}%`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -223,7 +314,6 @@ function TechniqueCard({ tech, onAdd, lang }) {
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Família */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
             <div style={{
               width: 6, height: 6, borderRadius: '50%',
@@ -233,14 +323,10 @@ function TechniqueCard({ tech, onAdd, lang }) {
               {familyCfg?.labelStr || tech.family}
             </span>
           </div>
-
-          {/* Nome */}
           <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
             {tech.name}
           </p>
         </div>
-
-        {/* Info toggle */}
         <button
           onClick={e => { e.stopPropagation(); setShowInfo(v => !v); }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, flexShrink: 0 }}
@@ -251,7 +337,6 @@ function TechniqueCard({ tech, onAdd, lang }) {
         </button>
       </div>
 
-      {/* I/O badges */}
       <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
         {inputSchema.type !== ARRAY_TYPES.ANY && (
           <span style={{ fontSize: '0.6rem', fontWeight: 600, padding: '1px 6px', borderRadius: 999, background: 'rgba(100,116,139,0.15)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }}>
@@ -270,73 +355,226 @@ function TechniqueCard({ tech, onAdd, lang }) {
         )}
       </div>
 
-      {/* Expanded info */}
-        {showInfo && (
-          <div
-            style={{ overflow: 'hidden' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-              {tech.description && (
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 6px', lineHeight: 1.5 }}>
-                  {tech.description}
+      {showInfo && (
+        <div style={{ overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+            {tech.description && (
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 6px', lineHeight: 1.5 }}>
+                {tech.description}
+              </p>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div>
+                <p style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Input</p>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', margin: 0 }}>
+                  {inputSchema.type}{inputSchema.shape && <span style={{ color: 'var(--text-muted)' }}> {inputSchema.shape}</span>}
                 </p>
-              )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                <div>
-                  <p style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
-                    Input
-                  </p>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', margin: 0 }}>
-                    {inputSchema.type}
-                    {inputSchema.shape && <span style={{ color: 'var(--text-muted)' }}> {inputSchema.shape}</span>}
-                  </p>
-                  {inputSchema.description && (
-                    <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{inputSchema.description}</p>
-                  )}
-                </div>
-                <div>
-                  <p style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
-                    Output
-                  </p>
-                  <p style={{ fontSize: '0.7rem', color: familyCfg?.color || 'var(--text-secondary)', fontFamily: 'var(--font-mono)', margin: 0 }}>
-                    {outputSchema.type}
-                    {outputSchema.shape && <span style={{ color: 'var(--text-muted)' }}> {outputSchema.shape}</span>}
-                  </p>
-                  {outputSchema.description && (
-                    <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{outputSchema.description}</p>
-                  )}
-                </div>
+                {inputSchema.description && <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{inputSchema.description}</p>}
               </div>
-
-              {tech.tags && tech.tags.length > 0 && (
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                  {(typeof tech.tags === 'string' ? JSON.parse(tech.tags) : tech.tags).map(tag => (
-                    <span key={tag} style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: 999, background: 'var(--bg-hover)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <button
-                onClick={() => onAdd(tech)}
-                style={{
-                  marginTop: 8, width: '100%', padding: '5px 0',
-                  background: familyCfg?.bg || 'rgba(37,99,235,0.1)',
-                  border: `1px solid ${familyCfg?.border || 'var(--border-active)'}`,
-                  borderRadius: 7, cursor: 'pointer',
-                  fontSize: '0.74rem', fontWeight: 600,
-                  color: familyCfg?.color || 'var(--text-accent)',
-                  transition: 'opacity 0.15s',
-                }}
-              >
-                + Adicionar ao canvas
-              </button>
+              <div>
+                <p style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Output</p>
+                <p style={{ fontSize: '0.7rem', color: familyCfg?.color || 'var(--text-secondary)', fontFamily: 'var(--font-mono)', margin: 0 }}>
+                  {outputSchema.type}{outputSchema.shape && <span style={{ color: 'var(--text-muted)' }}> {outputSchema.shape}</span>}
+                </p>
+                {outputSchema.description && <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{outputSchema.description}</p>}
+              </div>
             </div>
+            {tech.tags && tech.tags.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                {safeJson(tech.tags, []).map(tag => (
+                  <span key={tag} style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: 999, background: 'var(--bg-hover)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => onAdd(tech)}
+              style={{
+                marginTop: 8, width: '100%', padding: '5px 0',
+                background: familyCfg?.bg || 'rgba(37,99,235,0.1)',
+                border: `1px solid ${familyCfg?.border || 'var(--border-active)'}`,
+                borderRadius: 7, cursor: 'pointer',
+                fontSize: '0.74rem', fontWeight: 600,
+                color: familyCfg?.color || 'var(--text-accent)',
+                transition: 'opacity 0.15s',
+              }}
+            >
+              + Adicionar ao canvas
+            </button>
           </div>
-        )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Painel de configuração de parâmetros de um nó técnica
+// ────────────────────────────────────────────────────────────────────────────────
+function NodeConfigPanel({ node, onClose, onSave, saving }) {
+  const schema = node?.data?.parameterSchema || {};
+  const [values, setValues] = useState(() => ({ ...(node?.data?.parameters || {}) }));
+
+  useEffect(() => {
+    setValues({ ...(node?.data?.parameters || {}) });
+  }, [node?.id]);
+
+  if (!node) return null;
+  const fields = Object.entries(schema);
+
+  return (
+    <div style={{
+      width: 280, background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+      borderRadius: 10, padding: 12, boxShadow: 'var(--shadow)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <Sliders size={13} style={{ color: 'var(--text-accent)' }} />
+        <span style={{ flex: 1, fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          {node.data.label}
+        </span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <X size={13} />
+        </button>
+      </div>
+
+      {fields.length === 0 && (
+        <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Esta técnica não tem parâmetros configuráveis.</p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+        {fields.map(([key, spec]) => {
+          const type = spec?.type;
+          const isNumber = type === 'number' || type === 'integer';
+          return (
+            <div key={key}>
+              <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 2 }}>
+                {key}{spec?.description ? ` — ${spec.description}` : ''}
+              </label>
+              <input
+                className="input-field"
+                style={{ fontSize: '0.76rem', padding: '4px 8px' }}
+                type={isNumber ? 'number' : 'text'}
+                step={type === 'number' ? 'any' : undefined}
+                placeholder={spec?.default !== undefined ? String(spec.default) : ''}
+                value={values[key] ?? ''}
+                onChange={e => {
+                  const raw = e.target.value;
+                  setValues(prev => ({
+                    ...prev,
+                    [key]: raw === '' ? undefined : (isNumber ? Number(raw) : raw),
+                  }));
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+        <button onClick={onClose} className="btn-ghost" style={{ flex: 1, fontSize: '0.74rem', justifyContent: 'center' }}>
+          Cancelar
+        </button>
+        <button
+          onClick={() => onSave(node.id, Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined)))}
+          disabled={saving}
+          className="btn-primary"
+          style={{ flex: 1, fontSize: '0.74rem', justifyContent: 'center' }}
+        >
+          {saving ? <Loader2 size={12} className="anim-spin" /> : 'Salvar'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Painel de resultados da execução — lista os nós executados e suas portas de
+// saída, com ações "Visualizar" (abre o MultiDimModal sem precisar virar
+// dataset) e "Salvar como dataset" (promove a porta via
+// POST /executions/:id/nodes/:nid/outputs/:port — permite, por exemplo,
+// salvar train/validation/test do kennard_stone como 3 datasets nomeados).
+// ────────────────────────────────────────────────────────────────────────────────
+function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
+  if (!execution) return null;
+  const nodes = execution.nodes || [];
+
+  return (
+    <div style={{
+      width: 340, maxHeight: 'calc(100% - 24px)', overflowY: 'auto',
+      background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+      borderRadius: 10, padding: 12, boxShadow: 'var(--shadow)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <GitBranch size={13} style={{ color: 'var(--text-accent)' }} />
+        <span style={{ flex: 1, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          Execução #{execution.id ?? execution.uuid}
+        </span>
+        <span style={{
+          fontSize: '0.64rem', fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+          color: EXEC_STATUS_META[execution.status]?.color || 'var(--text-muted)',
+          background: 'rgba(255,255,255,0.05)',
+        }}>
+          {execution.status}
+        </span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <X size={13} />
+        </button>
+      </div>
+
+      {nodes.map(n => {
+        const meta = EXEC_STATUS_META[n.status] || EXEC_STATUS_META.pending;
+        const outputs = n.status === 'completed' ? safeJson(n.output_data, {}) : {};
+        const ports = Object.keys(outputs);
+        return (
+          <div key={n.id} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <meta.Icon size={12} color={meta.color} className={n.status === 'running' ? 'anim-spin' : ''} />
+              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {n.node_name || n.technique_slug}
+              </span>
+              <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>({n.node_key})</span>
+            </div>
+
+            {n.status === 'failed' && n.error_message && (
+              <p style={{ fontSize: '0.7rem', color: '#fca5a5', margin: '2px 0 4px' }}>{n.error_message}</p>
+            )}
+
+            {ports.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {ports.map(port => (
+                  <div key={port} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 8px',
+                  }}>
+                    <span style={{ flex: 1, fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                      {port}
+                    </span>
+                    <button
+                      title="Visualizar"
+                      onClick={() => onPreviewPort(n, port, outputs[port])}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', padding: 2 }}
+                    >
+                      <Eye size={13} />
+                    </button>
+                    <button
+                      title="Salvar como dataset"
+                      onClick={() => onSavePort(n, port)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6ee7b7', padding: 2 }}
+                    >
+                      <FolderDown size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {nodes.length === 0 && (
+        <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Nenhum nó executado ainda.</p>
+      )}
     </div>
   );
 }
@@ -349,104 +587,294 @@ export default function WorkflowEditorPage() {
   const { t, i18n } = useTranslation();
   const lang         = i18n.language || 'pt';
 
-  // ReactFlow state
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
+  const [edges, setEdges, onEdgesChangeBase] = useEdgesState([]);
 
-  // Painel lateral
   const [panelOpen,      setPanelOpen]   = useState(true);
   const [searchQuery,    setSearchQuery] = useState('');
   const [selectedFamily, setFamily]      = useState('');
   const [familiesOpen,   setFamsOpen]    = useState({});
 
-  // Validação
   const [errors, setErrors]     = useState([]);
   const [executing, setExec]    = useState(false);
-  const [saving, setSaving]     = useState(false);
 
-  // Node counter para IDs únicos
+  // Dataset→Técnica: ligação só existe no frontend (não há nó de dataset no
+  // grafo do backend — ver dispatchExecutionCore/dataset_bindings). Guardamos
+  // qual (nó técnica, porta) está ligado a qual nó-dataset do canvas.
+  // Formato: { [techNodeKey]: { [portName]: datasetNodeId } }
+  const [datasetBindings, setDatasetBindings] = useState({});
+
+  // Execução + polling
+  const [execution, setExecution]   = useState(null);
+  const [showResults, setShowResults] = useState(false);
+  const pollRef = useRef(null);
+
+  // Config de parâmetros de nó
+  const [configNodeId, setConfigNodeId] = useState(null);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  // Preview de dataset (nó dataset OU porta de resultado)
+  const [previewDataset, setPreviewDataset] = useState(null);
+
   const nodeCount = useRef(0);
 
   // ── Load workflow ────────────────────────────────────────────────────────────
   const { data: raw, loading } = useApi(() => api.workflows.get(id), [id]);
-  const { data: nodesRaw }     = useApi(() => api.workflows.nodes(id), [id]);
-  const { data: edgesRaw }     = useApi(() => api.workflows.edges(id), [id]);
+  const { data: nodesRaw, refetch: refetchNodes } = useApi(() => api.workflows.nodes(id), [id]);
+  const { data: edgesRaw, refetch: refetchEdges } = useApi(() => api.workflows.edges(id), [id]);
 
-  // ── Load techniques from API ─────────────────────────────────────────────────
   const { data: techsRaw, loading: techsLoading } = useApi(() =>
     api.techniques.list({ limit: 500, is_custom: false }), []
   );
   const techniques = (techsRaw?.data ?? techsRaw ?? []);
+
+  // ── Dataset node callbacks (refs para não recriar nodes a cada render) ──────
+  const onDatasetChangeRef = useRef(null);
+  onDatasetChangeRef.current = (nodeId, uuid, dsObj) => {
+    setNodes(prev => prev.map(n =>
+      n.id === nodeId
+        ? { ...n, data: { ...n.data, datasetUuid: uuid, label: dsObj?.name || 'Dataset de entrada' } }
+        : n
+    ));
+  };
+  const onPreviewRef = useRef(null);
+  onPreviewRef.current = async (datasetUuid) => {
+    if (!datasetUuid) return;
+    try {
+      const res = await api.datasets.get(datasetUuid);
+      setPreviewDataset(res?.data?.data ?? res?.data ?? res);
+    } catch {
+      toast.error('Não foi possível carregar o dataset.');
+    }
+  };
+  const onRemoveNodeRef = useRef(null);
+  onRemoveNodeRef.current = (nodeId) => removeNode(nodeId);
+  const onConfigureRef = useRef(null);
+  onConfigureRef.current = (nodeId) => setConfigNodeId(nodeId);
 
   // ── Populate ReactFlow from existing workflow nodes/edges ────────────────────
   useEffect(() => {
     if (!nodesRaw) return;
     const list = nodesRaw?.data ?? nodesRaw ?? [];
     const rfNodes = list.map((n, i) => ({
-      id:       String(n.id || n.uuid || i),
+      id:       String(n.node_key),
       type:     'technique',
-      position: { x: 260 + i * 230, y: 180 },
+      position: {
+        x: n.position_x != null ? Number(n.position_x) : 260 + i * 260,
+        y: n.position_y != null ? Number(n.position_y) : 180,
+      },
       data: {
-        label:      n.name,
-        slug:       n.technique_slug || n.node_key,
-        family:     n.family || '',
-        inputType:  parseSchema(n.input_schema).type,
-        outputType: parseSchema(n.output_schema).type,
+        label:          n.name || n.technique_name,
+        slug:           n.technique_slug,
+        family:         n.family || '',
+        techUuid:       n.technique_id,
+        inputPorts:     getPorts(n.input_schema),
+        outputPorts:    getPorts(n.output_schema),
+        parameters:     safeJson(n.parameters, {}),
+        parameterSchema: safeJson(n.parameter_schema, {}),
+        onRemove:    (nid) => onRemoveNodeRef.current?.(nid),
+        onConfigure: (nid) => onConfigureRef.current?.(nid),
       },
     }));
-    if (rfNodes.length > 0) {
-      setNodes(prev => [...datasetStarterNode(), ...rfNodes]);
-    } else {
-      setNodes(datasetStarterNode());
-    }
+    setNodes(prev => {
+      const datasetNodes = prev.filter(n => n.type === 'dataset');
+      if (rfNodes.length === 0 && datasetNodes.length === 0) {
+        return [defaultDatasetNode()];
+      }
+      return [...datasetNodes.length ? datasetNodes : [defaultDatasetNode()], ...rfNodes];
+    });
     nodeCount.current = rfNodes.length + 1;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodesRaw]);
 
   useEffect(() => {
     if (!edgesRaw) return;
     const list = edgesRaw?.data ?? edgesRaw ?? [];
     const rfEdges = list.map(e => ({
-      id:     `e-${e.source_node_key}-${e.target_node_key}`,
-      source: String(e.source_node_key),
-      target: String(e.target_node_key),
+      id:           `e-${e.id}`,
+      source:       String(e.source_node_key),
+      sourceHandle: e.source_port,
+      target:       String(e.target_node_key),
+      targetHandle: e.target_port,
       animated: true,
       style: { stroke: 'var(--accent)', strokeWidth: 2 },
+      data: { backendId: e.id },
     }));
-    setEdges(rfEdges);
+    setEdges(prev => {
+      const bindingEdges = prev.filter(e => e.data?.isDatasetBinding);
+      return [...rfEdges, ...bindingEdges];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edgesRaw]);
 
-  // ── Dataset starter node ─────────────────────────────────────────────────────
-  // Usamos uma ref para o callback para evitar recriar os nodes a cada render
-  const onDatasetChangeRef = useRef(null);
-  onDatasetChangeRef.current = (uuid, dsObj) => {
-    setNodes(prev => prev.map(n =>
-      n.id === 'dataset-0'
-        ? { ...n, data: { ...n.data, datasetUuid: uuid, label: dsObj?.name || 'Dataset de entrada' } }
-        : n
-    ));
-  };
-
-  function datasetStarterNode() {
-    return [{
+  function defaultDatasetNode() {
+    return {
       id:       'dataset-0',
       type:     'dataset',
       position: { x: 40, y: 180 },
       data: {
         label: 'Dataset de entrada',
-        outputType: ARRAY_TYPES.DATASET,
         datasetUuid: '',
-        onChange: (uuid, dsObj) => onDatasetChangeRef.current?.(uuid, dsObj),
+        onChange:  (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
+        onPreview: (uuid) => onPreviewRef.current?.(uuid),
+        onRemove:  (nid) => onRemoveNodeRef.current?.(nid),
       },
-    }];
+    };
   }
 
-  // ── onConnect — valida compatibilidade ───────────────────────────────────────
+  // ── Deriva as arestas visuais de ligação Dataset→Técnica a partir do
+  //    estado datasetBindings + da lista atual de nós (para refletir trocas
+  //    de dataset selecionado em tempo real) ───────────────────────────────────
+  useEffect(() => {
+    setEdges(prev => {
+      const real = prev.filter(e => !e.data?.isDatasetBinding);
+      const binding = [];
+      for (const [techNodeKey, ports] of Object.entries(datasetBindings)) {
+        for (const [portName, datasetNodeId] of Object.entries(ports)) {
+          if (!datasetNodeId) continue;
+          binding.push({
+            id: `dsedge-${techNodeKey}-${portName}`,
+            source: datasetNodeId,
+            sourceHandle: 'out',
+            target: techNodeKey,
+            targetHandle: portName,
+            animated: true,
+            style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '4 3' },
+            data: { isDatasetBinding: true },
+          });
+        }
+      }
+      return [...real, ...binding];
+    });
+  }, [datasetBindings, setEdges]);
+
+  // ── Remoção de nó (dataset ou técnica), com limpeza em cascata ──────────────
+  const removeNode = useCallback((nodeId) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    if (node.type === 'technique') {
+      api.workflows.deleteNode(id, nodeId).catch(() => {
+        toast.error('Não foi possível remover o nó no servidor.');
+      });
+      // Remove arestas reais conectadas a este nó (local + backend)
+      edges.forEach(e => {
+        if ((e.source === nodeId || e.target === nodeId) && e.data?.backendId) {
+          api.workflows.deleteEdge(id, e.data.backendId).catch(() => {});
+        }
+      });
+      setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId));
+      setDatasetBindings(prev => {
+        const next = { ...prev };
+        delete next[nodeId];
+        return next;
+      });
+    } else {
+      // Nó dataset: remove qualquer binding que aponte para ele
+      setDatasetBindings(prev => {
+        const next = {};
+        for (const [techKey, ports] of Object.entries(prev)) {
+          const filtered = Object.fromEntries(Object.entries(ports).filter(([, dnId]) => dnId !== nodeId));
+          if (Object.keys(filtered).length) next[techKey] = filtered;
+        }
+        return next;
+      });
+    }
+    setNodes(nds => nds.filter(n => n.id !== nodeId));
+  }, [nodes, edges, id, setEdges, setNodes]);
+
+  // ── onNodesChange: aplica o default do React Flow + sincroniza remoções ────
+  const onNodesChange = useCallback((changes) => {
+    changes.forEach(ch => {
+      if (ch.type === 'remove') removeNode(ch.id);
+    });
+    onNodesChangeBase(changes.filter(ch => ch.type !== 'remove'));
+  }, [onNodesChangeBase, removeNode]);
+
+  // ── onNodeDragStop: persiste a posição final (evita 1 request por pixel) ───
+  const onNodeDragStop = useCallback((_evt, node) => {
+    if (node.type !== 'technique') return;
+    api.workflows.updateNode(id, node.id, {
+      position_x: Math.round(node.position.x),
+      position_y: Math.round(node.position.y),
+    }).catch(() => {
+      toast.error('Não foi possível salvar a posição do nó.');
+    });
+  }, [id]);
+
+  // ── onEdgesChange: aplica o default + sincroniza remoções ───────────────────
+  const onEdgesChange = useCallback((changes) => {
+    changes.forEach(ch => {
+      if (ch.type !== 'remove') return;
+      const edge = edges.find(e => e.id === ch.id);
+      if (!edge) return;
+      if (edge.data?.isDatasetBinding) {
+        setDatasetBindings(prev => {
+          const next = { ...prev };
+          if (next[edge.target]) {
+            const ports = { ...next[edge.target] };
+            delete ports[edge.targetHandle];
+            if (Object.keys(ports).length) next[edge.target] = ports; else delete next[edge.target];
+          }
+          return next;
+        });
+      } else if (edge.data?.backendId) {
+        api.workflows.deleteEdge(id, edge.data.backendId).catch(() => {
+          toast.error('Não foi possível remover a conexão no servidor.');
+        });
+      }
+    });
+    onEdgesChangeBase(changes);
+  }, [edges, id, onEdgesChangeBase]);
+
+  // ── onConnect — valida compatibilidade por PORTA e sincroniza com backend ───
   const onConnect = useCallback((params) => {
     const sourceNode = nodes.find(n => n.id === params.source);
     const targetNode = nodes.find(n => n.id === params.target);
     if (!sourceNode || !targetNode) return;
+    if (targetNode.type !== 'technique') {
+      toast.error('Só é possível conectar a entrada de uma técnica.');
+      return;
+    }
 
-    const { valid, reason } = isValidConnection(sourceNode, targetNode);
+    const targetPort = params.targetHandle || 'value';
+    const tgtPortDef = (targetNode.data.inputPorts || []).find(p => p.name === targetPort);
+    const tgtType = tgtPortDef?.type || ARRAY_TYPES.ANY;
+
+    // Cada porta de entrada só aceita 1 ligação — remove a anterior (binding
+    // de dataset ou aresta real) antes de aceitar a nova.
+    const dropExisting = () => {
+      setDatasetBindings(prev => {
+        if (!prev[targetNode.id]?.[targetPort]) return prev;
+        const next = { ...prev, [targetNode.id]: { ...prev[targetNode.id] } };
+        delete next[targetNode.id][targetPort];
+        return next;
+      });
+      const existingEdge = edges.find(e => e.target === targetNode.id && e.targetHandle === targetPort && !e.data?.isDatasetBinding);
+      if (existingEdge?.data?.backendId) {
+        api.workflows.deleteEdge(id, existingEdge.data.backendId).catch(() => {});
+        setEdges(eds => eds.filter(e => e.id !== existingEdge.id));
+      }
+    };
+
+    if (sourceNode.type === 'dataset') {
+      const { valid, reason } = isValidConnection(ARRAY_TYPES.DATASET, tgtType);
+      if (!valid) {
+        toast.error(`Nó "${targetNode.data?.label}": ${reason}`, { duration: 4000 });
+        return;
+      }
+      dropExisting();
+      setDatasetBindings(prev => ({
+        ...prev,
+        [targetNode.id]: { ...(prev[targetNode.id] || {}), [targetPort]: sourceNode.id },
+      }));
+      setErrors(prev => prev.filter(e => !e.includes(targetNode.data?.label)));
+      return;
+    }
+
+    const sourcePort = params.sourceHandle || 'value';
+    const srcPortDef = (sourceNode.data.outputPorts || []).find(p => p.name === sourcePort);
+    const { valid, reason } = isValidConnection(srcPortDef?.type, tgtType);
     if (!valid) {
       const msg = `Nó "${targetNode.data?.label}": ${reason}`;
       toast.error(msg, { duration: 4000 });
@@ -454,69 +882,190 @@ export default function WorkflowEditorPage() {
       return;
     }
 
-    setEdges(eds => addEdge({
-      ...params,
-      animated: true,
-      style: { stroke: 'var(--accent)', strokeWidth: 2 },
-    }, eds));
-    setErrors(prev => prev.filter(e => !e.includes(targetNode.data?.label)));
-  }, [nodes, setEdges]);
+    dropExisting();
+    api.workflows.addEdge(id, {
+      source_node_key: sourceNode.id,
+      source_port:      sourcePort,
+      target_node_key: targetNode.id,
+      target_port:      targetPort,
+    }).then(res => {
+      const row = res?.data?.data ?? res?.data ?? res;
+      setEdges(eds => [...eds, {
+        id: `e-${row.id}`,
+        source: sourceNode.id, sourceHandle: sourcePort,
+        target: targetNode.id, targetHandle: targetPort,
+        animated: true, style: { stroke: 'var(--accent)', strokeWidth: 2 },
+        data: { backendId: row.id },
+      }]);
+      setErrors(prev => prev.filter(e => !e.includes(targetNode.data?.label)));
+    }).catch(err => {
+      const msg = err?.response?.data?.error?.details?.[0]?.message
+        || err?.response?.data?.error?.message
+        || 'O servidor rejeitou esta conexão.';
+      toast.error(msg, { duration: 4500 });
+      setErrors(prev => [...prev.filter(e => e !== msg), msg]);
+    });
+  }, [nodes, edges, id, setEdges]);
 
-  // ── Adicionar técnica ao canvas ──────────────────────────────────────────────
+  // ── Adicionar técnica ao canvas (cria de verdade no backend) ────────────────
   const handleAddTechnique = useCallback((tech) => {
     nodeCount.current += 1;
-    const nodeId    = `tech-${nodeCount.current}`;
-    const inputSch  = parseSchema(tech.input_schema);
-    const outputSch = parseSchema(tech.output_schema);
+    const nodeKey = `${tech.slug}_${Date.now().toString(36)}${nodeCount.current}`;
+    const position = { x: 300 + (nodeCount.current % 4) * 240, y: 140 + Math.floor(nodeCount.current / 4) * 160 };
 
-    const newNode = {
-      id:       nodeId,
-      type:     'technique',
-      position: { x: 260 + (nodeCount.current - 1) * 230, y: 160 + (nodeCount.current % 3) * 60 },
-      data: {
-        label:      tech.name,
-        slug:       tech.slug,
-        family:     tech.family,
-        inputType:  inputSch.type,
-        outputType: outputSch.type,
-        techId:     tech.uuid,
-      },
-    };
-    setNodes(prev => [...prev, newNode]);
-    toast.success(`${tech.name} adicionado`, { duration: 2000 });
-  }, [setNodes]);
+    api.workflows.addNode(id, {
+      technique_id: tech.uuid,
+      node_key: nodeKey,
+      name: tech.name,
+      parameters: {},
+      position_x: position.x,
+      position_y: position.y,
+    }).then(() => {
+      setNodes(prev => [...prev, {
+        id: nodeKey,
+        type: 'technique',
+        position,
+        data: {
+          label: tech.name,
+          slug: tech.slug,
+          family: tech.family,
+          techUuid: tech.uuid,
+          inputPorts: getPorts(tech.input_schema),
+          outputPorts: getPorts(tech.output_schema),
+          parameters: {},
+          parameterSchema: safeJson(tech.parameter_schema, {}),
+          onRemove: (nid) => onRemoveNodeRef.current?.(nid),
+          onConfigure: (nid) => onConfigureRef.current?.(nid),
+        },
+      }]);
+      toast.success(`${tech.name} adicionado`, { duration: 2000 });
+    }).catch(() => {
+      toast.error('Não foi possível adicionar a técnica ao workflow.');
+    });
+  }, [id, setNodes]);
 
-  // ── Execute ──────────────────────────────────────────────────────────────────
+  // ── Salvar parâmetros de um nó ───────────────────────────────────────────────
+  const handleSaveNodeConfig = useCallback(async (nodeId, parameters) => {
+    setSavingConfig(true);
+    try {
+      await api.workflows.updateNode(id, nodeId, { parameters });
+      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data: { ...n.data, parameters } } : n));
+      toast.success('Parâmetros salvos.');
+      setConfigNodeId(null);
+    } catch {
+      toast.error('Não foi possível salvar os parâmetros.');
+    } finally {
+      setSavingConfig(false);
+    }
+  }, [id, setNodes]);
+
+  // ── Execute: resolve dataset_bindings (uuid → tensor real) e dispara ───────
   const handleDispatch = async () => {
+    if (errors.length > 0) {
+      toast.error('Corrija os erros de conexão antes de executar.');
+      return;
+    }
     setExec(true);
     try {
-      await api.workflows.dispatch(id, {});
+      const resolvedBindings = {};
+      for (const [techNodeKey, ports] of Object.entries(datasetBindings)) {
+        resolvedBindings[techNodeKey] = {};
+        for (const [portName, datasetNodeId] of Object.entries(ports)) {
+          const dsNode = nodes.find(n => n.id === datasetNodeId);
+          const uuid = dsNode?.data?.datasetUuid;
+          if (!uuid) continue;
+          const dsRes = await api.datasets.get(uuid);
+          const dsRow = dsRes?.data?.data ?? dsRes?.data ?? dsRes;
+          const meta = safeJson(dsRow?.metadata, {});
+          const tensor = meta?.data?.tensor ?? meta?.data?.matrix ?? null;
+          if (!tensor) {
+            toast.error(`O dataset ligado à porta "${portName}" não tem dados numéricos.`);
+            setExec(false);
+            return;
+          }
+          resolvedBindings[techNodeKey][portName] = tensor;
+        }
+      }
+
+      const res = await api.workflows.dispatch(id, { dataset_bindings: resolvedBindings });
+      const payload = res?.data?.data ?? res?.data ?? res;
       toast.success(t('workflows.executionStarted'));
-    } catch {
-      toast.error(t('common.error'));
+      setShowResults(true);
+      startPolling(payload.execution_id);
+    } catch (err) {
+      const msg = err?.response?.data?.error?.details?.[0]?.message
+        || err?.response?.data?.error?.message
+        || t('common.error');
+      toast.error(msg);
     } finally {
       setExec(false);
     }
   };
 
-  // ── Salvar (sync nodes/edges para o backend) ─────────────────────────────────
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      // Por enquanto: snapshot da versão atual
-      await api.workflows.snapshot(id);
-      toast.success('Snapshot salvo!');
-    } catch {
-      toast.error(t('common.error'));
-    } finally {
-      setSaving(false);
-    }
-  };
+  const startPolling = useCallback((executionId) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    const tick = async () => {
+      try {
+        const res = await api.executions.get(executionId);
+        const execData = res?.data?.data ?? res?.data ?? res;
+        setExecution(execData);
 
-  // ── Famílias para o painel ───────────────────────────────────────────────────
+        // Reflete status por nó visualmente no canvas
+        const statusByKey = {};
+        (execData.nodes || []).forEach(n => { statusByKey[n.node_key] = n.status; });
+        setNodes(prev => prev.map(n =>
+          n.type === 'technique'
+            ? { ...n, data: { ...n.data, execStatus: statusByKey[n.id] || n.data.execStatus } }
+            : n
+        ));
+
+        const terminal = ['completed', 'failed', 'cancelled'];
+        if (terminal.includes(execData.status)) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          if (execData.status === 'completed') toast.success('Execução concluída!');
+          else if (execData.status === 'failed') toast.error('A execução terminou com erro em algum nó.');
+        }
+      } catch {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+    tick();
+    pollRef.current = setInterval(tick, 1500);
+  }, [setNodes]);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  // ── Resultados: visualizar porta / salvar porta como dataset ───────────────
+  const handlePreviewPort = useCallback((execNode, port, value) => {
+    const dims = (() => {
+      const d = []; let cur = value;
+      while (Array.isArray(cur)) { d.push(cur.length); cur = cur[0]; }
+      return d;
+    })();
+    setPreviewDataset({
+      name: `${execNode.node_name || execNode.technique_slug} · ${port}`,
+      dimensions: dims,
+      metadata: { data: { tensor: value } },
+    });
+  }, []);
+
+  const handleSavePort = useCallback((execNode, port) => {
+    const name = window.prompt(`Nome do dataset para a porta "${port}" (ex: "treino", "validação", "teste"):`, `${execNode.node_name || execNode.technique_slug}_${port}`);
+    if (!name || !name.trim()) return;
+    // A rota exige o UUID da execução (resolveExecution busca por `uuid`,
+    // não pelo id numérico) — execution.id é a PK numérica, não serve aqui.
+    api.executions.saveNodeOutput(execution?.uuid, execNode.node_key, port, { name: name.trim() })
+      .then(() => toast.success(`Dataset "${name.trim()}" salvo!`))
+      .catch(err => {
+        const msg = err?.response?.data?.error?.details?.[0]?.message || 'Não foi possível salvar este output como dataset.';
+        toast.error(msg);
+      });
+  }, [execution]);
+
+  // ── Famílias e filtro do painel lateral ─────────────────────────────────────
   const families = getFamiliesList(lang);
-
-  // ── Filtrar técnicas ─────────────────────────────────────────────────────────
   const filteredTechs = techniques.filter(tech => {
     const matchFamily = !selectedFamily || tech.family === selectedFamily || tech.family?.includes(selectedFamily);
     const q = searchQuery.toLowerCase().trim();
@@ -527,16 +1076,13 @@ export default function WorkflowEditorPage() {
       || tech.tags?.toString().toLowerCase().includes(q);
     return matchFamily && matchSearch;
   });
-
-  // Agrupa por família para exibição em accordions
   const groupedByFamily = families.map(fam => ({
     ...fam,
-    techs: filteredTechs.filter(t =>
-      t.family === fam.slug || t.family === fam.slug.replace(/^\d+_/, '')
-    ),
+    techs: filteredTechs.filter(t => t.family === fam.slug || t.family === fam.slug.replace(/^\d+_/, '')),
   })).filter(g => g.techs.length > 0);
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  const configNode = nodes.find(n => n.id === configNodeId);
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -576,32 +1122,29 @@ export default function WorkflowEditorPage() {
           )}
         </div>
 
-        {/* Errors indicator */}
         {errors.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fca5a5', fontSize: '0.74rem' }}>
             <AlertCircle size={13} />
             <span>{errors.length} erro{errors.length > 1 ? 's' : ''}</span>
           </div>
         )}
-        {errors.length === 0 && nodes.length > 1 && (
+        {errors.length === 0 && nodes.filter(n => n.type === 'technique').length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#6ee7b7', fontSize: '0.74rem' }}>
             <CheckCircle2 size={13} />
             <span>Pipeline válido</span>
           </div>
         )}
 
-        <button
-          onClick={() => setPanelOpen(v => !v)}
-          className="btn-ghost"
-          style={{ fontSize: '0.78rem', gap: 5 }}
-        >
+        {execution && (
+          <button onClick={() => setShowResults(v => !v)} className="btn-ghost" style={{ fontSize: '0.78rem', gap: 5 }}>
+            <GitBranch size={14} />
+            {showResults ? 'Ocultar resultados' : 'Resultados'}
+          </button>
+        )}
+
+        <button onClick={() => setPanelOpen(v => !v)} className="btn-ghost" style={{ fontSize: '0.78rem', gap: 5 }}>
           <Settings2 size={14} />
           {panelOpen ? 'Ocultar técnicas' : 'Técnicas'}
-        </button>
-
-        <button onClick={handleSave} disabled={saving} className="btn-ghost" style={{ fontSize: '0.78rem', gap: 5 }}>
-          {saving ? <Loader2 size={13} className="anim-spin" /> : <Save size={13} />}
-          {t('workflows.save')}
         </button>
 
         <button
@@ -625,6 +1168,7 @@ export default function WorkflowEditorPage() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodeDragStop={onNodeDragStop}
             onConnect={onConnect}
             nodeTypes={NODE_TYPES}
             fitView
@@ -647,34 +1191,26 @@ export default function WorkflowEditorPage() {
               style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}
             />
 
-            {/* Empty state */}
-            {nodes.length <= 1 && (
+            {nodes.filter(n => n.type === 'technique').length === 0 && (
               <Panel position="top-center">
-                <div
-                  style={{
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 10, padding: '10px 18px',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    color: 'var(--text-secondary)', fontSize: '0.8rem',
-                  }}
-                >
+                <div style={{
+                  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '10px 18px',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  color: 'var(--text-secondary)', fontSize: '0.8rem',
+                }}>
                   <GitBranch size={14} />
                   <span>Arraste técnicas do painel lateral para o canvas</span>
                 </div>
               </Panel>
             )}
 
-            {/* Error list */}
             {errors.length > 0 && (
               <Panel position="bottom-left">
-                <div
-                  style={{
-                    background: 'rgba(239,68,68,0.08)',
-                    border: '1px solid rgba(239,68,68,0.3)',
-                    borderRadius: 10, padding: '8px 12px', maxWidth: 320,
-                  }}
-                >
+                <div style={{
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: 10, padding: '8px 12px', maxWidth: 320,
+                }}>
                   {errors.map((e, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: '0.72rem', color: '#fca5a5', marginBottom: i < errors.length - 1 ? 4 : 0 }}>
                       <AlertCircle size={11} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -684,165 +1220,157 @@ export default function WorkflowEditorPage() {
                 </div>
               </Panel>
             )}
+
+            {configNode && (
+              <Panel position="top-right">
+                <NodeConfigPanel node={configNode} onClose={() => setConfigNodeId(null)} onSave={handleSaveNodeConfig} saving={savingConfig} />
+              </Panel>
+            )}
+
+            {showResults && execution && !configNode && (
+              <Panel position="top-right">
+                <ResultsPanel
+                  execution={execution}
+                  onClose={() => setShowResults(false)}
+                  onPreviewPort={handlePreviewPort}
+                  onSavePort={handleSavePort}
+                />
+              </Panel>
+            )}
           </ReactFlow>
         </div>
 
         {/* ── Painel de técnicas ──────────────────────────────────────────────── */}
-          {panelOpen && (
-            <aside
-              style={{
-                width: 300,
-                background: 'var(--bg-surface)',
-                borderLeft: '1px solid var(--border)',
-                display: 'flex', flexDirection: 'column',
-                overflow: 'hidden', flexShrink: 0,
-              }}
-            >
-              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
-                {/* Search */}
-                <div style={{ position: 'relative', marginBottom: 10 }}>
-                  <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                  <input
-                    className="input-field"
-                    style={{ paddingLeft: 30, paddingTop: '0.5rem', paddingBottom: '0.5rem', fontSize: '0.8rem' }}
-                    placeholder={t('workflows.searchTechnique')}
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
+        {panelOpen && (
+          <aside style={{
+            width: 300, background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
+          }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
+              <div style={{ position: 'relative', marginBottom: 10 }}>
+                <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                <input
+                  className="input-field"
+                  style={{ paddingLeft: 30, paddingTop: '0.5rem', paddingBottom: '0.5rem', fontSize: '0.8rem' }}
+                  placeholder={t('workflows.searchTechnique')}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
 
-                {/* Family filter pills */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                <button
+                  onClick={() => setFamily('')}
+                  style={{
+                    fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px', borderRadius: 999,
+                    background: !selectedFamily ? 'var(--accent)' : 'var(--bg-hover)',
+                    color: !selectedFamily ? '#fff' : 'var(--text-muted)',
+                    border: `1px solid ${!selectedFamily ? 'var(--accent)' : 'var(--border)'}`,
+                    cursor: 'pointer', transition: 'all 0.14s',
+                  }}
+                >
+                  {t('workflows.allFamilies')}
+                </button>
+                {families.map(fam => (
                   <button
-                    onClick={() => setFamily('')}
+                    key={fam.slug}
+                    onClick={() => setFamily(fam.slug === selectedFamily ? '' : fam.slug)}
                     style={{
-                      fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px', borderRadius: 999,
-                      background: !selectedFamily ? 'var(--accent)' : 'var(--bg-hover)',
-                      color: !selectedFamily ? '#fff' : 'var(--text-muted)',
-                      border: `1px solid ${!selectedFamily ? 'var(--accent)' : 'var(--border)'}`,
-                      cursor: 'pointer', transition: 'all 0.14s',
+                      fontSize: '0.62rem', fontWeight: 600, padding: '2px 7px', borderRadius: 999,
+                      background: selectedFamily === fam.slug ? fam.bg : 'transparent',
+                      color: selectedFamily === fam.slug ? fam.color : 'var(--text-muted)',
+                      border: `1px solid ${selectedFamily === fam.slug ? fam.border : 'var(--border)'}`,
+                      cursor: 'pointer', transition: 'all 0.14s', whiteSpace: 'nowrap',
                     }}
                   >
-                    {t('workflows.allFamilies')}
+                    {fam.labelStr}
                   </button>
-                  {families.map(fam => (
-                    <button
-                      key={fam.slug}
-                      onClick={() => setFamily(fam.slug === selectedFamily ? '' : fam.slug)}
-                      style={{
-                        fontSize: '0.62rem', fontWeight: 600, padding: '2px 7px', borderRadius: 999,
-                        background: selectedFamily === fam.slug ? fam.bg : 'transparent',
-                        color: selectedFamily === fam.slug ? fam.color : 'var(--text-muted)',
-                        border: `1px solid ${selectedFamily === fam.slug ? fam.border : 'var(--border)'}`,
-                        cursor: 'pointer', transition: 'all 0.14s',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {fam.labelStr}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Loading */}
-                {techsLoading && (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
-                    <Loader2 size={20} className="anim-spin" style={{ color: 'var(--text-muted)' }} />
-                  </div>
-                )}
-
-                {/* Grouped accordions */}
-                {!techsLoading && groupedByFamily.map(group => (
-                  <div key={group.slug} style={{ marginBottom: 8 }}>
-                    {/* Group header */}
-                    <button
-                      onClick={() => setFamsOpen(p => ({ ...p, [group.slug]: !p[group.slug] }))}
-                      style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '5px 6px', borderRadius: 7,
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        marginBottom: 4, transition: 'background 0.12s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = group.bg; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
-                    >
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: group.color, flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: '0.72rem', fontWeight: 700, color: group.color, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {group.labelStr}
-                      </span>
-                      <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginRight: 4 }}>
-                        {group.techs.length}
-                      </span>
-                      {familiesOpen[group.slug]
-                        ? <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} />
-                        : <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />
-                      }
-                    </button>
-
-                      {(familiesOpen[group.slug] || searchQuery || selectedFamily) && (
-                        <div
-                          style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4 }}
-                        >
-                          {group.techs.map(tech => (
-                            <TechniqueCard
-                              key={tech.uuid || tech.id || tech.slug}
-                              tech={tech}
-                              onAdd={handleAddTechnique}
-                              lang={lang}
-                            />
-                          ))}
-                        </div>
-                      )}
-                  </div>
                 ))}
-
-                {!techsLoading && groupedByFamily.length === 0 && (
-                  <div style={{ padding: '24px 8px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      Nenhuma técnica encontrada
-                    </p>
-                  </div>
-                )}
               </div>
 
-              {/* Dataset adder */}
-              <div style={{ padding: '10px', borderTop: '1px solid var(--border)' }}>
-                <button
-                  onClick={() => {
-                    nodeCount.current += 1;
-                    setNodes(prev => [...prev, {
-                      id:       `dataset-${nodeCount.current}`,
-                      type:     'dataset',
-                      position: { x: 40, y: 60 + nodeCount.current * 80 },
-                      data:     { label: 'Dataset', outputType: ARRAY_TYPES.DATASET },
-                    }]);
-                  }}
-                  className="btn-ghost"
-                  style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem', gap: 5 }}
-                >
-                  <DbIcon size={13} />
-                  {t('workflows.datasetNode')}
-                </button>
-              </div>
-            </aside>
-          )}
+              {techsLoading && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
+                  <Loader2 size={20} className="anim-spin" style={{ color: 'var(--text-muted)' }} />
+                </div>
+              )}
+
+              {!techsLoading && groupedByFamily.map(group => (
+                <div key={group.slug} style={{ marginBottom: 8 }}>
+                  <button
+                    onClick={() => setFamsOpen(p => ({ ...p, [group.slug]: !p[group.slug] }))}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 6px', borderRadius: 7,
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      marginBottom: 4, transition: 'background 0.12s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = group.bg; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: group.color, flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: '0.72rem', fontWeight: 700, color: group.color, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {group.labelStr}
+                    </span>
+                    <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginRight: 4 }}>
+                      {group.techs.length}
+                    </span>
+                    {familiesOpen[group.slug] ? <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />}
+                  </button>
+
+                  {(familiesOpen[group.slug] || searchQuery || selectedFamily) && (
+                    <div style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4 }}>
+                      {group.techs.map(tech => (
+                        <TechniqueCard key={tech.uuid || tech.id || tech.slug} tech={tech} onAdd={handleAddTechnique} lang={lang} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {!techsLoading && groupedByFamily.length === 0 && (
+                <div style={{ padding: '24px 8px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nenhuma técnica encontrada</p>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '10px', borderTop: '1px solid var(--border)' }}>
+              <button
+                onClick={() => {
+                  nodeCount.current += 1;
+                  const dsId = `dataset-${nodeCount.current}`;
+                  setNodes(prev => [...prev, {
+                    id: dsId,
+                    type: 'dataset',
+                    position: { x: 40, y: 60 + nodeCount.current * 110 },
+                    data: {
+                      label: 'Dataset', datasetUuid: '',
+                      onChange: (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
+                      onPreview: (uuid) => onPreviewRef.current?.(uuid),
+                      onRemove: (nid) => onRemoveNodeRef.current?.(nid),
+                    },
+                  }]);
+                }}
+                className="btn-ghost"
+                style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem', gap: 5 }}
+              >
+                <DbIcon size={13} />
+                {t('workflows.datasetNode')}
+              </button>
+            </div>
+          </aside>
+        )}
       </div>
+
+      {/* ── Modal de visualização multidimensional (dataset ou porta de saída) ── */}
+      {previewDataset && (
+        <MultiDimModal dataset={previewDataset} onClose={() => setPreviewDataset(null)} />
+      )}
     </div>
   );
-}
-
-// ────────────────────────────────────────────────────────────────────────────────
-// Utility: hex → r,g,b string for rgba()
-// ────────────────────────────────────────────────────────────────────────────────
-function hexToRgb(hex) {
-  if (!hex || !hex.startsWith('#')) return '100,116,139';
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  if (isNaN(r) || isNaN(g) || isNaN(b)) return '100,116,139';
-  return `${r},${g},${b}`;
 }

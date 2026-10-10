@@ -561,9 +561,20 @@ function Scene3D({ sizesForCamera, buildGroup, deps, exportRef }) {
     if (exportRef) exportRef.current = renderer.domElement;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 2000);
-    const maxDim = Math.max(...sizesForCamera, 1);
-    camera.position.set(maxDim * 1.8, maxDim * 1.4, maxDim * 1.8);
+    // Enquadramento por raio da esfera que envolve o objeto (metade da
+    // diagonal 3D), não pelo maior eixo isolado. Com `maxDim` isolado, um
+    // tensor anisotrópico (ex: espectro NIR reshapeado em 2D, 1000×5) ficava
+    // mal enquadrado: a câmera se afastava o suficiente para o eixo largo,
+    // mas via Surface3D sem levar em conta a altura real da superfície
+    // (`heightScale`, nunca incluído em `sizesForCamera` antes), então picos
+    // de valor alto saíam do campo de visão. Usando a diagonal real (soma em
+    // quadratura de todos os eixos, altura incluída) a câmera sempre cobre o
+    // objeto inteiro, isotrópico ou não.
+    const halfExtents = sizesForCamera.map(s => (s || 1) / 2);
+    const radius = Math.max(Math.sqrt(halfExtents.reduce((acc, s) => acc + s * s, 0)), 1);
+    const dist = radius * 2.6;
+    const camera = new THREE.PerspectiveCamera(45, W / H, Math.max(radius / 500, 0.1), dist * 6);
+    camera.position.set(dist * 0.72, dist * 0.56, dist * 0.72);
     camera.lookAt(0, 0, 0);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75));
@@ -574,7 +585,7 @@ function Scene3D({ sizesForCamera, buildGroup, deps, exportRef }) {
     dirLight2.position.set(-5, -3, -5);
     scene.add(dirLight2);
 
-    scene.add(new THREE.AxesHelper(maxDim * 0.6));
+    scene.add(new THREE.AxesHelper(radius * 0.6));
 
     // Grupo que recebe a geometria específica do modo (voxels ou superfície)
     // e tudo o que deve rotacionar junto (inclusive seu próprio wireframe).
@@ -678,14 +689,24 @@ function Voxel3D({ values, sizes, gMin, gMax, exportRef }) {
     const edges = new THREE_.EdgesGeometry(boxGeo);
     const lineMat = new THREE_.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.5 });
 
+    // Células com valor NaN (fatia fora dos dados reais, ou buraco em dados
+    // esparsos) eram antes coloridas com `viridis(0)` — a mesma cor roxo-
+    // escura usada para um valor numérico real próximo de gMin. Isso fazia
+    // "sem dado" parecer visualmente idêntico a "valor baixo real", o que o
+    // usuário viu como coloração incorreta no Voxel3D. Em vez de inventar
+    // uma cor para o que não existe, excluímos essas células da malha: elas
+    // aparecem como espaço vazio (visualmente honesto) em vez de um voxel
+    // sólido com valor fabricado.
+    const finite = values.filter(v => !isNaN(v.v));
+
     const MAX_VOXELS = 2000;
-    const visible = values.length <= MAX_VOXELS
-      ? values
-      : values.filter((_, i) => i % Math.ceil(values.length / MAX_VOXELS) === 0);
+    const visible = finite.length <= MAX_VOXELS
+      ? finite
+      : finite.filter((_, i) => i % Math.ceil(finite.length / MAX_VOXELS) === 0);
 
     const voxelGeo = new THREE_.BoxGeometry(0.85, 0.85, 0.85);
     const voxelMat = new THREE_.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.85 });
-    const mesh = new THREE_.InstancedMesh(voxelGeo, voxelMat, visible.length);
+    const mesh = new THREE_.InstancedMesh(voxelGeo, voxelMat, Math.max(visible.length, 1));
 
     const dummy = new THREE_.Object3D();
     const color = new THREE_.Color();
@@ -695,9 +716,17 @@ function Voxel3D({ values, sizes, gMin, gMax, exportRef }) {
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
       const t = gMax === gMin ? 0.5 : (v - gMin) / (gMax - gMin);
-      const [rr, gg, bb] = viridis(isNaN(v) ? 0 : t);
+      const [rr, gg, bb] = viridis(t);
       color.setRGB(rr / 255, gg / 255, bb / 255);
       mesh.setColorAt(i, color);
+    }
+    // Instâncias "sobrando" (quando visible.length === 0 forçamos 1 instância
+    // acima para o InstancedMesh não quebrar) ficam escaladas a zero —
+    // invisíveis — em vez de aparecerem na origem com uma cor qualquer.
+    if (visible.length === 0) {
+      dummy.scale.set(0, 0, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(0, dummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -719,8 +748,13 @@ function Voxel3D({ values, sizes, gMin, gMax, exportRef }) {
 }
 
 function Surface3D({ matrix, rows, cols, gMin, gMax, exportRef }) {
+  // Calculado fora do buildGroup para também alimentar `sizesForCamera` —
+  // antes a câmera só conhecia [cols, rows] e nunca sabia da altura real da
+  // superfície, então picos de valor alto em matrizes anisotrópicas (ex:
+  // 1000 colunas × 5 linhas) ficavam fora do enquadramento.
+  const heightScale = Math.max(rows, cols, 1) * 0.6;
+
   const buildGroup = useCallback((THREE_) => {
-    const heightScale = Math.max(rows, cols, 1) * 0.6;
     const geo = new THREE_.PlaneGeometry(cols - 1 || 1, rows - 1 || 1, Math.max(cols - 1, 1), Math.max(rows - 1, 1));
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -757,11 +791,11 @@ function Surface3D({ matrix, rows, cols, gMin, gMax, exportRef }) {
     group.add(wireMesh);
     group.add(new THREE_.LineSegments(edges, lineMat));
     return group;
-  }, [matrix, rows, cols, gMin, gMax]);
+  }, [matrix, rows, cols, gMin, gMax, heightScale]);
 
   return (
     <div className="relative w-full h-full">
-      <Scene3D sizesForCamera={[cols, rows]} buildGroup={buildGroup} deps={[matrix, rows, cols, gMin, gMax]} exportRef={exportRef} />
+      <Scene3D sizesForCamera={[cols, rows, heightScale]} buildGroup={buildGroup} deps={[matrix, rows, cols, gMin, gMax]} exportRef={exportRef} />
       <ColorScaleBar gMin={gMin} gMax={gMax} />
     </div>
   );
