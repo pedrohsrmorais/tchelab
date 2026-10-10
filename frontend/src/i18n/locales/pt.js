@@ -133,7 +133,7 @@ export default {
     searchTechnique: 'Buscar técnica...',
     allFamilies:     'Todas as famílias',
     selectDataset:   'Selecionar Dataset',
-    datasetNode:     'Dataset de Entrada',
+    datasetNode:     '+ Adicionar dataset ao canvas',
     inputSchema:     'Input esperado',
     outputSchema:    'Output gerado',
     paramSchema:     'Parâmetros',

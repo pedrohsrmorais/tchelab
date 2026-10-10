@@ -85,6 +85,38 @@ pm2 start worker.py --interpreter python3 --name tchelab-worker
 pm2 save
 ```
 
+> **Se o worker sob pm2 fica reiniciando sozinho** (log mostra "Sinal 2
+> recebido" / "Worker parado" / "TcheLab Worker iniciando" se repetindo em
+> intervalos irregulares, sem nenhum crash/exceção Python antes disso): o
+> sinal está vindo de fora do processo (do próprio pm2), não de um erro no
+> worker. Cheque, nesta ordem:
+>
+> 1. `pm2 describe tchelab-worker` — olhe `restarts` (contador) e se
+>    `watching` está `enabled`. Se estiver, o `--watch` do pm2 provavelmente
+>    está observando o próprio diretório `worker_api/` — e o worker não
+>    escreve nada nele em operação normal, então o suspeito mais comum é
+>    `__pycache__/` sendo regravado a cada import, ou o `.env` sendo tocado
+>    por outra automação. Rode sem watch: `pm2 start worker.py --interpreter
+>    python3 --name tchelab-worker --no-watch`, ou, se precisar de watch,
+>    `--ignore-watch="__pycache__ *.pyc .env"`.
+> 2. `pm2 describe tchelab-worker` também mostra `memory` / o limite de
+>    `max_memory_restart` configurado — se o processo cresce (ex: muitos
+>    jobs concorrentes com `WORKER_CONCURRENCY` alto processando tensores
+>    grandes) e bate no teto, pm2 reinicia silenciosamente. Suba o limite ou
+>    baixe `WORKER_CONCURRENCY`.
+> 3. Confirme que não existe um `cron_restart` configurado no
+>    `ecosystem.config.js` (ou equivalente) reiniciando o worker por
+>    agenda.
+>
+> Importante: mesmo com esse ciclo de restart acontecendo, **um job que
+> estava em andamento no exato momento do `SIGINT` é perdido** — o
+> `executor.shutdown(wait=True)` dá a ele uma chance de terminar, mas se o
+> `kill_timeout` do pm2 for curto demais, o processo é morto (SIGKILL) no
+> meio do trabalho, sem nunca publicar o resultado. O backend agora se
+> recupera sozinho da maioria desses casos (ver "Reconciliação" no arquivo
+> `backend_api/src/services/resultConsumer.service.js`), mas o ideal
+> continua sendo eliminar a causa do restart, não só tolerar os efeitos.
+
 **Docker**: dar ao worker seu próprio serviço/container com
 `restart: unless-stopped`, variáveis de ambiente (`REDIS_URL`, `JOB_QUEUE`,
 `RESULT_CHANNEL`, `WORKER_CONCURRENCY`) apontando para o mesmo Redis do

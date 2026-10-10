@@ -126,7 +126,7 @@ export default {
     searchTechnique: 'Search technique...',
     allFamilies:     'All families',
     selectDataset:   'Select Dataset',
-    datasetNode:     'Input Dataset',
+    datasetNode:     '+ Add dataset to canvas',
     inputSchema:     'Expected input',
     outputSchema:    'Generated output',
     paramSchema:     'Parameters',

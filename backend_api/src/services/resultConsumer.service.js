@@ -12,6 +12,32 @@
  * Este serviço assina o canal, atualiza as três tabelas, e — quando a
  * execução pertence a uma "operação rápida" de dataset (dataset_operations)
  * — grava o resultado como novo dataset ou aplica no dataset existente.
+ *
+ * ── Por que isto sozinho não é suficiente (reconciliação abaixo) ───────────
+ * Redis Pub/Sub é "fire-and-forget": uma mensagem publicada enquanto este
+ * processo está reiniciando (deploy, crash, `pm2 restart`) ou mesmo só
+ * reconectando a assinatura é perdida para sempre — Redis não guarda
+ * histórico de canais Pub/Sub. Em produção sob pm2, tanto o backend quanto
+ * o worker Python reiniciam de vez em quando (deploy, OOM, watch, etc.), e
+ * a lacuna de alguns milissegundos entre "SIGTERM recebido" e "assinatura
+ * recriada" é o suficiente para um resultado se perder — o job terminou de
+ * verdade no worker, mas `execution_nodes`/`jobs` nunca saem de
+ * pending/queued, e o editor mostra "SAÍDA (PENDENTE)" para sempre, mesmo
+ * com o worker saudável e processando normalmente.
+ *
+ * O worker já guarda cada resultado também como chave Redis expirável
+ * (`tchelab:result:{job_id}`, 1h de TTL — ver worker_api/redis_queue.py,
+ * `publish_result`), mas antes nada aqui a lia de volta — ela só existia
+ * "para o futuro", nunca consultada. `reconcile()` consulta essa chave para
+ * todo job ainda "queued" no banco e, se achar, processa o resultado como
+ * se tivesse chegado por Pub/Sub — fechando exatamente essa lacuna.
+ *
+ * Isso cobre resultado perdido. Para o caso em que o job nem chegou a
+ * publicar nada (ex: o worker caiu no meio do processamento, antes de
+ * publish_result), `reconcile()` também marca como "failed" qualquer
+ * execution_node pending/running mais velho que JOB_TIMEOUT_SECONDS sem
+ * nenhum resultado em lugar nenhum — assim o usuário vê um erro explicável
+ * em vez de um spinner infinito.
  */
 
 const { v4: uuidv4 } = require('uuid');
@@ -19,8 +45,15 @@ const db = require('../config/db.config');
 const redis = require('../config/redis.config');
 
 const RESULT_CHANNEL = process.env.RESULT_CHANNEL || 'tchelab_resultados';
+// Tem que ser compatível com worker_api/config.py (mesma env var nos dois
+// lados). Some uma margem de segurança sobre o timeout real do worker antes
+// de desistir de um job — ele pode estar genuinamente demorado, não travado.
+const JOB_TIMEOUT_SECONDS = parseInt(process.env.JOB_TIMEOUT_SECONDS || '300', 10);
+const STALE_GRACE_SECONDS = 30;
+const RECONCILE_INTERVAL_MS = 15000;
 
 let subscriber = null;
+let reconcileTimer = null;
 
 function inferShape(arr) {
   const dims = [];
@@ -38,6 +71,33 @@ function pickPrimaryOutput(outputs) {
   return outputs[arrayKey ?? keys[0]];
 }
 
+/**
+ * Fecha a `executions` pai quando não sobra nenhum `execution_node`
+ * pending/running — extraído de handleResultMessage para ser reaproveitado
+ * pelo sweep de reconciliação (reconcile(), abaixo), que também pode ser
+ * quem faz o último nó de uma execução sair de pending/running (seja
+ * aplicando um resultado atrasado, seja desistindo por timeout).
+ */
+async function finalizeExecutionIfDone(executionId) {
+  const [[{ n: pending }]] = await db.query(
+    `SELECT COUNT(*) AS n FROM execution_nodes WHERE execution_id = ? AND status IN ('pending','running')`,
+    [executionId],
+  );
+  if (pending > 0) return;
+
+  const [[{ n: failedCount }]] = await db.query(
+    `SELECT COUNT(*) AS n FROM execution_nodes WHERE execution_id = ? AND status = 'failed'`,
+    [executionId],
+  );
+  const executionStatus = failedCount > 0 ? 'failed' : 'completed';
+  await db.query(
+    `UPDATE executions SET status = ?, finished_at = NOW(), updated_at = NOW() WHERE id = ? AND status NOT IN ('completed','failed','cancelled')`,
+    [executionStatus, executionId],
+  );
+
+  await finalizeDatasetOperation(executionId, executionStatus);
+}
+
 async function handleResultMessage(raw) {
   let result;
   try { result = JSON.parse(raw); } catch (err) {
@@ -51,10 +111,20 @@ async function handleResultMessage(raw) {
   const isSuccess = status === 'success';
 
   try {
-    await db.query(
-      `UPDATE jobs SET status = ?, result = ?, error_message = ?, finished_at = NOW() WHERE uuid = ?`,
+    // Idempotente por design: reconcile() pode reaplicar uma mensagem cujo
+    // job já foi marcado 'done'/'failed' por este mesmo handler via Pub/Sub
+    // (ex: a mensagem chegou pelos dois caminhos). A condição
+    // `status = 'queued'` faz o segundo UPDATE virar um no-op.
+    const [jobUpdateResult] = await db.query(
+      `UPDATE jobs SET status = ?, result = ?, error_message = ?, finished_at = NOW() WHERE uuid = ? AND status = 'queued'`,
       [isSuccess ? 'done' : 'failed', outputs ? JSON.stringify(outputs) : null, error || null, jobUuid],
     );
+    if (jobUpdateResult.affectedRows === 0) {
+      // Já processado antes (Pub/Sub + reconcile competindo, ou reconcile
+      // rodando duas vezes) — não reprocessa execution_nodes/executions de
+      // novo, para não sobrescrever started_at/finished_at à toa.
+      return;
+    }
 
     const [exRows] = await db.query('SELECT id FROM executions WHERE uuid = ?', [execUuid]);
     if (!exRows.length) return;
@@ -82,26 +152,87 @@ async function handleResultMessage(raw) {
       ],
     );
 
-    // Só fecha a execução quando não sobra nenhum nó pending/running.
-    const [[{ n: pending }]] = await db.query(
-      `SELECT COUNT(*) AS n FROM execution_nodes WHERE execution_id = ? AND status IN ('pending','running')`,
-      [executionId],
-    );
-    if (pending > 0) return;
-
-    const [[{ n: failedCount }]] = await db.query(
-      `SELECT COUNT(*) AS n FROM execution_nodes WHERE execution_id = ? AND status = 'failed'`,
-      [executionId],
-    );
-    const executionStatus = failedCount > 0 ? 'failed' : 'completed';
-    await db.query(
-      `UPDATE executions SET status = ?, finished_at = NOW(), updated_at = NOW() WHERE id = ?`,
-      [executionStatus, executionId],
-    );
-
-    await finalizeDatasetOperation(executionId, executionStatus);
+    await finalizeExecutionIfDone(executionId);
   } catch (err) {
     console.error('[ResultConsumer] erro ao processar resultado:', err);
+  }
+}
+
+/**
+ * Reconciliação — ver o comentário grande no topo do arquivo para o porquê.
+ * Roda em duas situações: uma vez ao assinar o canal (pega o que se perdeu
+ * enquanto o backend estava fora do ar) e periodicamente depois
+ * (RECONCILE_INTERVAL_MS — pega o que se perder numa reconexão breve do
+ * assinante Pub/Sub enquanto o backend está no ar).
+ */
+async function reconcile() {
+  try {
+    // 1) Jobs ainda "queued" no banco, mas cujo worker já publicou — a
+    //    chave `tchelab:result:{uuid}` (SETEX 1h) é a cópia de segurança
+    //    desse resultado. Reaplica como se tivesse chegado agora pelo
+    //    Pub/Sub.
+    const [queuedJobs] = await db.query(
+      `SELECT uuid FROM jobs WHERE status = 'queued' AND job_type = 'execute_node'
+       AND queued_at < (NOW() - INTERVAL 3 SECOND)`,
+    );
+    for (const { uuid } of queuedJobs) {
+      try {
+        const raw = await redis.get(`tchelab:result:${uuid}`);
+        if (raw) {
+          console.log(`[ResultConsumer] reconcile: resultado perdido recuperado para job ${uuid}`);
+          await handleResultMessage(raw);
+        }
+      } catch (err) {
+        console.error(`[ResultConsumer] reconcile: erro ao checar job ${uuid}:`, err.message);
+      }
+    }
+
+    // 2) execution_nodes pending/running há mais tempo do que o worker
+    //    jamais deveria levar (JOB_TIMEOUT_SECONDS + margem) e que (1) não
+    //    resolveu — ou o job nunca chegou a ser processado (fila sem
+    //    consumidor, ex: worker.py não está rodando — ver worker_api/
+    //    README.md) ou o worker morreu no meio do job sem publicar nada.
+    //    Marca como falha com uma mensagem acionável em vez de deixar o
+    //    spinner girando pra sempre.
+    const staleCutoffSeconds = JOB_TIMEOUT_SECONDS + STALE_GRACE_SECONDS;
+    const [staleNodes] = await db.query(
+      `SELECT en.id, en.execution_id
+       FROM execution_nodes en
+       WHERE en.status IN ('pending','running')
+         AND en.created_at < (NOW() - INTERVAL ? SECOND)`,
+      [staleCutoffSeconds],
+    );
+    const touchedExecutions = new Set();
+    for (const node of staleNodes) {
+      // CONCAT(), não `||` — MySQL trata `||` como OR lógico por padrão
+      // (sql_mode sem PIPES_AS_CONCAT), não como concatenação de string.
+      await db.query(
+        `UPDATE execution_nodes
+           SET status = 'failed',
+               error_message = CONCAT('Tempo esgotado: nenhum resultado recebido do worker Python em mais de ', ?, 's. Verifique se o processo worker.py está rodando (ver worker_api/README.md).'),
+               finished_at = NOW(), updated_at = NOW()
+         WHERE id = ? AND status IN ('pending','running')`,
+        [staleCutoffSeconds, node.id],
+      );
+      // Reflete o mesmo diagnóstico no job correspondente (casado pelo
+      // execution_node_id embutido no payload no momento do dispatch —
+      // ver dispatchExecutionCore em execution.controller.js).
+      await db.query(
+        `UPDATE jobs
+           SET status = 'failed',
+               error_message = 'Tempo esgotado: sem resposta do worker Python.',
+               finished_at = NOW()
+         WHERE status = 'queued'
+           AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.execution_node_id')) = ?`,
+        [String(node.id)],
+      );
+      touchedExecutions.add(node.execution_id);
+    }
+    for (const executionId of touchedExecutions) {
+      await finalizeExecutionIfDone(executionId);
+    }
+  } catch (err) {
+    console.error('[ResultConsumer] erro na reconciliação:', err.message);
   }
 }
 
@@ -234,11 +365,20 @@ function start() {
     handleResultMessage(message);
   });
 
+  // Reconciliação: uma vez já no start (pega o que se perdeu enquanto este
+  // processo estava fora do ar) e depois periodicamente (pega mensagens
+  // perdidas em reconexões breves do assinante enquanto o processo está no
+  // ar, e detecta jobs genuinamente travados por falta de worker).
+  reconcile();
+  if (reconcileTimer) clearInterval(reconcileTimer);
+  reconcileTimer = setInterval(reconcile, RECONCILE_INTERVAL_MS);
+
   return subscriber;
 }
 
 function stop() {
   if (subscriber) { subscriber.disconnect(); subscriber = null; }
+  if (reconcileTimer) { clearInterval(reconcileTimer); reconcileTimer = null; }
 }
 
-module.exports = { start, stop, handleResultMessage };
+module.exports = { start, stop, handleResultMessage, reconcile };
