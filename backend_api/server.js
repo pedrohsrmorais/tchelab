@@ -24,6 +24,22 @@ const app  = express();
 const PORT = process.env.PORT || 3003;
 const ENV  = process.env.NODE_ENV || 'development';
 
+// ─── Confia no proxy reverso (nginx) na frente deste container ──────────────
+// Sem isto, Express ignora o header X-Forwarded-For que o nginx envia e usa
+// o IP do socket TCP cru como `req.ip` — que, atrás do Docker, é sempre o
+// gateway da rede bridge (ex: 172.18.0.1), o MESMO para qualquer visitante.
+// express-rate-limit usa `req.ip` como chave por padrão: com todo mundo
+// colapsando no mesmo IP, o limite de 500 req/15min deixa de ser por
+// visitante e vira um orçamento ÚNICO compartilhado por todo o site —
+// esgotado em minutos só com o tráfego normal de poucas páginas (é
+// exatamente o "429 Too Many Requests" em tudo que apareceu em produção
+// logo após a migração pra Docker: antes, com pm2, o Node media o próprio
+// host, então essa distinção nunca ficou visível da mesma forma).
+// `1` = confia em exatamente um hop de proxy na frente (o nginx do host),
+// e nada além disso — não abre brecha pra um cliente forjar X-Forwarded-For
+// e se passar por outro IP, porque só o hop mais próximo é confiado.
+app.set('trust proxy', 1);
+
 // ─── Security headers ────────────────────────────────────────────────────────
 app.use(helmet());
 
