@@ -150,5 +150,52 @@ monta mais `seed_kennard_stone.sql` separado — só `init.mysql`.
     < backend_api/sql/seed_kennard_stone.sql
   docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
     < backend_api/sql/beta_active_set.sql
+  docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
+    < backend_api/sql/catalog_content.sql
   docker compose up -d --build backend
   ```
+
+## 7. Conteúdo do módulo Catálogo (2026-10-10) — `how_it_works`, `historical_note`, `usage_tips`
+
+Pedido do usuário: a página de Catálogo precisa mostrar, pra cada técnica,
+como ela funciona, uma curiosidade histórica, dicas de uso prático (ex:
+"espera dados ortogonais, recomenda-se PCA antes"), e descrição de cada
+porta de input/output — não só o nome.
+
+Três colunas novas em `techniques` (`ALTER TABLE ... ADD COLUMN IF NOT
+EXISTS`, seguro rodar de novo): `how_it_works`, `historical_note` (pode ser
+NULL — nem toda técnica tem uma origem notável o suficiente pra citar) e
+`usage_tips`. Além disso, `input_schema`/`output_schema` ganharam uma chave
+`description` por porta via `JSON_MERGE_PATCH` (preserva `type`/`shape` que
+já existiam, só acrescenta a descrição).
+
+Conteúdo escrito à mão pra todas as 75 técnicas ativas (as 123 "em
+desenvolvimento" mantêm só a `description` curta que já tinham — não
+receberam o tratamento completo, por escopo: o pedido foi sobre os modelos
+desta versão beta). Fontes:
+
+- `catalog_content_source.py` — dicionário Python com o conteúdo de cada
+  técnica (fonte da verdade; é aqui que se edita/corrige texto).
+- `catalog_content.json` — dump do dicionário acima (gerado, não editar à mão).
+- `gen_catalog_content_sql.py` — lê o JSON e gera `catalog_content.sql`.
+- `catalog_content.sql` — o SQL final, idempotente, já incorporado ao fim
+  de `init.mysql` (então uma instalação nova já nasce com o conteúdo).
+
+**Armadilha encontrada e corrigida**: várias técnicas (pca, svd,
+autovalores/autovetores/eig, determinante, rank, trace, norma, transpose,
+reshape, squeeze, expand_dims, mean/median/std/max/min/sum, folding,
+unfolding, pls_da) **já tinham** `input_schema`/`output_schema` com nomes
+de porta reais (ex: `svd` usa `A`/`U`/`S`/`Vt`, não `X`/`U`/`S`/`Vt`). O
+conteúdo escrito inicialmente usou nomes "de memória" que não bateram em
+~20 casos — se tivesse ido direto pro `JSON_MERGE_PATCH`, teria criado
+portas fantasmas (com descrição, mas nunca populadas em execução real) ao
+lado das portas reais (sem descrição). `gen_catalog_content_sql.py` tem um
+dicionário `RENAME` que corrige isso antes de gerar o SQL — qualquer
+técnica nova adicionada ao conteúdo deve ter seu `input_schema`/
+`output_schema` real (`SELECT input_schema, output_schema FROM techniques
+WHERE slug=...`) conferido contra as chaves usadas, não assumido.
+
+`kennard_stone` é a única das 75 sem `usage_tips` (schema completo já
+definido em `seed_kennard_stone.sql`, com descrição por porta desde a
+criação — não sobrescrito), mas ganhou `how_it_works`/`historical_note`
+pra não ficar como a única sem nenhum texto na página de Catálogo.

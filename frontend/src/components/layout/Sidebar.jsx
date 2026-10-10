@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuthStore } from '../../store/auth';
 import {
   LayoutDashboard, FolderKanban, Database, GitBranch, Beaker,
-  BookOpen, Users, Cpu, Zap, Sparkles, ShieldCheck,
+  BookOpen, Users, Cpu, Zap, Sparkles, ShieldCheck, Library,
   LogOut, ChevronRight, Sun, Moon, Globe, ChevronDown,
 } from 'lucide-react';
 
@@ -16,6 +16,7 @@ const NAV_MAIN = [
   { to: '/projects',   icon: FolderKanban,   key: 'projects'   },
   { to: '/datasets',   icon: Database,        key: 'datasets'   },
   { to: '/workflows',  icon: GitBranch,       key: 'workflows'  },
+  { to: '/catalogo',   icon: Library,         key: 'catalog'    },
   { to: '/articles',   icon: BookOpen,        key: 'articles'   },
   { to: '/communities',icon: Users,           key: 'communities'},
   { to: '/models',     icon: Cpu,             key: 'models'     },

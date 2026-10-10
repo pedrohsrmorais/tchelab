@@ -4,6 +4,7 @@ export default {
     projects:     'Projects',
     datasets:     'Datasets',
     workflows:    'Workflows',
+    catalog:      'Catalog',
     articles:     'Articles',
     communities:  'Communities',
     models:       'Models',

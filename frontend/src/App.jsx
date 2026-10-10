@@ -19,6 +19,8 @@ const CommunitiesPage    = lazy(() => import('./pages/CommunitiesPage'));
 const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
 const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
 const WorkflowEditorPage = lazy(() => import('./pages/WorkflowEditorPage'));
+const CatalogPage        = lazy(() => import('./pages/CatalogPage'));
+const CatalogDetailPage  = lazy(() => import('./pages/CatalogDetailPage'));
 const ArticlesPage       = lazy(() => import('./pages/ArticlesPage'));
 const ModelsPage         = lazy(() => import('./pages/ModelsPage'));
 const JobsPage           = lazy(() => import('./pages/JobsPage'));
@@ -39,6 +41,8 @@ if (typeof window !== 'undefined') {
     import('./pages/CommunityDetailPage');
     import('./pages/WorkflowsPage');
     import('./pages/WorkflowEditorPage');
+    import('./pages/CatalogPage');
+    import('./pages/CatalogDetailPage');
     import('./pages/ArticlesPage');
     import('./pages/ModelsPage');
     import('./pages/JobsPage');
@@ -91,6 +95,8 @@ export default function App() {
           <Route path="communities/:id" element={<CommunityDetailPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="workflows/:id" element={<WorkflowEditorPage />} />
+          <Route path="catalogo" element={<CatalogPage />} />
+          <Route path="catalogo/:id" element={<CatalogDetailPage />} />
           <Route path="articles" element={<ArticlesPage />} />
           <Route path="models" element={<ModelsPage />} />
           <Route path="jobs" element={<JobsPage />} />

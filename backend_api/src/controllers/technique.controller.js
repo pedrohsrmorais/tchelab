@@ -33,8 +33,12 @@ async function listTechniques(req, res) {
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
+      // `active` entra aqui pra página de Catálogo (que sempre passa
+      // include_inactive=true) mostrar o badge "ativo"/"em desenvolvimento"
+      // sem precisar de um GET /techniques/:id por linha.
       `SELECT id, uuid, slug, name, category, family, description, min_order, max_order,
-              requires_sample_axis, input_schema, output_schema, parameter_schema, tags, is_beta, is_custom
+              requires_sample_axis, input_schema, output_schema, parameter_schema, tags,
+              is_beta, is_custom, active
        FROM techniques WHERE ${where} ORDER BY category, family, name LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );
