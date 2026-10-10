@@ -95,3 +95,40 @@ docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
 
 `init.mysql` também foi atualizado com a mesma sincronização, então uma
 instalação nova (`docker compose down -v && up -d --build`) já nasce correta.
+
+## 5. Lista beta (2026-10-10) — 75 técnicas ativas, resto "em desenvolvimento"
+
+Decisão do usuário: pra essa versão beta, só as 75 técnicas abaixo ficam
+selecionáveis no editor de workflow (`active = 1`); as outras 123 continuam
+no catálogo pra documentação, mas marcadas `active = 0` — não aparecem no
+editor e a API recusa criar nó com elas (`workflowNode.controller.js`).
+
+**37 analíticas**: PCA, HCA, PLS, PLS-DA, SIMCA, PLS One-Class, SVM, Random
+Forest, KNN, SNV, MSC, Autoscaling, Mean Centering, Savitzky-Golay,
+Correção de Linha de Base, N-PLS, U-PLS, PARAFAC, Tucker3, Multiway PLS-DA,
+iPLS, VIP, Cross-Validation, Detecção de Outliers, Metrics Aggregation, DS,
+PDS, MLP, CNN-1D, Autoencoder, RNN, Transformer, Diffusion Model, PCR,
+MCR-ALS, LDA, Leverage e Influência.
+
+**38 utilitárias (família 01_dados — infraestrutura, não modelos)**:
+Kennard-Stone, SVD, autovalores/autovetores/EIG, inversa/pseudo-inversa,
+folding/unfolding, e a plumbing básica de array (soma, transpose, reshape,
+slice, split, stack, concatenação, etc).
+
+Achado durante a implementação: `mlp` nunca teve linha própria no banco —
+era um dos 5 pares ambíguos da seção 3 (só existiam `mlp_classification` e
+`mlp_regression` separados, mas o script Python real é um só, parametrizado
+por `task`). Inserida a linha `mlp` em `beta_active_set.sql`;
+`mlp_classification`/`mlp_regression` ficam como duplicatas inativas.
+
+Implementação: `GET /techniques` agora filtra `active = 1` por padrão (passe
+`include_inactive=true` pra listar tudo — é o que a página de Catálogo vai
+usar). `POST /workflows/:wid/nodes` recusa criar nó com técnica `active = 0`
+mesmo chamando a API direto, não só escondendo da listagem.
+
+Aplicar em produção:
+```bash
+docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
+  < backend_api/sql/beta_active_set.sql
+docker compose up -d --build backend
+```

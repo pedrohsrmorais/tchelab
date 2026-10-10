@@ -56,6 +56,15 @@ async function addNode(req, res) {
     if (!techs.length) return R.notFound(res, 'Técnica');
     const tech = techs[0];
 
+    // Técnica desativada (fora da lista beta) não pode virar nó — mesmo
+    // que alguém chame esta rota direto, sem passar pelo editor (que já
+    // nem lista as desativadas via GET /techniques).
+    if (!tech.is_custom && !tech.active) {
+      return R.unprocessable(res, [
+        { field: 'technique_id', message: `Técnica "${tech.name}" ainda não está disponível nesta versão.` },
+      ]);
+    }
+
     // Valida node_key único no workflow
     const [existing] = await db.query(
       'SELECT id FROM workflow_nodes WHERE workflow_id = ? AND node_key = ?',

@@ -7,9 +7,18 @@ const R = require('../utils/response');
 // GET /techniques
 async function listTechniques(req, res) {
   try {
-    const { category, family, min_order, max_order, requires_sample_axis, is_beta, is_custom } = req.query;
+    const { category, family, min_order, max_order, requires_sample_axis, is_beta, is_custom, include_inactive } = req.query;
     const conditions = ['(is_custom = 0 OR user_id = ?)'];
     const params = [req.user.id];
+
+    // Versão beta: só técnicas marcadas active=1 aparecem pro usuário comum
+    // (editor de workflow, etc). A página de Catálogo passa include_inactive=true
+    // pra listar tudo (ativas + "em desenvolvimento"), já que ali é documentação,
+    // não execução. Técnicas customizadas do próprio usuário sempre aparecem.
+    if (include_inactive !== 'true') {
+      conditions.push('(active = 1 OR (is_custom = 1 AND user_id = ?))');
+      params.push(req.user.id);
+    }
 
     if (category) { conditions.push('category = ?'); params.push(category); }
     if (family) { conditions.push('family = ?'); params.push(family); }
