@@ -53,9 +53,17 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── Rate limiting ───────────────────────────────────────────────────────────
+// `max: 500` foi calibrado baixo demais pra essa SPA: ela dispara várias
+// chamadas /api/ em paralelo a cada navegação (auth/me, admin/stats,
+// projects, datasets, workflows/templates, ...), e isso é por visitante
+// desde o fix do `trust proxy` acima — então um único usuário navegando
+// ativamente por alguns minutos já esgotava o orçamento de 15min inteiro.
+// Subindo bastante (3000/15min ≈ 200 req/min) pra acomodar uso normal e
+// ainda assim conter abuso de verdade; `authLimiter` abaixo continua
+// restrito, pois é a proteção contra brute-force de login/registro.
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,   // 15 min
-  max: 500,
+  max: 3000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { data: null, meta: null, error: { code: 'RATE_LIMIT', message: 'Muitas requisições. Tente novamente em alguns minutos.' } },
