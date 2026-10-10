@@ -42,6 +42,15 @@ client.interceptors.response.use(
         queue = []
         localStorage.removeItem('tchelab_token')
         localStorage.removeItem('tchelab_refresh')
+        // O ProtectedRoute (App.jsx) decide se mostra o Dashboard ou o Login
+        // olhando o `token` persistido pelo Zustand em 'tchelab-auth' — uma
+        // chave SEPARADA desta aqui. Sem limpar essa também, o reload abaixo
+        // reidrata o Zustand com o token antigo (ainda "válido" pra ele),
+        // o guard renderiza o Dashboard de novo, que chama fetchMe() de
+        // novo, que 401 de novo, que tenta refresh de novo (sem token raw),
+        // que 422 de novo... um loop de reload infinito, várias vezes por
+        // segundo, que foi o que esgotou o rate limit em produção.
+        localStorage.removeItem('tchelab-auth')
         window.location.href = '/login'
       } finally { refreshing = false }
     }
