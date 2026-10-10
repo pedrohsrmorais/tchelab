@@ -45,8 +45,10 @@ services:
       # docker-entrypoint-initdb.d só roda na 1ª subida (volume vazio) — é
       # assim que "recriar o banco do zero" acontece: apague o volume
       # mysql_data (`docker compose down -v`) e suba de novo.
+      # init.mysql é o único arquivo necessário — já inclui schema, seed
+      # base, sincronização do catálogo (169 scripts) e a lista beta de
+      # técnicas ativas, tudo consolidado (ver backend_api/sql/CATALOG_AUDIT.md).
       - ./backend_api/src/config/init.mysql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./backend_api/sql/seed_kennard_stone.sql:/docker-entrypoint-initdb.d/02-seed_kennard_stone.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       interval: 5s

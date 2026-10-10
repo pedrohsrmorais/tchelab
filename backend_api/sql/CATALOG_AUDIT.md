@@ -126,9 +126,29 @@ Implementação: `GET /techniques` agora filtra `active = 1` por padrão (passe
 usar). `POST /workflows/:wid/nodes` recusa criar nó com técnica `active = 0`
 mesmo chamando a API direto, não só escondendo da listagem.
 
-Aplicar em produção:
-```bash
-docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
-  < backend_api/sql/beta_active_set.sql
-docker compose up -d --build backend
-```
+## 6. `init.mysql` consolidado (2026-10-10)
+
+`seed_kennard_stone.sql` e `beta_active_set.sql` foram incorporados ao final
+de `backend_api/src/config/init.mysql`, na ordem: schema → seed base → sync
+do catálogo (169 scripts) → seed Kennard-Stone (schema completo, sobrescreve
+a versão thin do sync) → lista beta de 75 ativas. `docker-compose.yml` não
+monta mais `seed_kennard_stone.sql` separado — só `init.mysql`.
+
+**Dois caminhos, não confundir:**
+
+- **Banco do zero** (`docker compose down -v && up -d --build`, ou primeira
+  instalação): só precisa de `init.mysql`, que já roda tudo sozinho via
+  `docker-entrypoint-initdb.d`. Ele faz `DROP TABLE IF EXISTS` em tudo — **não
+  rode à mão contra um banco que já tem dado que você quer manter.**
+- **Banco já existente, sem recriar volume** (caso de produção com dado
+  real): continue usando os arquivos avulsos em sequência, que são
+  idempotentes e não tocam em nenhuma tabela além de `techniques`:
+  ```bash
+  docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
+    < backend_api/sql/sync_catalog_169.sql
+  docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
+    < backend_api/sql/seed_kennard_stone.sql
+  docker compose exec -T mysql mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_NAME" \
+    < backend_api/sql/beta_active_set.sql
+  docker compose up -d --build backend
+  ```

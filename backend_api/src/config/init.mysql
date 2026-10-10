@@ -1532,6 +1532,127 @@ INSERT IGNORE INTO `techniques` (`uuid`,`name`,`slug`,`category`,`subcategory`,`
 ('51f0c172-72d1-4926-b0f2-98fba8d98444','U-PCA — Unfolded PCA','u_pca','multiway_regression','regression','08_multiway_regression','PCA sobre tensor desdobrado (análise exploratória multiway).',1,0),
 ('d3cdd8a4-91af-404c-aabc-7c8e539173b5','Wavelet Transform','wavelet_transform','preprocessing','other','02_preprocessamento','Decomposição Wavelet discreta para suavização, decomposição ou extração de features.',1,0);
 
+-- =============================================================================
+-- SEED: técnica Kennard-Stone (schema completo — sobrescreve a versão thin
+-- inserida no sync acima via ON DUPLICATE KEY UPDATE). Mantido idêntico a
+-- backend_api/sql/seed_kennard_stone.sql.
+-- =============================================================================
+
+-- TcheLab — Registro da técnica "kennard_stone" na tabela `techniques`.
+--
+-- Por quê este arquivo existe: o repositório não tem nenhum sistema de
+-- migração (sem Knex/Sequelize/db-migrate, sem schema.sql versionado — ver
+-- `docs/database.md` para o DDL completo, que também não está commitado como
+-- .sql). O catálogo Python (worker_api/catalog/) se auto-registra sozinho
+-- via ScriptFactory, mas a tabela `techniques` do MySQL — de onde o editor
+-- de workflow, o ShapeValidatorService e a listagem /techniques leem os
+-- schemas de porta — precisa ser populada manualmente.
+--
+-- Como aplicar: rode este arquivo contra o banco do ambiente
+-- (ex: `mysql -u tchelab -p tchelab < backend_api/sql/seed_kennard_stone.sql`).
+-- É seguro rodar mais de uma vez: na primeira vez insere a técnica, nas
+-- seguintes apenas atualiza os campos (ON DUPLICATE KEY UPDATE pela `slug`,
+-- que é UNIQUE) em vez de pular silenciosamente — então reaplicar também
+-- conserta a linha caso ela precise de correção (foi exatamente o caso do
+-- `SET NAMES utf8mb4` abaixo: sem ele, rodar este arquivo num cliente mysql
+-- com locale não-UTF8 — comum em servidores com LANG=C/POSIX — gravava
+-- "Separação" como "SeparaÃ§Ã£o", um double-encoding silencioso só visível
+-- consultando com `mysql --default-character-set=utf8mb4`; a primeira versão
+-- deste arquivo não tinha essa linha e usava WHERE NOT EXISTS, então uma
+-- linha já corrompida nunca seria reescrita por um reaplique).
+SET NAMES utf8mb4;
+
+INSERT INTO techniques (
+  uuid, slug, name, category, subcategory, family, description,
+  input_type, output_type, input_schema, output_schema, parameter_schema,
+  min_order, max_order, requires_sample_axis, tags, version,
+  is_beta, is_custom, implementation, documentation, active,
+  created_at, updated_at
+) VALUES (
+  UUID(),
+  'kennard_stone',
+  'Separação Kennard-Stone',
+  'validation',
+  'sample_split',
+  '01_dados',
+  'Divide as amostras em calibração (treino), teste e, opcionalmente, validação, selecionando iterativamente a amostra mais distante (distância Euclidiana) das já escolhidas — maximiza a cobertura da variabilidade multivariada em vez de uma divisão aleatória. Determinístico: a mesma entrada sempre produz a mesma divisão.',
+  'Matrix',
+  'Matrix',
+  JSON_OBJECT(
+    'X', JSON_OBJECT('type', 'matrix', 'description', 'Amostras × variáveis (sample_axis configurável, aceita N-way)')
+  ),
+  JSON_OBJECT(
+    'train', JSON_OBJECT('type', 'matrix', 'description', 'Subconjunto de calibração/treino'),
+    'test', JSON_OBJECT('type', 'matrix', 'description', 'Subconjunto de teste'),
+    'validation', JSON_OBJECT('type', 'matrix', 'description', 'Subconjunto de validação (presente apenas quando n_validation/validation_size > 0)'),
+    'train_indices', JSON_OBJECT('type', 'vector', 'description', 'Índices originais (em X) do conjunto de treino'),
+    'test_indices', JSON_OBJECT('type', 'vector', 'description', 'Índices originais (em X) do conjunto de teste'),
+    'validation_indices', JSON_OBJECT('type', 'vector', 'description', 'Índices originais (em X) do conjunto de validação')
+  ),
+  JSON_OBJECT(
+    'sample_axis', JSON_OBJECT('type', 'integer', 'default', 0, 'description', 'Eixo de amostras'),
+    'n_train', JSON_OBJECT('type', 'integer', 'description', 'Tamanho absoluto do conjunto de treino (prioridade sobre train_size)'),
+    'train_size', JSON_OBJECT('type', 'number', 'default', 0.7, 'range', JSON_ARRAY(0, 1), 'description', 'Fração do total para treino, usada quando n_train não é informado'),
+    'n_validation', JSON_OBJECT('type', 'integer', 'description', 'Tamanho absoluto do conjunto de validação (opcional)'),
+    'validation_size', JSON_OBJECT('type', 'number', 'default', 0, 'range', JSON_ARRAY(0, 1), 'description', 'Fração do total para validação, usada quando n_validation não é informado')
+  ),
+  1,
+  NULL,
+  1,
+  JSON_ARRAY('kennard-stone', 'split', 'train-test', 'calibração', 'amostragem', 'validação'),
+  '1.0',
+  0,
+  0,
+  'worker_api/catalog/familia_01_dados/scripts.py:KennardStone',
+  'Ver docs/catalogo_scripts.md#kennard_stone para o algoritmo completo e exemplos.',
+  1,
+  NOW(),
+  NOW()
+)
+ON DUPLICATE KEY UPDATE
+  name = VALUES(name),
+  category = VALUES(category),
+  subcategory = VALUES(subcategory),
+  family = VALUES(family),
+  description = VALUES(description),
+  input_type = VALUES(input_type),
+  output_type = VALUES(output_type),
+  input_schema = VALUES(input_schema),
+  output_schema = VALUES(output_schema),
+  parameter_schema = VALUES(parameter_schema),
+  min_order = VALUES(min_order),
+  max_order = VALUES(max_order),
+  requires_sample_axis = VALUES(requires_sample_axis),
+  tags = VALUES(tags),
+  implementation = VALUES(implementation),
+  documentation = VALUES(documentation),
+  active = VALUES(active),
+  updated_at = NOW();
+
+-- =============================================================================
+-- LISTA BETA: 75 técnicas ativas (ver backend_api/sql/CATALOG_AUDIT.md §5).
+-- Mantido idêntico a backend_api/sql/beta_active_set.sql.
+-- =============================================================================
+
+-- =============================================================================
+-- Lista beta: 75 técnicas ativas, resto marcado 'em desenvolvimento' (active=0)
+-- Decidido em conversa com o usuário em 2026-10-10 — ver backend_api/sql/CATALOG_AUDIT.md
+-- Idempotente.
+-- =============================================================================
+
+-- `mlp` (MLP único, parametrizado por task=classification/regression) nunca
+-- teve linha própria — era um dos 5 pares ambíguos deixados de lado no sync
+-- anterior (o banco só tinha `mlp_classification`/`mlp_regression`
+-- separados). Insere agora porque o usuário confirmou MLP pra beta.
+-- `mlp_classification`/`mlp_regression` ficam como duplicatas inativas
+-- (já cobertas pelo active=0 abaixo), documentadas em CATALOG_AUDIT.md.
+INSERT IGNORE INTO `techniques` (`uuid`,`name`,`slug`,`category`,`subcategory`,`family`,`description`,`active`,`is_beta`)
+VALUES (UUID(), 'MLP — Multi-Layer Perceptron', 'mlp', 'deep_learning', 'mlp', '06_deep_learning', 'Rede neural densa (MLP) para regressão ou classificação.', 1, 0);
+
+UPDATE `techniques` SET `active` = 0 WHERE `is_custom` = 0;
+
+UPDATE `techniques` SET `active` = 1 WHERE `is_custom` = 0 AND `slug` IN ('autoencoder','autoscaling','autovalores','autovetores','baseline','centering','cnn_1d','concatenacao','cross_validation','determinante','diffusion','divisao_elementwise','ds','eig','expand_dims','folding','formula_customizada','hca','importacao','inversa','ipls','kennard_stone','knn','lda','leverage_influence','limpeza','max','mcr_als','mean','median','metrics_aggregation','min','mlp','msc','multiplicacao_elementwise','multiway_pls_da','n_pls','norma','outlier_detection','parafac','pca','pcr','pds','pls','pls_da','pls_oc','produto_matricial','pseudo_inversa','random_forest','rank','reshape','rnn','savitzky_golay','selecao_amostras','selecao_variaveis','simca','slice','snv','soma','split','squeeze','stack','std','subtracao','sum','svd','svm','trace','transformer','transpose','tratamento_missing','tucker3','u_pls','unfolding','vip');
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
