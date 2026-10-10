@@ -10,7 +10,17 @@
 --
 -- Como aplicar: rode este arquivo contra o banco do ambiente
 -- (ex: `mysql -u tchelab -p tchelab < backend_api/sql/seed_kennard_stone.sql`).
--- É seguro rodar mais de uma vez (idempotente via WHERE NOT EXISTS).
+-- É seguro rodar mais de uma vez: na primeira vez insere a técnica, nas
+-- seguintes apenas atualiza os campos (ON DUPLICATE KEY UPDATE pela `slug`,
+-- que é UNIQUE) em vez de pular silenciosamente — então reaplicar também
+-- conserta a linha caso ela precise de correção (foi exatamente o caso do
+-- `SET NAMES utf8mb4` abaixo: sem ele, rodar este arquivo num cliente mysql
+-- com locale não-UTF8 — comum em servidores com LANG=C/POSIX — gravava
+-- "Separação" como "SeparaÃ§Ã£o", um double-encoding silencioso só visível
+-- consultando com `mysql --default-character-set=utf8mb4`; a primeira versão
+-- deste arquivo não tinha essa linha e usava WHERE NOT EXISTS, então uma
+-- linha já corrompida nunca seria reescrita por um reaplique).
+SET NAMES utf8mb4;
 
 INSERT INTO techniques (
   uuid, slug, name, category, subcategory, family, description,
@@ -18,8 +28,7 @@ INSERT INTO techniques (
   min_order, max_order, requires_sample_axis, tags, version,
   is_beta, is_custom, implementation, documentation, active,
   created_at, updated_at
-)
-SELECT
+) VALUES (
   UUID(),
   'kennard_stone',
   'Separação Kennard-Stone',
@@ -59,6 +68,23 @@ SELECT
   1,
   NOW(),
   NOW()
-WHERE NOT EXISTS (
-  SELECT 1 FROM techniques WHERE slug = 'kennard_stone'
-);
+)
+ON DUPLICATE KEY UPDATE
+  name = VALUES(name),
+  category = VALUES(category),
+  subcategory = VALUES(subcategory),
+  family = VALUES(family),
+  description = VALUES(description),
+  input_type = VALUES(input_type),
+  output_type = VALUES(output_type),
+  input_schema = VALUES(input_schema),
+  output_schema = VALUES(output_schema),
+  parameter_schema = VALUES(parameter_schema),
+  min_order = VALUES(min_order),
+  max_order = VALUES(max_order),
+  requires_sample_axis = VALUES(requires_sample_axis),
+  tags = VALUES(tags),
+  implementation = VALUES(implementation),
+  documentation = VALUES(documentation),
+  active = VALUES(active),
+  updated_at = NOW();

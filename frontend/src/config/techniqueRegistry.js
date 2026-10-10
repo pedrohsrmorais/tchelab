@@ -39,154 +39,166 @@ export const ARRAY_TYPES = {
 };
 
 // ── Famílias e seus metadados visuais ────────────────────────────────────────
-// Chave = slug da família no banco (techniques.family)
+// Chave = slug da família no banco (techniques.family). ATENÇÃO: isto tem que
+// bater EXATAMENTE com os valores reais gravados em `techniques.family` pelo
+// seed (backend_api/src/config/init.mysql) — que por sua vez espelham os
+// nomes das 20 pastas do catálogo Python (worker_api/catalog/familia_NN_*).
+// Até esta correção, as chaves aqui eram uma taxonomia inventada à parte
+// (ex: '02_pre_processamento', '06_clustering', '09_selecao_variaveis' na
+// posição 9) que nunca bateu com os valores reais do banco para as famílias
+// 02–19 (ex: o banco usa '02_preprocessamento' sem underscore extra, a
+// família 9 real é 'multiway_classif' e não tem nada a ver com "seleção de
+// variáveis", que é a família 11). Resultado: `groupedByFamily` no editor de
+// workflow (que filtra por `t.family === fam.slug`) descartava silenciosamente
+// as técnicas de 18 das 20 famílias — a causa raiz do catálogo aparecendo
+// quase vazio no painel lateral, mesmo com a API retornando as técnicas.
 export const FAMILIES = {
   '01_dados': {
-    label:    { pt: 'Dados & I/O',            en: 'Data & I/O' },
+    label:    { pt: 'Dados & I/O',              en: 'Data & I/O' },
     color:    '#64748b',
     bg:       'rgba(100,116,139,0.15)',
     border:   'rgba(100,116,139,0.4)',
     category: 'entrada',
     order:    1,
   },
-  '02_pre_processamento': {
-    label:    { pt: 'Pré-processamento',       en: 'Pre-processing' },
+  '02_preprocessamento': {
+    label:    { pt: 'Pré-processamento',        en: 'Pre-processing' },
     color:    '#0ea5e9',
     bg:       'rgba(14,165,233,0.12)',
     border:   'rgba(14,165,233,0.4)',
     category: 'transformacao',
     order:    2,
   },
-  '03_decomposicao': {
-    label:    { pt: 'Decomposição',            en: 'Decomposition' },
+  '03_exploratoria': {
+    label:    { pt: 'Análise Exploratória',     en: 'Exploratory Analysis' },
     color:    '#8b5cf6',
     bg:       'rgba(139,92,246,0.12)',
     border:   'rgba(139,92,246,0.4)',
     category: 'analise',
     order:    3,
   },
-  '04_regressao': {
-    label:    { pt: 'Regressão',               en: 'Regression' },
+  '04_regressao_1d': {
+    label:    { pt: 'Regressão',                en: 'Regression' },
     color:    '#10b981',
     bg:       'rgba(16,185,129,0.12)',
     border:   'rgba(16,185,129,0.4)',
     category: 'modelagem',
     order:    4,
   },
-  '05_classificacao': {
-    label:    { pt: 'Classificação',           en: 'Classification' },
+  '05_classificacao_1d': {
+    label:    { pt: 'Classificação',            en: 'Classification' },
     color:    '#f59e0b',
     bg:       'rgba(245,158,11,0.12)',
     border:   'rgba(245,158,11,0.4)',
     category: 'modelagem',
     order:    5,
   },
-  '06_clustering': {
-    label:    { pt: 'Clustering',              en: 'Clustering' },
+  '06_deep_learning': {
+    label:    { pt: 'Deep Learning',            en: 'Deep Learning' },
     color:    '#ec4899',
     bg:       'rgba(236,72,153,0.12)',
     border:   'rgba(236,72,153,0.4)',
-    category: 'analise',
+    category: 'modelagem',
     order:    6,
   },
-  '07_calibracao': {
-    label:    { pt: 'Calibração',              en: 'Calibration' },
+  '07_multiway_decomp': {
+    label:    { pt: 'Decomposição Multiway',    en: 'Multiway Decomposition' },
     color:    '#06b6d4',
     bg:       'rgba(6,182,212,0.12)',
     border:   'rgba(6,182,212,0.4)',
-    category: 'modelagem',
+    category: 'analise',
     order:    7,
   },
-  '08_validacao': {
-    label:    { pt: 'Validação',               en: 'Validation' },
+  '08_multiway_regression': {
+    label:    { pt: 'Regressão Multiway',       en: 'Multiway Regression' },
     color:    '#84cc16',
     bg:       'rgba(132,204,22,0.12)',
     border:   'rgba(132,204,22,0.4)',
-    category: 'avaliacao',
+    category: 'modelagem',
     order:    8,
   },
-  '09_selecao_variaveis': {
-    label:    { pt: 'Seleção de Variáveis',    en: 'Variable Selection' },
+  '09_multiway_classif': {
+    label:    { pt: 'Classificação Multiway',   en: 'Multiway Classification' },
     color:    '#f97316',
     bg:       'rgba(249,115,22,0.12)',
     border:   'rgba(249,115,22,0.4)',
-    category: 'transformacao',
+    category: 'modelagem',
     order:    9,
   },
-  '10_fusao': {
-    label:    { pt: 'Fusão de Dados',          en: 'Data Fusion' },
+  '10_calibracao_ordem_superior': {
+    label:    { pt: 'Calibração de Ordem Superior', en: 'Higher-Order Calibration' },
     color:    '#6366f1',
     bg:       'rgba(99,102,241,0.12)',
     border:   'rgba(99,102,241,0.4)',
-    category: 'transformacao',
+    category: 'modelagem',
     order:    10,
   },
-  '11_n_way': {
-    label:    { pt: 'N-way (3D+)',             en: 'N-way (3D+)' },
+  '11_selecao_variaveis': {
+    label:    { pt: 'Seleção de Variáveis',     en: 'Variable Selection' },
     color:    '#a855f7',
     bg:       'rgba(168,85,247,0.12)',
     border:   'rgba(168,85,247,0.4)',
-    category: 'analise',
+    category: 'transformacao',
     order:    11,
   },
-  '12_multibloco': {
-    label:    { pt: 'Multi-Bloco',             en: 'Multi-Block' },
+  '12_validacao_modelos': {
+    label:    { pt: 'Validação de Modelos',     en: 'Model Validation' },
     color:    '#14b8a6',
     bg:       'rgba(20,184,166,0.12)',
     border:   'rgba(20,184,166,0.4)',
-    category: 'analise',
+    category: 'avaliacao',
     order:    12,
   },
-  '13_augmented': {
-    label:    { pt: 'Augmented',               en: 'Augmented' },
+  '13_transferencia_aprendizado': {
+    label:    { pt: 'Transferência de Aprendizado', en: 'Transfer Learning' },
     color:    '#ef4444',
     bg:       'rgba(239,68,68,0.12)',
     border:   'rgba(239,68,68,0.4)',
-    category: 'transformacao',
+    category: 'modelagem',
     order:    13,
   },
-  '14_transferencia': {
-    label:    { pt: 'Transferência',           en: 'Transfer' },
+  '14_sinais_espectrais': {
+    label:    { pt: 'Sinais Espectrais',        en: 'Spectral Signals' },
     color:    '#22c55e',
     bg:       'rgba(34,197,94,0.12)',
     border:   'rgba(34,197,94,0.4)',
-    category: 'modelagem',
+    category: 'transformacao',
     order:    14,
   },
-  '15_sensorial': {
-    label:    { pt: 'Análise Sensorial',       en: 'Sensory Analysis' },
+  '15_imagens_hiperespectrais': {
+    label:    { pt: 'Imagens Hiperespectrais',  en: 'Hyperspectral Imaging' },
     color:    '#fb923c',
     bg:       'rgba(251,146,60,0.12)',
     border:   'rgba(251,146,60,0.4)',
     category: 'analise',
     order:    15,
   },
-  '16_quimiometria_imagem': {
-    label:    { pt: 'Quimiometria de Imagem',  en: 'Chemometric Imaging' },
+  '16_dados_faltantes': {
+    label:    { pt: 'Dados Faltantes',          en: 'Missing Data' },
     color:    '#38bdf8',
     bg:       'rgba(56,189,248,0.12)',
     border:   'rgba(56,189,248,0.4)',
-    category: 'analise',
+    category: 'transformacao',
     order:    16,
   },
-  '17_eletroquimica': {
-    label:    { pt: 'Eletroquímica',           en: 'Electrochemistry' },
+  '17_fusao_dados': {
+    label:    { pt: 'Fusão de Dados',           en: 'Data Fusion' },
     color:    '#facc15',
     bg:       'rgba(250,204,21,0.12)',
     border:   'rgba(250,204,21,0.4)',
-    category: 'analise',
+    category: 'transformacao',
     order:    17,
   },
-  '18_espectrometria_massa': {
-    label:    { pt: 'Espectrometria de Massa', en: 'Mass Spectrometry' },
+  '18_quimiometria_processo': {
+    label:    { pt: 'Quimiometria de Processo', en: 'Process Chemometrics (SPC)' },
     color:    '#c084fc',
     bg:       'rgba(192,132,252,0.12)',
     border:   'rgba(192,132,252,0.4)',
     category: 'analise',
     order:    18,
   },
-  '19_temporais': {
-    label:    { pt: 'Séries Temporais',        en: 'Time Series' },
+  '19_interpretabilidade': {
+    label:    { pt: 'Interpretabilidade',       en: 'Interpretability' },
     color:    '#34d399',
     bg:       'rgba(52,211,153,0.12)',
     border:   'rgba(52,211,153,0.4)',
@@ -194,7 +206,7 @@ export const FAMILIES = {
     order:    19,
   },
   '20_utilitarios': {
-    label:    { pt: 'Utilitários',             en: 'Utilities' },
+    label:    { pt: 'Utilitários',              en: 'Utilities' },
     color:    '#94a3b8',
     bg:       'rgba(148,163,184,0.12)',
     border:   'rgba(148,163,184,0.4)',

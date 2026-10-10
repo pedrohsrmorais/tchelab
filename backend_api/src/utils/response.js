@@ -65,9 +65,15 @@ function serverError(res, err) {
  */
 function paginate(req, total) {
   const page = Math.max(1, parseInt(req.query.page || '1', 10));
-  // Teto em 200 (não 100) para a tela de "operação rápida" poder trazer o
-  // catálogo inteiro de técnicas (~115 linhas) numa página só.
-  const per_page = Math.max(1, Math.min(200, parseInt(req.query.per_page || '20', 10)));
+  // Teto em 200 (não 100) para a tela de "operação rápida" e o editor de
+  // workflow poderem trazer o catálogo inteiro de técnicas (~160 linhas)
+  // numa página só. Aceita tanto `per_page` quanto `limit` — o frontend
+  // (frontend/src/pages/WorkflowEditorPage.jsx, api.techniques.list) sempre
+  // mandou `limit`, nunca `per_page`, então esse teto de 200 nunca surtia
+  // efeito: a paginação sempre caía no default de 20, e o painel de técnicas
+  // do editor só via as primeiras 20 de ~160 técnicas (a causa raiz de
+  // "Nenhuma técnica encontrada"/catálogo incompleto no editor).
+  const per_page = Math.max(1, Math.min(200, parseInt(req.query.per_page || req.query.limit || '20', 10)));
   const offset = (page - 1) * per_page;
   const total_pages = Math.ceil(total / per_page);
   return {
