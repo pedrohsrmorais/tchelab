@@ -56,14 +56,106 @@ const EXEC_STATUS_META = {
 };
 
 // ────────────────────────────────────────────────────────────────────────────────
+// Combobox pesquisável — substitui o <select> simples de escolha de dataset.
+// Antes, com muitos datasets, a lista era um <select> nativo só por nome; o
+// usuário pedia para poder digitar ("data") e já filtrar as opções em vez de
+// rolar uma lista às vezes em branco (o "branco" era, na real, o bug de
+// paginação/família corrigido antes — mas digitar para filtrar continua
+// sendo melhor UX que um <select> simples quando o catálogo de datasets cresce).
+// ────────────────────────────────────────────────────────────────────────────────
+function DatasetCombobox({ datasets, value, onChange, placeholder = '— Selecionar dataset —' }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapRef = useRef(null);
+  const selected = datasets.find(d => d.uuid === value);
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const q = query.toLowerCase().trim();
+  const filtered = q
+    ? datasets.filter(d => d.name?.toLowerCase().includes(q) || d.data_type?.toLowerCase().includes(q))
+    : datasets;
+
+  return (
+    <div ref={wrapRef} className="nodrag" style={{ position: 'relative', marginBottom: 4 }}>
+      <input
+        value={open ? query : (selected?.name || '')}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => { setOpen(true); setQuery(''); }}
+        placeholder={placeholder}
+        style={{
+          width: '100%',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(37,99,235,0.35)',
+          borderRadius: 6,
+          color: value ? 'var(--text-primary)' : 'var(--text-muted)',
+          fontSize: '0.78rem',
+          padding: '4px 8px',
+          outline: 'none',
+        }}
+      />
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+          marginTop: 2, maxHeight: 180, overflowY: 'auto',
+          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+          borderRadius: 7, boxShadow: 'var(--shadow)',
+        }}>
+          <div
+            onClick={() => { onChange(''); setOpen(false); setQuery(''); }}
+            style={{ padding: '5px 9px', fontSize: '0.76rem', color: 'var(--text-muted)', cursor: 'pointer' }}
+          >
+            — Nenhum —
+          </div>
+          {filtered.map(d => (
+            <div
+              key={d.uuid}
+              onClick={() => { onChange(d.uuid); setOpen(false); setQuery(''); }}
+              style={{
+                padding: '5px 9px', fontSize: '0.78rem', cursor: 'pointer',
+                color: d.uuid === value ? 'var(--text-accent)' : 'var(--text-primary)',
+                background: d.uuid === value ? 'rgba(37,99,235,0.12)' : 'transparent',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = d.uuid === value ? 'rgba(37,99,235,0.12)' : 'transparent'; }}
+            >
+              {d.name}
+              <span style={{ marginLeft: 6, fontSize: '0.64rem', color: 'var(--text-muted)' }}>
+                {d.data_type || 'matrix'}
+              </span>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: '7px 9px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              Nenhum dataset encontrado.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // Custom node: Dataset (nó de entrada — somente local, nunca persistido no
 // backend. O grafo real (workflow_nodes/workflow_edges) só conhece técnicas;
 // a ligação Dataset→Técnica é resolvida no momento do dispatch via
-// `dataset_bindings`, igual à "operação rápida" em datasetOperation.controller.js)
+// `dataset_bindings`, igual à "operação rápida" em datasetOperation.controller.js.
+// As escolhas de dataset + a própria existência deste nó SÃO persistidas,
+// via workflows.definition.canvas — ver handleAddTechnique/autosave abaixo —
+// então não se perdem mais ao sair e voltar ao workflow.)
 // ────────────────────────────────────────────────────────────────────────────────
 function DatasetNode({ id, data, selected }) {
-  const { data: dsRaw } = useApi(api.datasets.list, []);
-  const datasets = (dsRaw?.data ?? dsRaw ?? []);
+  const datasets = data.datasets || [];
   const selectedDs = datasets.find(d => d.uuid === data.datasetUuid);
 
   return (
@@ -109,28 +201,11 @@ function DatasetNode({ id, data, selected }) {
         </button>
       </div>
 
-      <select
+      <DatasetCombobox
+        datasets={datasets}
         value={data.datasetUuid || ''}
-        onChange={e => data.onChange && data.onChange(id, e.target.value, datasets.find(d => d.uuid === e.target.value))}
-        className="nodrag"
-        style={{
-          width: '100%',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(37,99,235,0.35)',
-          borderRadius: 6,
-          color: data.datasetUuid ? 'var(--text-primary)' : 'var(--text-muted)',
-          fontSize: '0.78rem',
-          padding: '4px 8px',
-          cursor: 'pointer',
-          outline: 'none',
-          marginBottom: 4,
-        }}
-      >
-        <option value="">— Selecionar dataset —</option>
-        {datasets.map(d => (
-          <option key={d.uuid} value={d.uuid}>{d.name}</option>
-        ))}
-      </select>
+        onChange={(uuid) => data.onChange && data.onChange(id, uuid, datasets.find(d => d.uuid === uuid))}
+      />
 
       {selectedDs && (
         <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
@@ -207,6 +282,20 @@ function TechniqueNode({ id, data, selected }) {
             className={data.execStatus === 'running' ? 'anim-spin' : ''}
           />
         )}
+        <button
+          className="nodrag"
+          title={data.hasExecData ? 'Visualizar entrada/saída' : 'Execute o workflow para ver os dados'}
+          onClick={() => data.onViewIO && data.onViewIO(id)}
+          disabled={!data.hasExecData}
+          style={{
+            background: 'none', border: 'none', padding: 2,
+            cursor: data.hasExecData ? 'pointer' : 'default',
+            color: data.hasExecData ? '#93c5fd' : 'var(--text-muted)',
+            opacity: data.hasExecData ? 1 : 0.4,
+          }}
+        >
+          <Eye size={12} />
+        </button>
         <button
           className="nodrag"
           title="Configurar parâmetros"
@@ -293,12 +382,20 @@ function TechniqueCard({ tech, onAdd, lang }) {
 
   return (
     <div
+      draggable
+      onDragStart={e => {
+        // Arrastar para o canvas solta a técnica onde o usuário soltar o
+        // mouse (ver onDrop em WorkflowEditorPage) — em vez de só poder
+        // clicar e cair numa posição em grade pré-calculada.
+        e.dataTransfer.setData('application/x-tchelab-technique', tech.uuid);
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         borderRadius: 10,
         padding: '10px 12px',
-        cursor: 'pointer',
+        cursor: 'grab',
         transition: 'border-color 0.18s, background 0.18s',
         position: 'relative',
       }}
@@ -580,6 +677,109 @@ function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// Painel de entrada/saída de UM nó — aberto pelo botão "olho" no próprio nó
+// técnica do canvas (ex: clicar na PCA). Mostra, lado a lado, os dados que
+// entraram (input_data, resolvido via dataset_bindings no dispatch — ver
+// dispatchExecutionCore no backend) e tudo que saiu (output_data: figuras de
+// mérito, PCs/scores, imagens, etc — uma porta por linha), cada uma com
+// "Visualizar" (MultiDimModal) e, para saídas, "Salvar como dataset".
+// ────────────────────────────────────────────────────────────────────────────────
+function NodeIOPanel({ execNode, onClose, onPreviewPort, onSavePort }) {
+  if (!execNode) return null;
+  const meta = EXEC_STATUS_META[execNode.status] || EXEC_STATUS_META.pending;
+  const inputs = safeJson(execNode.input_data, {}) || {};
+  const outputs = execNode.status === 'completed' ? (safeJson(execNode.output_data, {}) || {}) : {};
+  const inputPorts = Object.keys(inputs);
+  const outputPorts = Object.keys(outputs);
+
+  return (
+    <div style={{
+      width: 320, maxHeight: 'calc(100% - 24px)', overflowY: 'auto',
+      background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+      borderRadius: 10, padding: 12, boxShadow: 'var(--shadow)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <Eye size={13} style={{ color: 'var(--text-accent)' }} />
+        <span style={{ flex: 1, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          {execNode.node_name || execNode.technique_slug}
+        </span>
+        <meta.Icon size={13} color={meta.color} className={execNode.status === 'running' ? 'anim-spin' : ''} />
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <X size={13} />
+        </button>
+      </div>
+
+      {execNode.status === 'failed' && execNode.error_message && (
+        <p style={{ fontSize: '0.72rem', color: '#fca5a5', margin: '0 0 8px' }}>{execNode.error_message}</p>
+      )}
+
+      <p style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '4px 0 6px' }}>
+        Entrada
+      </p>
+      {inputPorts.length === 0 && (
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8 }}>
+          Este nó não recebeu dados de entrada (ex: fonte primária do pipeline).
+        </p>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+        {inputPorts.map(port => (
+          <div key={port} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'rgba(96,165,250,0.06)', borderRadius: 6, padding: '4px 8px',
+          }}>
+            <span style={{ flex: 1, fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+              {port}
+            </span>
+            <button
+              title="Visualizar"
+              onClick={() => onPreviewPort(execNode, port, inputs[port])}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', padding: 2 }}
+            >
+              <Eye size={13} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '4px 0 6px' }}>
+        Saída {execNode.status !== 'completed' && `(${meta.label.toLowerCase()})`}
+      </p>
+      {outputPorts.length === 0 && (
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          {execNode.status === 'completed' ? 'Nenhuma porta de saída.' : 'Ainda não há saída — aguarde a execução terminar.'}
+        </p>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {outputPorts.map(port => (
+          <div key={port} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 8px',
+          }}>
+            <span style={{ flex: 1, fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+              {port}
+            </span>
+            <button
+              title="Visualizar"
+              onClick={() => onPreviewPort(execNode, port, outputs[port])}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', padding: 2 }}
+            >
+              <Eye size={13} />
+            </button>
+            <button
+              title="Salvar como dataset"
+              onClick={() => onSavePort(execNode, port)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6ee7b7', padding: 2 }}
+            >
+              <FolderDown size={13} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // Main page
 // ────────────────────────────────────────────────────────────────────────────────
 export default function WorkflowEditorPage() {
@@ -616,7 +816,37 @@ export default function WorkflowEditorPage() {
   // Preview de dataset (nó dataset OU porta de resultado)
   const [previewDataset, setPreviewDataset] = useState(null);
 
+  // Painel "visualizar entrada/saída" de um nó técnica específico (botão
+  // de olho no próprio nó do canvas — ver NodeIOPanel).
+  const [viewIONodeKey, setViewIONodeKey] = useState(null);
+
+  // Instância do React Flow, capturada via onInit — usada para converter a
+  // posição (em pixels de tela) do drop de uma técnica arrastada do painel
+  // lateral em posição real do canvas (screenToFlowPosition). Evitamos
+  // useReactFlow() aqui porque este componente não está dentro de um
+  // <ReactFlowProvider> próprio (o <ReactFlow> de baixo cria o seu).
+  const rfInstanceRef = useRef(null);
+
+  // Até a 1ª hidratação a partir de workflows.definition.canvas terminar,
+  // não deixamos o autosave de canvas rodar — senão ele gravaria de volta o
+  // estado local (ainda vazio/default) por cima do que já estava salvo.
+  const canvasHydratedRef = useRef(false);
+
   const nodeCount = useRef(0);
+
+  // Se o componente do editor for reaproveitado para outro workflow sem
+  // desmontar (ex: navegar de /workflows/A para /workflows/B via <Link>, o
+  // que o React Router faz sem remount já que é a mesma rota) os `useRef`
+  // acima sobreviveriam com o estado do workflow A — canvasHydratedRef
+  // ficaria "true" para sempre e o canvas de B nunca seria hidratado (ou
+  // peor: o autosave salvaria o canvas de A por cima do de B). Reseta tudo
+  // que é por-workflow sempre que `id` muda.
+  useEffect(() => {
+    canvasHydratedRef.current = false;
+    setDatasetBindings({});
+    setNodes(prev => prev.filter(n => n.type !== 'dataset'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // ── Load workflow ────────────────────────────────────────────────────────────
   const { data: raw, loading } = useApi(() => api.workflows.get(id), [id]);
@@ -627,6 +857,13 @@ export default function WorkflowEditorPage() {
     api.techniques.list({ limit: 500, is_custom: false }), []
   );
   const techniques = (techsRaw?.data ?? techsRaw ?? []);
+
+  // Catálogo de datasets — carregado uma única vez aqui (em vez de cada
+  // DatasetNode chamar useApi(api.datasets.list) por conta própria, o que
+  // disparava N requisições idênticas com N nós de dataset no canvas) e
+  // sincronizado para dentro de data.datasets de cada nó dataset abaixo.
+  const { data: datasetsRaw } = useApi(() => api.datasets.list({ limit: 200 }), []);
+  const datasetsList = (datasetsRaw?.data ?? datasetsRaw ?? []);
 
   // ── Dataset node callbacks (refs para não recriar nodes a cada render) ──────
   const onDatasetChangeRef = useRef(null);
@@ -651,8 +888,12 @@ export default function WorkflowEditorPage() {
   onRemoveNodeRef.current = (nodeId) => removeNode(nodeId);
   const onConfigureRef = useRef(null);
   onConfigureRef.current = (nodeId) => setConfigNodeId(nodeId);
+  const onViewIORef = useRef(null);
+  onViewIORef.current = (nodeId) => setViewIONodeKey(nodeId);
 
-  // ── Populate ReactFlow from existing workflow nodes/edges ────────────────────
+  // ── Populate ReactFlow from existing workflow nodes/edges (nós técnica —
+  //    nós dataset são hidratados separadamente, a partir de
+  //    workflows.definition.canvas, no efeito abaixo) ──────────────────────────
   useEffect(() => {
     if (!nodesRaw) return;
     const list = nodesRaw?.data ?? nodesRaw ?? [];
@@ -674,18 +915,54 @@ export default function WorkflowEditorPage() {
         parameterSchema: safeJson(n.parameter_schema, {}),
         onRemove:    (nid) => onRemoveNodeRef.current?.(nid),
         onConfigure: (nid) => onConfigureRef.current?.(nid),
+        onViewIO:    (nid) => onViewIORef.current?.(nid),
       },
     }));
-    setNodes(prev => {
-      const datasetNodes = prev.filter(n => n.type === 'dataset');
-      if (rfNodes.length === 0 && datasetNodes.length === 0) {
-        return [defaultDatasetNode()];
-      }
-      return [...datasetNodes.length ? datasetNodes : [defaultDatasetNode()], ...rfNodes];
-    });
-    nodeCount.current = rfNodes.length + 1;
+    // Preserva nós dataset existentes (e sua ordem) — este efeito só repõe
+    // os nós técnica, vindos da fonte de verdade real (workflow_nodes).
+    setNodes(prev => [...prev.filter(n => n.type === 'dataset'), ...rfNodes]);
+    nodeCount.current = Math.max(nodeCount.current, rfNodes.length + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodesRaw]);
+
+  // ── Hidrata nós dataset + datasetBindings a partir de
+  //    workflows.definition.canvas (persistido pelo autosave mais abaixo).
+  //    Antes, o canvas de datasets (qual dataset foi escolhido, onde o nó
+  //    dataset ficava, e a ligação dataset→porta) só existia em useState
+  //    local — saía da página e isso tudo se perdia, mesmo que os nós
+  //    técnica continuassem lá (eles sim já eram persistidos de verdade via
+  //    workflow_nodes). Roda só uma vez por carregamento do workflow. ───────────
+  useEffect(() => {
+    if (canvasHydratedRef.current) return;
+    if (!raw) return;
+    const workflowObj = raw?.data ?? raw;
+    const canvas = workflowObj?.definition?.canvas;
+
+    if (canvas && Array.isArray(canvas.datasetNodes) && canvas.datasetNodes.length > 0) {
+      const dsNodes = canvas.datasetNodes.map((dn) => ({
+        id: dn.id,
+        type: 'dataset',
+        position: dn.position || { x: 40, y: 180 },
+        data: {
+          label: dn.label || 'Dataset de entrada',
+          datasetUuid: dn.datasetUuid || '',
+          datasets: datasetsList,
+          onChange:  (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
+          onPreview: (uuid) => onPreviewRef.current?.(uuid),
+          onRemove:  (nid) => onRemoveNodeRef.current?.(nid),
+        },
+      }));
+      setNodes(prev => [...dsNodes, ...prev.filter(n => n.type !== 'dataset')]);
+      setDatasetBindings(canvas.datasetBindings || {});
+      nodeCount.current = Math.max(nodeCount.current, dsNodes.length);
+    } else {
+      // Workflow novo / nunca teve canvas salvo: garante pelo menos 1 nó
+      // dataset em branco para o usuário começar (comportamento antigo).
+      setNodes(prev => (prev.some(n => n.type === 'dataset') ? prev : [defaultDatasetNode(), ...prev]));
+    }
+    canvasHydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw]);
 
   useEffect(() => {
     if (!edgesRaw) return;
@@ -715,12 +992,55 @@ export default function WorkflowEditorPage() {
       data: {
         label: 'Dataset de entrada',
         datasetUuid: '',
+        datasets: datasetsList,
         onChange:  (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
         onPreview: (uuid) => onPreviewRef.current?.(uuid),
         onRemove:  (nid) => onRemoveNodeRef.current?.(nid),
       },
     };
   }
+
+  // ── Mantém data.datasets de todos os nós dataset em dia quando o catálogo
+  //    carrega/atualiza (ele chega depois da hidratação do canvas, então os
+  //    nós dataset nascem com data.datasets=[] e precisam ser atualizados). ──
+  useEffect(() => {
+    if (!datasetsRaw) return;
+    setNodes(prev => prev.map(n =>
+      n.type === 'dataset' ? { ...n, data: { ...n.data, datasets: datasetsList } } : n
+    ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasetsRaw]);
+
+  // ── Autosave do canvas de datasets (nós + bindings) em
+  //    workflows.definition.canvas — debounced para não disparar 1 PUT por
+  //    pixel arrastado / tecla digitada. Só roda depois da hidratação inicial
+  //    (canvasHydratedRef) para não sobrescrever o que já estava salvo com o
+  //    estado local ainda vazio do primeiro render. ───────────────────────────
+  const datasetNodesKey = JSON.stringify(
+    nodes.filter(n => n.type === 'dataset').map(n => ({
+      id: n.id, position: n.position, datasetUuid: n.data?.datasetUuid || '', label: n.data?.label || '',
+    }))
+  );
+  const datasetBindingsKey = JSON.stringify(datasetBindings);
+  const saveCanvasTimerRef = useRef(null);
+  useEffect(() => {
+    if (!canvasHydratedRef.current) return;
+    if (saveCanvasTimerRef.current) clearTimeout(saveCanvasTimerRef.current);
+    saveCanvasTimerRef.current = setTimeout(() => {
+      api.workflows.update(id, {
+        definition: {
+          canvas: {
+            datasetNodes: JSON.parse(datasetNodesKey),
+            datasetBindings: JSON.parse(datasetBindingsKey),
+          },
+        },
+      }).catch(() => {
+        // Autosave silencioso — uma falha aqui não deve interromper o
+        // usuário; a próxima mudança de canvas tenta salvar de novo.
+      });
+    }, 800);
+    return () => { if (saveCanvasTimerRef.current) clearTimeout(saveCanvasTimerRef.current); };
+  }, [datasetNodesKey, datasetBindingsKey, id]);
 
   // ── Deriva as arestas visuais de ligação Dataset→Técnica a partir do
   //    estado datasetBindings + da lista atual de nós (para refletir trocas
@@ -908,10 +1228,17 @@ export default function WorkflowEditorPage() {
   }, [nodes, edges, id, setEdges]);
 
   // ── Adicionar técnica ao canvas (cria de verdade no backend) ────────────────
-  const handleAddTechnique = useCallback((tech) => {
+  // `dropPosition`, quando informado (arrastar do painel lateral e soltar no
+  // canvas — ver onDrop mais abaixo), já vem em coordenadas do canvas via
+  // screenToFlowPosition e é usado no lugar da antiga posição em grade fixa
+  // (x = 300 + (n%4)*240...) — era essa grade que fazia o nó "aparecer numa
+  // região aleatória" em vez de onde o usuário soltou.
+  const handleAddTechnique = useCallback((tech, dropPosition) => {
     nodeCount.current += 1;
     const nodeKey = `${tech.slug}_${Date.now().toString(36)}${nodeCount.current}`;
-    const position = { x: 300 + (nodeCount.current % 4) * 240, y: 140 + Math.floor(nodeCount.current / 4) * 160 };
+    const position = dropPosition
+      ? { x: Math.round(dropPosition.x), y: Math.round(dropPosition.y) }
+      : { x: 300 + (nodeCount.current % 4) * 240, y: 140 + Math.floor(nodeCount.current / 4) * 160 };
 
     api.workflows.addNode(id, {
       technique_id: tech.uuid,
@@ -936,6 +1263,7 @@ export default function WorkflowEditorPage() {
           parameterSchema: safeJson(tech.parameter_schema, {}),
           onRemove: (nid) => onRemoveNodeRef.current?.(nid),
           onConfigure: (nid) => onConfigureRef.current?.(nid),
+          onViewIO: (nid) => onViewIORef.current?.(nid),
         },
       }]);
       toast.success(`${tech.name} adicionado`, { duration: 2000 });
@@ -1002,6 +1330,24 @@ export default function WorkflowEditorPage() {
     }
   };
 
+  // Reflete o resultado de uma execução (status + dados de entrada/saída por
+  // nó) no canvas. Extraído do tick de polling para também ser usado na
+  // hidratação ao montar a página (ver efeito abaixo) — sem isto, o único
+  // jeito de ver o resultado de uma execução era ficar na mesma aba olhando
+  // o polling rodar; sair e voltar (ou abrir em outra aba) mostrava o
+  // workflow como se nada tivesse sido executado, daí a sensação de "preciso
+  // relogar para ver o resultado da fila" relatada pelo usuário — na
+  // verdade nem relogar ajudava, porque nada buscava a última execução.
+  const applyExecutionToNodes = useCallback((execData) => {
+    const byKey = {};
+    (execData.nodes || []).forEach(n => { byKey[n.node_key] = n; });
+    setNodes(prev => prev.map(n =>
+      n.type === 'technique'
+        ? { ...n, data: { ...n.data, execStatus: byKey[n.id]?.status || n.data.execStatus, hasExecData: !!byKey[n.id] } }
+        : n
+    ));
+  }, [setNodes]);
+
   const startPolling = useCallback((executionId) => {
     if (pollRef.current) clearInterval(pollRef.current);
     const tick = async () => {
@@ -1009,15 +1355,7 @@ export default function WorkflowEditorPage() {
         const res = await api.executions.get(executionId);
         const execData = res?.data?.data ?? res?.data ?? res;
         setExecution(execData);
-
-        // Reflete status por nó visualmente no canvas
-        const statusByKey = {};
-        (execData.nodes || []).forEach(n => { statusByKey[n.node_key] = n.status; });
-        setNodes(prev => prev.map(n =>
-          n.type === 'technique'
-            ? { ...n, data: { ...n.data, execStatus: statusByKey[n.id] || n.data.execStatus } }
-            : n
-        ));
+        applyExecutionToNodes(execData);
 
         const terminal = ['completed', 'failed', 'cancelled'];
         if (terminal.includes(execData.status)) {
@@ -1033,9 +1371,45 @@ export default function WorkflowEditorPage() {
     };
     tick();
     pollRef.current = setInterval(tick, 1500);
-  }, [setNodes]);
+  }, [applyExecutionToNodes]);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  // ── Ao abrir o editor, busca a execução mais recente deste workflow (se
+  //    houver) e: se ainda estiver rodando, retoma o polling automaticamente
+  //    (em vez do usuário precisar disparar de novo ou recarregar a página
+  //    repetidas vezes para eventualmente ver o resultado); se já tiver
+  //    terminado, só carrega o resultado para os botões de "olho"/Resultados
+  //    já funcionarem sem precisar executar de novo. ───────────────────────────
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.workflows.executions(id, { limit: 1, per_page: 1 });
+        const list = res?.data?.data ?? res?.data ?? res ?? [];
+        const latest = Array.isArray(list) ? list[0] : null;
+        if (!latest || cancelled) return;
+
+        const execRes = await api.executions.get(latest.uuid);
+        const execData = execRes?.data?.data ?? execRes?.data ?? execRes;
+        if (cancelled) return;
+        setExecution(execData);
+        applyExecutionToNodes(execData);
+
+        const terminal = ['completed', 'failed', 'cancelled'];
+        if (!terminal.includes(execData.status)) {
+          setShowResults(true);
+          startPolling(latest.uuid);
+        }
+      } catch {
+        // Sem execuções anteriores (ou falha ao buscar) — tudo bem, o editor
+        // só começa sem painel de resultados, como sempre começou.
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // ── Resultados: visualizar porta / salvar porta como dataset ───────────────
   const handlePreviewPort = useCallback((execNode, port, value) => {
@@ -1082,6 +1456,7 @@ export default function WorkflowEditorPage() {
   })).filter(g => g.techs.length > 0);
 
   const configNode = nodes.find(n => n.id === configNodeId);
+  const viewIONode = execution?.nodes?.find(n => n.node_key === viewIONodeKey);
 
   if (loading) {
     return (
@@ -1162,10 +1537,33 @@ export default function WorkflowEditorPage() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', borderRadius: '0 0 12px 12px', border: '1px solid var(--border)', borderTop: 'none' }}>
 
         {/* ── ReactFlow canvas ─────────────────────────────────────────────── */}
-        <div style={{ flex: 1, position: 'relative', background: 'var(--bg-base)' }}>
+        <div
+          style={{ flex: 1, position: 'relative', background: 'var(--bg-base)' }}
+          onDragOver={e => {
+            // Precisa de preventDefault para o onDrop disparar (regra da
+            // HTML5 Drag & Drop API) — sem isto o navegador simplesmente
+            // rejeita o drop.
+            if (e.dataTransfer.types.includes('application/x-tchelab-technique')) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+            }
+          }}
+          onDrop={e => {
+            const techUuid = e.dataTransfer.getData('application/x-tchelab-technique');
+            if (!techUuid) return;
+            e.preventDefault();
+            const tech = techniques.find(t => t.uuid === techUuid);
+            if (!tech) return;
+            const position = rfInstanceRef.current
+              ? rfInstanceRef.current.screenToFlowPosition({ x: e.clientX, y: e.clientY })
+              : { x: 300, y: 140 };
+            handleAddTechnique(tech, position);
+          }}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
+            onInit={(instance) => { rfInstanceRef.current = instance; }}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeDragStop={onNodeDragStop}
@@ -1227,7 +1625,18 @@ export default function WorkflowEditorPage() {
               </Panel>
             )}
 
-            {showResults && execution && !configNode && (
+            {!configNode && viewIONode && (
+              <Panel position="top-right">
+                <NodeIOPanel
+                  execNode={viewIONode}
+                  onClose={() => setViewIONodeKey(null)}
+                  onPreviewPort={handlePreviewPort}
+                  onSavePort={handleSavePort}
+                />
+              </Panel>
+            )}
+
+            {showResults && execution && !configNode && !viewIONode && (
               <Panel position="top-right">
                 <ResultsPanel
                   execution={execution}
@@ -1350,6 +1759,7 @@ export default function WorkflowEditorPage() {
                     position: { x: 40, y: 60 + nodeCount.current * 110 },
                     data: {
                       label: 'Dataset', datasetUuid: '',
+                      datasets: datasetsList,
                       onChange: (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
                       onPreview: (uuid) => onPreviewRef.current?.(uuid),
                       onRemove: (nid) => onRemoveNodeRef.current?.(nid),

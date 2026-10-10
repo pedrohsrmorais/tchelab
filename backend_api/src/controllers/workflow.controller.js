@@ -136,13 +136,23 @@ async function updateWorkflow(req, res) {
     if (!workflow) return R.notFound(res, 'Workflow');
     if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
 
-    const allowed = ['name', 'description', 'visibility', 'status', 'tags'];
+    // 'definition' não guarda o grafo real (workflow_nodes/workflow_edges são
+    // a fonte de verdade disso, montada em buildDefinition) — guarda o estado
+    // de CANVAS que só existe no frontend: nós de dataset (posição + uuid do
+    // dataset escolhido) e o mapa datasetBindings (porta de técnica → nó de
+    // dataset). Antes disto, nada no backend aceitava escrever essa coluna
+    // (createWorkflow grava uma vez, mas nunca era reescrita depois), então
+    // ela ficava sempre lida como "{}" no editor — e como DatasetNode/
+    // datasetBindings só existiam como useState local, saíam e voltavam para
+    // o workflow faziam o "estado não ficou salvo" (dataset solto / ligação
+    // perdida) relatado pelo usuário.
+    const allowed = ['name', 'description', 'visibility', 'status', 'tags', 'definition'];
     const fields = [];
     const values = [];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         fields.push(`${key} = ?`);
-        values.push(key === 'tags' ? JSON.stringify(req.body[key]) : req.body[key]);
+        values.push(key === 'tags' || key === 'definition' ? JSON.stringify(req.body[key]) : req.body[key]);
       }
     }
     if (!fields.length) return R.badRequest(res, 'Nenhum campo para atualizar.');

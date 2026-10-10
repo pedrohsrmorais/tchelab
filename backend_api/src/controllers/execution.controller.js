@@ -126,11 +126,28 @@ async function dispatchExecutionCore(workflow, user, { parameters_override = {},
     };
     const inputs = dataset_bindings[nodeKey] || {};
 
-    // Registra nó de execução com status pending
+    // input_metadata guarda só a "forma" (dims) de cada porta de entrada, não
+    // o tensor inteiro de novo — o tensor já vai ficar em input_data, então
+    // isto é só para o editor poder mostrar "3 amostras × 5 variáveis" sem
+    // precisar re-percorrer o array toda vez que abre o visualizador de nó.
+    const inputShapes = {};
+    for (const [portName, value] of Object.entries(inputs)) {
+      const dims = [];
+      let cur = value;
+      while (Array.isArray(cur)) { dims.push(cur.length); cur = cur[0]; }
+      inputShapes[portName] = dims;
+    }
+
+    // Registra nó de execução com status pending — grava também input_data
+    // (os dados que de fato entraram nesta porta, resolvidos a partir de
+    // dataset_bindings). Antes esta coluna nunca era escrita em lugar algum
+    // do backend, então "visualizar o input" de um nó já executado era
+    // impossível (a coluna existia no schema mas ficava sempre NULL) — era
+    // um dos bugs pedidos: "visualizar o input 'os dados que entraram'".
     const [enResult] = await db.query(
-      `INSERT INTO execution_nodes (execution_id, workflow_node_id, status, created_at, updated_at)
-       VALUES (?, ?, 'pending', NOW(), NOW())`,
-      [executionId, node.id],
+      `INSERT INTO execution_nodes (execution_id, workflow_node_id, status, input_data, input_metadata, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, NOW(), NOW())`,
+      [executionId, node.id, JSON.stringify(inputs), JSON.stringify(inputShapes)],
     );
 
     const { uuid: jobUuid } = await jobService.createJob({
