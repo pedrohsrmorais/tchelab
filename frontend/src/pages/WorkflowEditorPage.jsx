@@ -507,6 +507,172 @@ function TechniqueCard({ tech, onAdd, lang }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// Campo individual do NodeConfigPanel — o tipo de input é escolhido a partir
+// do parameter_schema real da técnica (preenchido na auditoria de
+// hiperparâmetros, 2026-10-13): enum vira <select>, boolean vira checkbox,
+// array vira um editor de lista (um input por item, com adicionar/remover),
+// e number/integer com min/max usa esses limites no próprio <input type=
+// number>. object é o único fallback que ainda cai pra edição como JSON
+// cru (caso raro — hoje só `slice.ranges`).
+// ────────────────────────────────────────────────────────────────────────────────
+// Fallback raro pra parâmetro tipo "object" (ex: slice.ranges) — edição como
+// JSON cru até ganhar um editor dedicado; valor inválido não é enviado (fica
+// sinalizado em vermelho). Componente próprio porque usa hooks (useState),
+// que não podem ser chamados condicionalmente dentro de ConfigFieldInput.
+function ConfigObjectFieldInput({ spec, value, onChange, inputStyle }) {
+  const [draft, setDraft] = useState(() => JSON.stringify(value ?? spec?.default ?? {}, null, 0));
+  const [invalid, setInvalid] = useState(false);
+  return (
+    <input
+      className="input-field"
+      style={{ ...inputStyle, borderColor: invalid ? 'var(--danger)' : undefined }}
+      type="text"
+      placeholder="JSON, ex: {&quot;0&quot;: [0, 10, 1]}"
+      value={draft}
+      onChange={e => {
+        const raw = e.target.value;
+        setDraft(raw);
+        try {
+          onChange(raw.trim() === '' ? undefined : JSON.parse(raw));
+          setInvalid(false);
+        } catch {
+          setInvalid(true);
+        }
+      }}
+    />
+  );
+}
+
+function ConfigFieldInput({ type, spec, value, onChange }) {
+  const inputStyle = { fontSize: '0.76rem', padding: '4px 8px', width: '100%' };
+
+  // enum (qualquer tipo) → select
+  if (Array.isArray(spec?.enum) && spec.enum.length > 0) {
+    const castBack = (raw) => {
+      if (raw === '') return undefined;
+      if (type === 'integer') return parseInt(raw, 10);
+      if (type === 'number') return Number(raw);
+      if (type === 'boolean') return raw === 'true';
+      return raw;
+    };
+    return (
+      <select
+        className="input-field"
+        style={inputStyle}
+        value={value ?? ''}
+        onChange={e => onChange(castBack(e.target.value))}
+      >
+        <option value="">
+          {spec?.default !== undefined && spec?.default !== null ? `(padrão: ${String(spec.default)})` : '— selecione —'}
+        </option>
+        {spec.enum.map(opt => (
+          <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
+        ))}
+      </select>
+    );
+  }
+
+  if (type === 'boolean') {
+    const checked = value ?? spec?.default ?? false;
+    return (
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--text-primary)' }}>
+        <input
+          type="checkbox"
+          checked={!!checked}
+          onChange={e => onChange(e.target.checked)}
+        />
+        {checked ? 'Sim' : 'Não'}
+      </label>
+    );
+  }
+
+  if (type === 'array') {
+    const itemType = spec?.items?.type;
+    const itemIsNumber = itemType === 'number' || itemType === 'integer';
+    const list = Array.isArray(value) ? value : (Array.isArray(spec?.default) ? spec.default : []);
+    const castItem = (raw) => {
+      if (!itemIsNumber) return raw;
+      const n = itemType === 'integer' ? parseInt(raw, 10) : Number(raw);
+      return Number.isNaN(n) ? 0 : n;
+    };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {list.map((item, idx) => (
+          <div key={idx} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input
+              className="input-field"
+              style={{ ...inputStyle, flex: 1 }}
+              type={itemIsNumber ? 'number' : 'text'}
+              step={itemType === 'number' ? 'any' : undefined}
+              min={itemType === 'integer' ? spec?.items?.minimum : undefined}
+              value={item ?? ''}
+              onChange={e => {
+                const next = [...list];
+                next[idx] = castItem(e.target.value);
+                onChange(next);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(list.filter((_, i) => i !== idx))}
+              className="btn-ghost"
+              title="Remover item"
+              style={{ padding: '2px 7px', fontSize: '0.78rem', lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange([...list, itemIsNumber ? 0 : ''])}
+          className="btn-ghost"
+          style={{ fontSize: '0.7rem', justifyContent: 'center', padding: '3px 6px' }}
+        >
+          + adicionar item
+        </button>
+      </div>
+    );
+  }
+
+  if (type === 'integer' || type === 'number') {
+    return (
+      <input
+        className="input-field"
+        style={inputStyle}
+        type="number"
+        step={type === 'number' ? 'any' : '1'}
+        min={spec?.minimum}
+        max={spec?.maximum}
+        placeholder={spec?.default !== undefined && spec?.default !== null ? String(spec.default) : ''}
+        value={value ?? ''}
+        onChange={e => {
+          const raw = e.target.value;
+          if (raw === '') { onChange(undefined); return; }
+          onChange(type === 'integer' ? parseInt(raw, 10) : Number(raw));
+        }}
+      />
+    );
+  }
+
+  if (type === 'object') {
+    return <ConfigObjectFieldInput spec={spec} value={value} onChange={onChange} inputStyle={inputStyle} />;
+  }
+
+  // string (ou tipo desconhecido) → texto livre
+  return (
+    <input
+      className="input-field"
+      style={inputStyle}
+      type="text"
+      placeholder={spec?.default !== undefined && spec?.default !== null ? String(spec.default) : ''}
+      value={value ?? ''}
+      onChange={e => onChange(e.target.value === '' ? undefined : e.target.value)}
+    />
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // Painel de configuração de parâmetros de um nó técnica
 // ────────────────────────────────────────────────────────────────────────────────
 function NodeConfigPanel({ node, onClose, onSave, saving }) {
@@ -522,7 +688,7 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
 
   return (
     <div style={{
-      width: 280, background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+      width: 300, background: 'var(--bg-elevated)', border: '1px solid var(--border)',
       borderRadius: 10, padding: 12, boxShadow: 'var(--shadow)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -539,29 +705,19 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
         <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Esta técnica não tem parâmetros configuráveis.</p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto' }}>
         {fields.map(([key, spec]) => {
           const type = spec?.type;
-          const isNumber = type === 'number' || type === 'integer';
           return (
             <div key={key}>
-              <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 2 }}>
+              <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 3 }}>
                 {key}{spec?.description ? ` — ${spec.description}` : ''}
               </label>
-              <input
-                className="input-field"
-                style={{ fontSize: '0.76rem', padding: '4px 8px' }}
-                type={isNumber ? 'number' : 'text'}
-                step={type === 'number' ? 'any' : undefined}
-                placeholder={spec?.default !== undefined ? String(spec.default) : ''}
-                value={values[key] ?? ''}
-                onChange={e => {
-                  const raw = e.target.value;
-                  setValues(prev => ({
-                    ...prev,
-                    [key]: raw === '' ? undefined : (isNumber ? Number(raw) : raw),
-                  }));
-                }}
+              <ConfigFieldInput
+                type={type}
+                spec={spec}
+                value={values[key]}
+                onChange={(next) => setValues(prev => ({ ...prev, [key]: next }))}
               />
             </div>
           );
