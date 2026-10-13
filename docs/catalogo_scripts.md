@@ -477,13 +477,14 @@ Suavização e derivadas via filtro Savitzky-Golay.
 
 ---
 
-## `mean_center`
+## `centering`
 
-Centraliza na média (subtrai média das colunas).
+Mean Centering. Subtrai a média de cada variável (ou amostra, conforme `axis`).
 
-**Inputs:** `X`  
-**Parâmetros:** `axis` (0=amostras, 1=variáveis)  
-**Outputs:** `X_mc`, `mean`
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `axis` (0=centraliza colunas/variáveis, 1=centraliza linhas; default 0)  
+**Outputs:** `X_c`, `mean_`  
+**Restrições:** X deve ser matriz 2D
 
 ---
 
@@ -506,13 +507,101 @@ Normalização por norma L1, L2 ou máximo.
 
 ---
 
-## `baseline_correction`
+## `baseline`
 
-Subtrai linha de base por polinômio ou rubberband.
+Correção de Linha de Base. Remove a linha de base por método linear, polinomial, rubberband (envoltória convexa inferior) ou ALS (Asymmetric Least Squares).
 
-**Inputs:** `X`  
-**Parâmetros:** `method` (polynomial | rubberband), `degree`  
-**Outputs:** `X_bc`
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `method` (linear | polynomial | rubberband | als; default `linear`), `degree` (usado em `polynomial`, default 2), `lambda_` (peso de suavização, usado em `als`, default 1e4), `spectral_axis` (default 1)  
+**Outputs:** `X_bl`  
+**Restrições:** `method` deve ser um dos 4 válidos; X deve ser matriz 2D
+
+---
+
+## `pareto`
+
+Pareto Scaling. Mean centering seguido de divisão pela raiz quadrada do desvio padrão.
+
+**Inputs:** `X` (matrix)  
+**Outputs:** `X_p`, `mean_`, `scale_`  
+**Restrições:** X deve ser matriz 2D
+
+---
+
+## `outros_scalings`
+
+VAST, level e range scaling, conforme `method`.
+
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `method` (vast | level | range; default `vast`), `axis` (default 0)  
+**Outputs:** `X_s`, `params_` (conteúdo varia por método: `mean_`/`std_`/`cv` em vast, `mean_` em level, `min_`/`max_` em range)  
+**Restrições:** `method` deve ser um dos 3 válidos
+
+---
+
+## `robust_scaling`
+
+Robust Scaling. Centraliza pela mediana e escala pelo IQR (sklearn `RobustScaler`), insensível a outliers.
+
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `quantile_range` (tupla de percentis, default `(25, 75)`)  
+**Outputs:** `X_rs`, `median_`, `iqr_`  
+**Restrições:** X deve ser matriz 2D
+
+---
+
+## `mie_emsc`
+
+RMie-EMSC (Resonance Mie Scatter Extended MSC). Correção simplificada de espalhamento físico de Mie para FTIR de células/tecidos, via EMSC iterativo usando componentes de PCA como interferentes. `is_beta=true`.
+
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `wavenumbers` (obrigatório), `reference` ("mean" ou vetor explícito, default "mean"), `n_components` (default 7), `n_iterations` (default 4), `particle_size_range` (default `[2, 8]`)  
+**Outputs:** `X_corrected`, `mie_spectra_`  
+**Restrições:** X deve ser matriz 2D; `wavenumbers` é obrigatório em `params`
+
+---
+
+## `pqn`
+
+PQN — Probabilistic Quotient Normalization. Normaliza cada amostra por um fator de escala igual à mediana dos quocientes ponto a ponto contra um espectro de referência.
+
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `reference` ("mean" | "median" | vetor explícito, default "mean")  
+**Outputs:** `X_pqn`, `reference_used`, `quotients_`, `scaling_factors_`  
+**Restrições:** X deve ser matriz 2D
+
+---
+
+## `eilers_smoothing`
+
+Eilers Smoothing (Whittaker). Suavização por spline penalizada, resolvendo um sistema linear esparso.
+
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `lambda_` (peso de penalização, default 1e3, deve ser > 0), `d` (ordem da diferença de penalização, default 2), `spectral_axis` (default 1)  
+**Outputs:** `X_smooth`  
+**Restrições:** `lambda_` deve ser > 0; X deve ter ndim ≥ 2
+
+---
+
+## `wavelet_transform`
+
+Decomposição Wavelet discreta (PyWavelets) para suavização/denoise, decomposição em coeficientes ou extração de features, conforme `mode`.
+
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `wavelet` (default "db4"), `level`, `mode` (denoise | decompose | features; default "denoise"), `threshold_method` (default "soft"), `spectral_axis` (default 1)  
+**Outputs:** `X_denoised` (mode=denoise) ou `approximation`+`details` (mode=decompose) ou `X_features` (mode=features)  
+**Restrições:** `mode` deve ser um dos 3 válidos; X deve ter ndim ≥ 2
+
+---
+
+## `automated_preprocessing`
+
+Seleciona automaticamente, por busca exaustiva, a melhor sequência de até `max_steps` scripts de pré-processamento do catálogo, avaliada por RMSECV de um PLS.
+
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `methods_pool` (lista de slugs de pré-processamento, default `[snv, msc, baseline, savitzky_golay, centering, autoscaling, pareto]`), `max_steps` (default 3), `n_components_pls` (default 5), `cv_folds` (default 5), `scoring_metric` (default "rmsecv")  
+**Outputs:** `best_pipeline`, `best_score`, `scores_all_combinations`, `X_preprocessed`  
+**Restrições:** X deve ser matriz 2D; `y` é obrigatório
 
 ---
 
@@ -665,6 +754,28 @@ Regressão não-linear com núcleos (SVR, GP, Neural Net).
 
 ---
 
+## `cls`
+
+CLS — Classical Least Squares. Resolve concentrações `C` a partir de espectros puros conhecidos `S`, assumindo X = C × Sᵀ.
+
+**Inputs:** `X` (matrix: n_amostras × n_variáveis), `S` (matrix de espectros puros: n_variáveis × n_componentes)  
+**Parâmetros:** `non_negativity` (bool, default `False`; usa NNLS por amostra quando `True`)  
+**Outputs:** `C` (concentrações estimadas), `X_reconstructed`, `residuals`, `metrics_cal` (`RMSE_reconstructed`)  
+**Restrições:** X e S devem ser matrizes 2D; `X.shape[1]` deve ser igual a `S.shape[0]` (nº de variáveis)
+
+---
+
+## `ils`
+
+ILS — Inverse Least Squares. Modela `y = X × b` diretamente, com regularização opcional.
+
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `regularization` (none | ridge | lasso; default "none"), `alpha` (usado em ridge/lasso, default 1.0)  
+**Outputs:** `model`, `coefficients`, `metrics_cal`  
+**Restrições:** `regularization` deve ser "none", "ridge" ou "lasso"; se "none", exige n_amostras > n_variáveis (caso contrário, usar ridge/lasso ou selecionar variáveis antes)
+
+---
+
 # Família 05 — Classificação 1D (`05_classificacao_1d`)
 
 ---
@@ -737,6 +848,61 @@ Soft Independent Modelling of Class Analogy.
 
 ---
 
+## `oc_simca`
+
+One-Class SIMCA. Modela apenas a classe alvo com PCA e classifica por distância ortogonal com limiar via qui-quadrado.
+
+**Inputs:** `X`, `y`  
+**Parâmetros:** `target_class` (default = primeira classe de y), `n_components` (default 2), `alpha` (default 0.05)  
+**Outputs:** `model`, `threshold`, `orthogonal_distances`, `metrics_cal`  
+**Restrições:** X e y devem ter o mesmo número de amostras
+
+---
+
+## `dd_simca`
+
+DD-SIMCA — Data-Driven SIMCA. Combina distância de score (Mahalanobis no espaço de scores) e distância ortogonal (resíduo), com limiar via distribuição F.
+
+**Inputs:** `X`, `y`  
+**Parâmetros:** `target_class` (default = primeira classe de y), `n_components` (default 3), `alpha` (default 0.05)  
+**Outputs:** `model`, `threshold`, `SD0`, `OD0`, `combined_distances`, `SD_scores`, `OD_scores`, `metrics_cal`  
+**Restrições:** X e y devem ter o mesmo número de amostras; `n_components` deve ser ≥ 1
+
+---
+
+## `one_class_svm`
+
+One-Class SVM. Detecção de novidades treinando um SVM de uma classe apenas com as amostras da classe alvo (sklearn `OneClassSVM`).
+
+**Inputs:** `X`, `y`  
+**Parâmetros:** `target_class` (default = primeira classe de y), `kernel` (default "rbf"), `nu` (default 0.05), `gamma` (default "scale")  
+**Outputs:** `model`, `decision_scores`, `metrics_cal`  
+**Restrições:** X e y devem ter o mesmo número de amostras
+
+---
+
+## `pls_oc`
+
+PLS One-Class. Ajusta um PLS contra pseudo-negativos sintéticos (permutações/ruído da classe alvo) e usa Hotelling T² nos scores como limiar de pertencimento.
+
+**Inputs:** `X`, `y`  
+**Parâmetros:** `target_class` (default = primeira classe de y), `n_components` (default 3), `alpha` (default 0.05), `random_state` (default 42)  
+**Outputs:** `model`, `threshold_T2`, `T2_scores`, `metrics_cal`  
+**Restrições:** X e y devem ter o mesmo número de amostras
+
+---
+
+## `oc_rf`
+
+OC-RF — One-Class Random Forest. Treina uma Random Forest contra pseudo-negativos sintéticos (amostrados da distribuição marginal de cada variável) e usa a probabilidade de classe como limiar de pertencimento.
+
+**Inputs:** `X`, `y`  
+**Parâmetros:** `target_class` (default = primeira classe de y), `n_estimators` (default 100), `threshold` (default 0.5), `random_state` (default 42)  
+**Outputs:** `model`, `membership_probability`, `feature_importances`, `metrics_cal`  
+**Restrições:** X e y devem ter o mesmo número de amostras
+
+---
+
 # Família 06 — Deep Learning (`06_deep_learning`)
 
 ---
@@ -751,13 +917,25 @@ Multi-Layer Perceptron (regressão ou classificação).
 
 ---
 
-## `cnn1d`
+## `cnn_1d`
 
-Convolutional Neural Network 1D.
+Convolutional Neural Network 1D para espectros/séries temporais (regressão ou classificação).
 
 **Inputs:** `X` (n_samples × n_vars), `y`  
-**Parâmetros:** `filters`, `kernel_size`, `epochs`, `task`  
-**Outputs:** `model`, `history`, `metrics`
+**Parâmetros:** `filters` (lista, default `[32, 64]`), `kernel_size` (default 5), `pool_size` (default 2), `dense_units` (default `[64]`), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3), `task` (regression | classification)  
+**Outputs:** `model`, `history`  
+**Restrições:** X deve ser 2D (n_samples, n_features); X e y devem ter o mesmo número de amostras
+
+---
+
+## `cnn_2d`
+
+Convolutional Neural Network 2D para imagens hiperespectrais ou mapas 2D.
+
+**Inputs:** `X` (3D: N×H×W, ou 4D: N×H×W×C), `y`  
+**Parâmetros:** `filters` (default `[32, 64]`), `kernel_size` (default 3), `pool_size` (default 2), `dense_units` (default `[128]`), `epochs` (default 30), `batch_size` (default 16), `learning_rate` (default 1e-3), `task` (regression | classification)  
+**Outputs:** `model`, `history`  
+**Restrições:** X deve ser 3D ou 4D; X e y devem ter o mesmo número de amostras
 
 ---
 
@@ -769,6 +947,39 @@ Recurrent Neural Network (LSTM/GRU).
 **Parâmetros:** `units`, `cell_type` (lstm | gru), `epochs`, `task`  
 **Outputs:** `model`, `history`, `metrics`  
 **Restrições:** X deve ser 3D
+
+---
+
+## `autoencoder`
+
+Autoencoder denso (variante padrão ou variacional) para redução de dimensão / detecção de anomalias.
+
+**Inputs:** `X` (matrix: n_samples × n_features)  
+**Parâmetros:** `variant` (standard | variational; default "standard"), `latent_dim` (default 8), `encoder_layers` (lista, default `[64, 32]`), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3)  
+**Outputs:** `model`, `latent`, `reconstruction_error`, `history`  
+**Restrições:** X deve ser 2D; `variant` deve ser "standard" ou "variational"
+
+---
+
+## `transformer`
+
+Transformer com multi-head self-attention 1D para espectros/séries.
+
+**Inputs:** `X` (matrix: n_samples × sequence_length), `y`  
+**Parâmetros:** `n_heads` (default 4), `d_model` (default 32), `ff_dim` (default 64), `n_blocks` (default 2), `dense_units` (default `[64]`), `dropout` (default 0.1), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3), `task` (regression | classification)  
+**Outputs:** `model`, `history`  
+**Restrições:** X deve ser 2D (n_samples, sequence_length); X e y devem ter o mesmo número de amostras
+
+---
+
+## `diffusion`
+
+Diffusion Model — rede de denoising por difusão para denoising ou augmentação de espectros.
+
+**Inputs:** `X` (matrix: n_samples × n_features)  
+**Parâmetros:** `task` (denoise | augment; default "denoise"), `T` (número de passos de difusão, default 100), `hidden_units` (default `[128, 128]`), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3), `n_augment` (nº de amostras a gerar quando task=augment, default = n_samples de X)  
+**Outputs:** `model`, `X_denoised` (task=denoise) ou `X_augmented` (task=augment), `training_loss`  
+**Restrições:** X deve ser 2D; `task` deve ser "denoise" ou "augment"
 
 ---
 
@@ -784,6 +995,28 @@ PARAFAC / CP Decomposition.
 **Parâmetros:** `rank`, `n_iter_max`, `tol`, `init`  
 **Outputs:** `factors` (lista de matrizes por modo), `reconstruction_error`  
 **Restrições:** ndim ≥ 3
+
+---
+
+## `parafac2`
+
+PARAFAC2. Decompõe um conjunto de matrizes com número de linhas variável (mas mesmo número de colunas) em fatores compartilhados mais projeções por slice.
+
+**Inputs:** `slices` (lista de ≥ 2 matrizes)  
+**Parâmetros:** `rank` (default 2), `n_iter_max` (default 200), `tol` (default 1e-8)  
+**Outputs:** `model`, `weights`, `factors`, `n_slices`  
+**Restrições:** `slices` deve ser lista/tupla com pelo menos 2 matrizes
+
+---
+
+## `parafac_aumentado`
+
+PARAFAC Aumentado. Concatena o tensor com uma versão de colunas permutadas ao longo do último modo e aplica PARAFAC não-negativo sobre o tensor aumentado.
+
+**Inputs:** `X` (tensor, ndim ≥ 3)  
+**Parâmetros:** `rank` (default 3), `n_iter_max` (default 300), `tol` (default 1e-8)  
+**Outputs:** `model`, `weights`, `factors`, `fit`  
+**Restrições:** X deve ser tensor de ordem ≥ 3
 
 ---
 
@@ -807,23 +1040,36 @@ Multivariate Curve Resolution — Alternating Least Squares.
 
 ---
 
-## `npls`
+## `mpca`
 
-N-way PLS (NPLS).
+MPCA — Multilinear PCA. Projeta um tensor sobre matrizes de projeção por modo (exceto o modo amostras), estimadas por SVD iterativo dos desdobramentos.
 
-**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
-**Parâmetros:** `n_components`  
-**Outputs:** `scores`, `loadings`, `metrics`
+**Inputs:** `X` (tensor, ndim ≥ 3)  
+**Parâmetros:** `n_components` (default 2), `n_iter` (default 20)  
+**Outputs:** `model`, `scores` (tensor projetado), `projections` (matrizes de projeção por modo)  
+**Restrições:** X deve ser tensor de ordem ≥ 3
 
 ---
 
-## `hosvd`
+## `tensor_svd`
 
-Higher-Order SVD.
+Tensor SVD (Multilinear SVD / HOSVD simplificado). Calcula um SVD independente para o desdobramento (unfolding) de cada modo do tensor.
 
-**Inputs:** `X` (tensor)  
-**Parâmetros:** `ranks`  
-**Outputs:** `core`, `factors`, `explained_variance`
+**Inputs:** `X` (tensor, ndim ≥ 2)  
+**Parâmetros:** `n_components` (default 2)  
+**Outputs:** `model`, `U_modes`, `S_modes`, `Vt_modes` (um conjunto U/S/Vt por modo)  
+**Restrições:** X deve ter ndim ≥ 2
+
+---
+
+## `tensor_nmf`
+
+Tensor NMF. NMF não-negativa aplicada ao desdobramento de um modo escolhido do tensor.
+
+**Inputs:** `X` (tensor, ndim ≥ 2, valores ≥ 0)  
+**Parâmetros:** `n_components` (default 3), `mode` (modo a desdobrar, default 0), `max_iter` (default 200)  
+**Outputs:** `model`, `W`, `H`, `reconstruction_error`  
+**Restrições:** X deve ter ndim ≥ 2; todos os valores de X devem ser ≥ 0
 
 ---
 
@@ -831,23 +1077,91 @@ Higher-Order SVD.
 
 ---
 
-## `npls_regression`
+## `n_pls`
 
-N-PLS para regressão com dados de ordem superior.
+N-PLS — N-way Partial Least Squares. Desdobra o tensor no modo amostras e ajusta um PLS padrão sobre a matriz resultante.
 
 **Inputs:** `X` (tensor, ndim ≥ 3), `y`  
-**Parâmetros:** `n_components`  
-**Outputs:** `model`, `scores`, `weights`, `metrics`
+**Parâmetros:** `n_components` (default 3)  
+**Outputs:** `model`, `scores`, `x_loadings`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
 
 ---
 
-## `upls`
+## `u_pls`
 
-Unfolded PLS (U-PLS).
+U-PLS — Unfolded PLS. Desdobra o tensor no modo amostras, normaliza (`StandardScaler`) e ajusta PLS sobre a matriz resultante.
 
-**Inputs:** `X` (tensor), `y`  
-**Parâmetros:** `n_components`, `unfold_mode`  
-**Outputs:** `model`, `metrics`
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `n_components` (default 3)  
+**Outputs:** `model`, `scores`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
+## `u_pca`
+
+U-PCA — Unfolded PCA. Desdobra o tensor no modo amostras e aplica PCA (exploração multiway, sem variável resposta).
+
+**Inputs:** `X` (tensor, ndim ≥ 3)  
+**Parâmetros:** `n_components` (default 3)  
+**Outputs:** `model`, `scores`, `loadings`, `explained_variance_ratio`  
+**Restrições:** X deve ser tensor de ordem ≥ 3
+
+---
+
+## `n_way_pcr`
+
+N-way PCR — N-way Principal Component Regression. Desdobra o tensor no modo amostras, aplica PCA e regride y linearmente sobre os scores.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `n_components` (default 3)  
+**Outputs:** `model`, `scores`, `loadings`, `explained_variance_ratio`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
+## `parafac_regression`
+
+PARAFAC Regression. Decompõe X via PARAFAC e usa os scores do modo amostras (fator 0) como entrada de uma regressão linear sobre y.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `rank` (default 3), `n_iter_max` (default 200)  
+**Outputs:** `model`, `sample_scores`, `factors` (demais modos), `weights`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
+## `tucker_regression`
+
+Tucker Regression. Decompõe X via Tucker e usa o fator do modo amostras como entrada de uma regressão linear sobre y.
+
+**Inputs:** `X` (tensor 3D: I×J×K), `y`  
+**Parâmetros:** `ranks` (lista de 3 ranks, default `[3, 3, 3]`)  
+**Outputs:** `model`, `sample_loadings`, `core_shape`, `metrics_cal`  
+**Restrições:** X deve ser tensor 3D (ndim = 3); X e y devem ter o mesmo número de amostras
+
+---
+
+## `hpls`
+
+HPLS — Hierarchical PLS. Ajusta um PLS por bloco de dados e depois um meta-PLS sobre os scores concatenados de todos os blocos.
+
+**Inputs:** `blocks` (lista de ≥ 2 matrizes), `y`  
+**Parâmetros:** `n_components_block` (default 2), `n_components_meta` (default 2)  
+**Outputs:** `model`, `block_models`, `meta_scores`, `metrics_cal`  
+**Restrições:** `blocks` deve ser lista/tupla com ≥ 2 matrizes; cada bloco deve ter o mesmo número de amostras que `y`
+
+---
+
+## `tensor_regression`
+
+Tensor Regression (CP). Ajusta uma regressão linear por gradiente descendente sobre o tensor desdobrado no modo amostras.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `rank` (default 3, apenas registrado em `model`), `n_iter_max` (default 200), `learning_rate` (default 0.01), `epochs` (default 100)  
+**Outputs:** `model`, `coefficients`, `intercept`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
 
 ---
 
@@ -875,6 +1189,61 @@ SVM sobre features extraídas de tensor via Tucker.
 
 ---
 
+## `tensor_knn`
+
+Tensor KNN. Desdobra o tensor no modo amostras e classifica por K vizinhos mais próximos.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `n_neighbors` (default 5), `metric` (default "euclidean")  
+**Outputs:** `model`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
+## `tensor_random_forest`
+
+Tensor Random Forest. Desdobra o tensor, reduz via PCA e classifica com Random Forest.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `n_estimators` (default 100), `n_components_pca` (default 20), `random_state` (default 42)  
+**Outputs:** `model`, `feature_importances`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
+## `multiway_pls_da`
+
+Multiway PLS-DA. Desdobra o tensor e ajusta PLS-DA com variável resposta dummy (one-hot).
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `n_components` (default 3)  
+**Outputs:** `model`, `scores`, `classes`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
+## `multiway_simca`
+
+Multiway SIMCA. Ajusta um modelo PCA por classe sobre o tensor desdobrado e classifica por distância ortogonal ao modelo de cada classe.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `n_components` (default 3), `alpha` (nível de significância do limiar, default 0.05)  
+**Outputs:** `model`, `thresholds`, `classes`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
+## `multiway_one_class`
+
+Multiway One-Class. Desdobra o tensor, reduz via PCA sobre a classe alvo e ajusta um One-Class SVM.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `target_class` (default = primeira classe encontrada em y), `n_components_pca` (default 10), `nu` (default 0.05), `kernel` (default "rbf")  
+**Outputs:** `model`, `decision_scores`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
+
+---
+
 # Família 10 — Calibração de Ordem Superior (`10_calibracao_ordem_superior`)
 
 ---
@@ -896,6 +1265,28 @@ Calibração de terceira ordem — terceira geração analítica.
 **Inputs:** `X` (tensor 4-way), `y`  
 **Parâmetros:** `n_components`, `method`  
 **Outputs:** `model`, `metrics`
+
+---
+
+## `quarta_ordem`
+
+Calibração de 4ª ordem via PARAFAC sobre tensor 5-way.
+
+**Inputs:** `X` (tensor 5D: n_samples × J × K × L × M), `y`  
+**Parâmetros:** `rank` (default 3), `n_iter_max` (default 300)  
+**Outputs:** `model`, `sample_scores`, `mode_profiles`, `weights`, `fit`, `metrics_cal`  
+**Restrições:** X deve ser tensor 5D (ndim = 5); X e y devem ter o mesmo número de amostras
+
+---
+
+## `ordem_superior_generica`
+
+Calibração de ordem superior genérica: PARAFAC (ou PARAFAC não-negativo) sobre tensor de qualquer ordem ≥ 3, seguido de regressão linear nos scores do modo amostras.
+
+**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
+**Parâmetros:** `rank` (default 3), `n_iter_max` (default 300), `non_negative` (bool, default `False`)  
+**Outputs:** `model` (inclui `order`, `rank`, `shape`), `sample_scores`, `mode_profiles`, `weights`, `fit`, `metrics_cal`  
+**Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
 
 ---
 

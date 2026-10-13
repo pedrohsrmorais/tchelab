@@ -1,9 +1,13 @@
 # TcheLab — Documentação do Banco de Dados
 
-> Versão: v6
+> Versão: v7
 > Engine: MySQL 8.0+
 > Charset: utf8mb4_unicode_ci
-> Última revisão: alinhado com api.md, requisitos.md, workflow.md e catalogo_scripts.md
+> Última revisão: reauditado contra o schema real (`init.mysql`) em 2026-10-13 — v6 tinha ficado
+> desalinhado (faltavam 3 colunas de `techniques`, 2 valores inexistentes no enum `category`, e
+> 5 tabelas reais fora deste diagrama: `dataset_operations`, `synthetic_datasets`,
+> `community_datasets`, `community_workflows`, `project_history`; as duas últimas já tinham seção
+> própria mais abaixo, só faltavam aqui na visão geral)
 
 ---
 
@@ -23,7 +27,8 @@ USUÁRIOS
     │       ├── project_members
     │       ├── project_datasets        ← dataset + papel (calibração, validação…)
     │       ├── project_workflows
-    │       └── project_articles
+    │       ├── project_articles
+    │       └── project_history         ← linha do tempo de ações do projeto
     │
     ├── DADOS
     │       ├── spectra
@@ -31,7 +36,9 @@ USUÁRIOS
     │       ├── collections
     │       ├── datasets
     │       │       └── dataset_lineage
-    │       └── dataset_spectra
+    │       ├── dataset_spectra
+    │       ├── dataset_operations      ← operação avulsa de catálogo num dataset (fora de workflow salvo)
+    │       └── synthetic_datasets      ← geração de dataset sintético pra teste/validação
     │
     ├── ARTIGOS & IA
     │       ├── articles
@@ -278,6 +285,23 @@ Associa datasets a projetos com papel explícito. O mesmo dataset pode ter papé
 | `added_at` | DATETIME | |
 | UNIQUE | `(project_id, article_id)` | |
 
+### `project_history`
+
+Linha do tempo de um projeto — toda ação relevante (criado, renomeado, dataset adicionado,
+membro convidado…) gera uma linha aqui. Alimenta `GET /projects/:id/history`.
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | BIGINT UNSIGNED PK | |
+| `project_id` | BIGINT UNSIGNED FK → projects | |
+| `user_id` | BIGINT UNSIGNED FK → users NULL | Quem fez a ação (NULL se foi automática/sistema) |
+| `action` | VARCHAR(100) NOT NULL | Ex: created, renamed, dataset_added, member_invited |
+| `entity_type` | VARCHAR(100) NULL | Tipo da entidade afetada, quando aplicável |
+| `entity_id` | BIGINT UNSIGNED NULL | Id da entidade afetada |
+| `description` | TEXT NULL | |
+| `metadata` | JSON NULL | |
+| `created_at` | DATETIME | |
+
 ---
 
 ## Domínio 4 — Dados
@@ -414,6 +438,56 @@ Associa espectros individuais a posições em datasets matriciais.
 | UNIQUE | `(dataset_id, spectrum_id)` | |
 | UNIQUE | `(dataset_id, position)` | |
 
+### `dataset_operations`
+
+Registra uma operação avulsa de catálogo aplicada diretamente a um dataset fora de um workflow
+salvo (ex: usuário clica "Aplicar SNV" direto na tela do dataset) — por baixo, isso ainda cria um
+workflow/execução de 1 nó só, pra reusar a mesma infraestrutura de execução e manter a linhagem
+em `dataset_lineage`. Usada pelo `datasetOperation.controller.js`.
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | BIGINT UNSIGNED PK | |
+| `uuid` | CHAR(36) UNIQUE NOT NULL | |
+| `user_id` | BIGINT UNSIGNED FK → users | |
+| `source_dataset_id` | BIGINT UNSIGNED FK → datasets | Dataset de entrada |
+| `technique_id` | BIGINT UNSIGNED FK → techniques | Técnica aplicada |
+| `workflow_id` | BIGINT UNSIGNED FK → workflows | Workflow de 1 nó criado internamente pra essa operação |
+| `execution_id` | BIGINT UNSIGNED FK → executions | Execução desse workflow |
+| `params` | JSON NULL | Parâmetros passados à técnica |
+| `save_mode` | ENUM('new_dataset','in_place') DEFAULT 'new_dataset' | Se o resultado vira um dataset novo ou substitui o atual |
+| `new_dataset_name` | VARCHAR(255) NULL | Nome do dataset novo (quando save_mode = new_dataset) |
+| `output_dataset_id` | BIGINT UNSIGNED FK → datasets NULL | Preenchido quando save_mode=new_dataset e a execução conclui com sucesso |
+| `status` | ENUM('pending','completed','failed') DEFAULT 'pending' | |
+| `error_message` | TEXT NULL | |
+| `created_at` | DATETIME | |
+| `updated_at` | DATETIME | |
+
+### `synthetic_datasets`
+
+Pedido de geração de um dataset sintético (espectros simulados com ruído/baseline controlados,
+pra teste e validação de workflows sem precisar de dados reais). Usada pelo
+`synthetic.controller.js` (rotas `/synthetic-datasets`).
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | BIGINT UNSIGNED PK | |
+| `uuid` | CHAR(36) UNIQUE NOT NULL | |
+| `user_id` | BIGINT UNSIGNED FK → users | |
+| `name` | VARCHAR(255) NOT NULL | |
+| `status` | ENUM('pending','ready','failed') DEFAULT 'pending' | |
+| `n_samples` | INT UNSIGNED DEFAULT 100 | |
+| `n_variables` | INT UNSIGNED DEFAULT 10 | Número de variáveis espectrais/features |
+| `x_range_start` | DOUBLE DEFAULT 400 | |
+| `x_range_end` | DOUBLE DEFAULT 2500 | |
+| `noise_level` | DOUBLE DEFAULT 0 | |
+| `signal_formula` | TEXT NULL | Fórmula do sinal simulado |
+| `baseline_formula` | TEXT NULL | Fórmula da linha de base simulada |
+| `tags` | JSON NULL | |
+| `output_dataset_uuid` | CHAR(36) NULL | UUID do dataset gerado, depois que status=ready |
+| `created_at` | DATETIME | |
+| `updated_at` | DATETIME | |
+
 ---
 
 ## Domínio 5 — Artigos e IA
@@ -513,7 +587,7 @@ Catálogo dos blocos executáveis. Inclui técnicas nativas e modelos customizad
 | `uuid` | CHAR(36) UNIQUE | |
 | `slug` | VARCHAR(255) UNIQUE NOT NULL | Identificador único. Ex: parafac, snv, transpose |
 | `name` | VARCHAR(255) NOT NULL | Nome legível |
-| `category` | ENUM('input','preprocessing','exploratory','regression','classification','multiway','multiway_regression','multiway_classification','calibration','interferents','deep_learning','visualization','validation','variable_selection','optimization','synthetic','calibration_transfer','sensor_fusion','utility','other') | |
+| `category` | ENUM('input','preprocessing','exploratory','regression','classification','multiway','multiway_regression','multiway_classification','calibration','interferents','deep_learning','visualization','validation','variable_selection','optimization','synthetic','utility','other') | `calibration_transfer` e `sensor_fusion` apareciam numa versão anterior deste enum, mas nunca foram criados no banco — removidos daqui em 2026-10-13 pra bater com o enum real |
 | `subcategory` | VARCHAR(100) | Subcategoria livre |
 | `family` | VARCHAR(50) | Família do catálogo. Ex: 07_decomposicao_multiway |
 | `description` | TEXT | O que o script faz |
@@ -536,6 +610,9 @@ Catálogo dos blocos executáveis. Inclui técnicas nativas e modelos customizad
 | `active` | TINYINT(1) DEFAULT 1 | |
 | `created_at` | DATETIME | |
 | `updated_at` | DATETIME | |
+| `how_it_works` | TEXT NULL | Explicação em texto corrido de como o algoritmo funciona — conteúdo da página de Catálogo, adicionado em 2026-10-10 |
+| `historical_note` | TEXT NULL | Nota histórica/origem da técnica (pode ser NULL — nem toda técnica tem uma origem notável o suficiente pra citar) |
+| `usage_tips` | TEXT NULL | Dicas práticas de uso, também exibidas na página de Catálogo |
 
 **Constraints:**
 ```sql
@@ -763,6 +840,12 @@ Estado e resultado de cada nó em uma execução.
 
 Grupo de execuções comparadas lado a lado.
 
+> Reauditado em 2026-10-13: a implementação real (`executionComparison.controller.js`) guarda a
+> lista de execuções do grupo direto em `execution_uuids` (JSON), em vez de usar a tabela de
+> junção `execution_comparison_items` abaixo — que existe no schema mas **não é lida nem escrita
+> por nenhum controller**. Fica documentada porque a tabela ainda existe (nada a migrar), mas se
+> você for consultar/alterar comparações, é por aqui, não por `execution_comparison_items`.
+
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
 | `id` | BIGINT UNSIGNED PK | |
@@ -771,12 +854,16 @@ Grupo de execuções comparadas lado a lado.
 | `name` | VARCHAR(255) NOT NULL | Ex: "PLS vs N-PLS no dataset EEM" |
 | `description` | TEXT | |
 | `conclusion` | TEXT | Conclusão do pesquisador após comparação |
+| `execution_uuids` | JSON | Array de UUIDs das execuções incluídas no grupo — é isto, não `execution_comparison_items`, que a API lê/escreve de fato |
+| `metric_names` | JSON | Array de nomes de métrica a comparar entre as execuções |
 | `created_at` | DATETIME | |
 | `updated_at` | DATETIME | |
 
-### `execution_comparison_items`
+### `execution_comparison_items` (tabela morta — não usada pelo código atual)
 
-Execuções que fazem parte de um grupo de comparação.
+Execuções que fazem parte de um grupo de comparação. **Nenhum controller lê ou escreve esta
+tabela hoje** — `execution_comparisons.execution_uuids` (acima) faz esse papel na implementação
+real. Documentada aqui só porque ainda existe no schema (`init.mysql`); não é alimentada.
 
 | Campo | Tipo | Descrição |
 |-------|------|-----------|

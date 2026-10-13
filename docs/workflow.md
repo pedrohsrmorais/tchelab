@@ -80,16 +80,20 @@ Scripts da família 17 — retornam dados estruturados para o frontend renderiza
 
 ## Validação de conexões
 
-Antes de aceitar uma aresta, o sistema verifica (via `ShapeValidatorService`):
+Antes de aceitar uma aresta, o sistema verifica (via `ShapeValidatorService.validateEdge`,
+em `backend_api/src/services/shapeValidator.service.js` — a numeração abaixo é a mesma
+usada no comentário de cabeçalho desse arquivo, para as duas fontes nunca divergirem de novo):
 
 ### 1. Existência
 `source_node_key` e `target_node_key` existem no workflow.
 
-### 2. Porta válida
+### 2. Porta de saída existe
 `source_port` existe no `output_schema` da técnica de origem.
+
+### 3. Porta de entrada existe
 `target_port` existe no `input_schema` da técnica de destino.
 
-### 3. Tipo compatível
+### 4. Tipo compatível
 O tipo declarado no `output_schema` da porta de origem é compatível com o tipo no `input_schema` da porta de destino.
 
 ```
@@ -99,8 +103,8 @@ model  → tensor     ✗ (geralmente)
 scalar → matrix     ✗
 ```
 
-### 4. Ordem analítica
-O `data_order` do array de entrada satisfaz `min_order` e `max_order` da técnica de destino.
+### 5. Ordem analítica
+O `data_order` do array de entrada satisfaz `min_order` e `max_order` da técnica de destino. Só é checada quando a aresta já tem um dataset conhecido na ponta de origem (`datasetMeta`); numa aresta entre dois nós de workflow ainda sem execução, essa camada é pulada.
 
 ```
 PARAFAC recebe tensor de order=1   ✗  (min_order=2)
@@ -108,8 +112,8 @@ PARAFAC recebe tensor de order=5   ✓  (max_order=NULL)
 SNV     recebe matrix de order=2   ✗  (max_order=1)
 ```
 
-### 5. Eixo de amostras
-O `sample_axis` do array satisfaz `requires_sample_axis` da técnica.
+### 6. Eixo de amostras
+O `sample_axis` do array satisfaz `requires_sample_axis` da técnica (mesma condição de `datasetMeta` da camada 5).
 
 ```
 requires_sample_axis = 1 → dataset deve ter sample_axis declarado
@@ -117,24 +121,32 @@ requires_sample_axis = 0 → dataset não deve ter sample_axis
 requires_sample_axis = NULL → indiferente
 ```
 
-### 6. Compatibilidade matemática de shape
-Para operações com restrições de shape:
-
-```
-produto_matricial: A.shape[-1] == B.shape[-2]
-soma: shapes compatíveis
-inversa: A deve ser quadrada
-```
-
 ### 7. Compatibilidade semântica
-Declarada em `technique_compatibilities`. Mesmo shape idêntico não garante compatibilidade semântica:
+Consulta `technique_compatibilities` por uma regra de blacklist (`is_valid = 0`) para o par
+(técnica de origem, técnica de destino, porta de origem, porta de destino). Usa a regra mais
+específica entre as que casam — uma linha com as duas portas preenchidas vale mais que uma com
+uma das portas `NULL` ("qualquer porta"), que vale mais que uma com as duas `NULL`. Essa tabela é
+**opt-in**: enquanto nenhuma linha for cadastrada pra um par de técnicas, esta camada nunca
+bloqueia nada — ela serve pra declarar exceções conhecidas, não uma whitelist que precisa ser
+populada antes de qualquer conexão funcionar.
 
 ```
 scores PCA  shape=(100,5)  ≠  matriz espectral  shape=(100,5)
+   → cadastre em technique_compatibilities: source=pca, target=<técnica>,
+     source_port=scores, is_valid=0, notes="scores não são espectros brutos."
 ```
 
 ### 8. Ausência de ciclos
 A aresta não pode criar um ciclo — o grafo deve ser um DAG (grafo acíclico dirigido).
+
+### Nota: compatibilidade matemática de shape (produto_matricial, inversa…)
+Restrições como `produto_matricial: A.shape[-1] == B.shape[-2]` ou `inversa: A deve ser
+quadrada` **não são checadas nas 8 camadas acima** — o shape concreto dos arrays só existe
+depois que os dados de fato fluem pelo grafo, então não dá pra validar isso só com base no
+`output_schema`/`input_schema` declarado na técnica, antes de qualquer execução. Essa checagem
+já existe, mas no lugar certo: o `validate(inputs, params)` de cada script Python
+(`worker_api/catalog/<familia>/scripts.py`) roda imediatamente antes do `execute()` de cada nó,
+e falha a execução (não a criação da aresta) se o shape não servir.
 
 ---
 

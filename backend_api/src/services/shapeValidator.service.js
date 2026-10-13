@@ -15,8 +15,26 @@ const db = require('../config/db.config');
  *  4. Tipos compatíveis
  *  5. Ordem analítica (data_order vs min_order / max_order)
  *  6. Eixo de amostras (requires_sample_axis)
- *  7. Compatibilidade matemática de shape (produto_matricial, inversa…)
+ *  7. Compatibilidade semântica (blacklist explícita em technique_compatibilities)
  *  8. Ausência de ciclo (DAG)
+ *
+ * Nota sobre "compatibilidade matemática de shape" (produto_matricial exige
+ * A.shape[-1]==B.shape[-2], inversa exige matriz quadrada, etc.): isso NÃO
+ * é checado aqui porque o shape concreto dos arrays só existe depois que os
+ * dados de fato fluem pelo grafo — não dá pra saber na hora de desenhar a
+ * aresta. Essa checagem já existe, mas no lugar certo: o validate() de cada
+ * script Python (worker_api/catalog/<familia>/scripts.py), roda imediatamente
+ * antes do execute() de cada nó.
+ *
+ * A camada 7 (achada ausente numa auditoria de docs-vs-código em
+ * 2026-10-13 — o comentário acima já prometia 8 camadas, mas o código só
+ * implementava 7, saltando direto de #6 pra #8) é adicionada abaixo. A
+ * tabela technique_compatibilities funciona como blacklist: enquanto
+ * estiver vazia (estado atual — nenhuma linha foi semeada ainda), esta
+ * camada nunca bloqueia nada; ela só entra em ação quando alguém popular
+ * uma linha com is_valid=0 pra uma combinação de técnicas/portas
+ * conhecidamente incompatível (ex: "scores de PCA não são entrada válida
+ * para PARAFAC").
  */
 
 class ShapeValidatorService {
@@ -126,10 +144,58 @@ class ShapeValidatorService {
       }
     }
 
+    // 7. Compatibilidade semântica — blacklist explícita em technique_compatibilities.
+    // Pega a regra mais específica pra esse par de portas (linha com os dois
+    // ports preenchidos > linha com um deles NULL ["qualquer porta"] > linha
+    // com os dois NULL). Sem nenhuma linha cadastrada, não bloqueia nada —
+    // a tabela é opt-in, não uma whitelist que precisa ser populada antes de
+    // qualquer conexão funcionar.
+    const incompatible = await this._checkSemanticCompatibility(
+      nodeMap[source_node_key].technique_id,
+      nodeMap[target_node_key].technique_id,
+      source_port,
+      target_port,
+    );
+    if (!incompatible.valid) return incompatible;
+
     // 8. Ciclo (DAG check)
     const cycleResult = await this._checkNoCycle(workflowId, source_node_key, target_node_key);
     if (!cycleResult.valid) return cycleResult;
 
+    return { valid: true };
+  }
+
+  /**
+   * Camada 7 — consulta technique_compatibilities por uma regra de blacklist
+   * (is_valid = 0) pra esse par de técnicas/portas. Pega a regra mais
+   * específica entre as que casam (dois ports exatos > um port exato + o
+   * outro NULL > os dois NULL), igual a `ORDER BY` abaixo descreve.
+   */
+  async _checkSemanticCompatibility(sourceTechniqueId, targetTechniqueId, sourcePort, targetPort) {
+    const [rows] = await db.query(
+      `SELECT source_port, target_port, is_valid, notes
+       FROM technique_compatibilities
+       WHERE source_technique_id = ? AND target_technique_id = ?
+         AND (source_port IS NULL OR source_port = ?)
+         AND (target_port IS NULL OR target_port = ?)
+       ORDER BY
+         (source_port IS NOT NULL AND target_port IS NOT NULL) DESC,
+         (source_port IS NOT NULL OR target_port IS NOT NULL) DESC
+       LIMIT 1`,
+      [sourceTechniqueId, targetTechniqueId, sourcePort, targetPort],
+    );
+
+    if (!rows.length) return { valid: true };
+
+    const rule = rows[0];
+    if (!rule.is_valid) {
+      return this._fail(
+        rule.notes
+          ? `Conexão não permitida: ${rule.notes}`
+          : `A técnica de origem não é semanticamente compatível com a técnica de destino nessas portas ` +
+            `(regra declarada em technique_compatibilities, id source=${sourceTechniqueId} target=${targetTechniqueId}).`,
+      );
+    }
     return { valid: true };
   }
 

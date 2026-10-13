@@ -148,7 +148,7 @@ me(req, res)
 |--------|------|-----------|
 | `GET`    | `/users/:id` | Retorna perfil público do usuário |
 | `PUT`    | `/users/:id` | Atualiza perfil (nome, bio, área, instituição, Lattes, LinkedIn, GitHub) |
-| `PUT`    | `/users/:id/avatar` | Upload de avatar |
+| `POST`   | `/users/:id/avatar` | Upload de avatar — reauditado em 2026-10-13: é POST no código (upload multipart), não PUT |
 | `GET`    | `/users/:id/stats` | Retorna contadores: modelos, análises, datasets |
 | `DELETE` | `/users/:id` | Soft delete da conta |
 
@@ -202,13 +202,13 @@ deleteUser(req, res)
 | `PUT`    | `/communities/:id/members/:uid` | Altera papel do membro (member/moderator/admin) |
 | `DELETE` | `/communities/:id/members/:uid` | Remove membro |
 | `GET`    | `/communities/:id/projects` | Lista projetos da comunidade |
-| `POST`   | `/communities/:id/projects/:pid` | Vincula projeto existente à comunidade |
+| `POST`   | `/communities/:id/projects` | Vincula projeto existente à comunidade (id do projeto vai no corpo, não na URL — reauditado em 2026-10-13) |
 | `DELETE` | `/communities/:id/projects/:pid` | Desvincula projeto da comunidade |
 | `GET`    | `/communities/:id/datasets` | Lista datasets compartilhados na comunidade |
-| `POST`   | `/communities/:id/datasets/:did` | Compartilha dataset na comunidade |
+| `POST`   | `/communities/:id/datasets` | Compartilha dataset na comunidade (id do dataset vai no corpo — reauditado em 2026-10-13) |
 | `DELETE` | `/communities/:id/datasets/:did` | Remove compartilhamento |
 | `GET`    | `/communities/:id/workflows` | Lista workflows compartilhados |
-| `POST`   | `/communities/:id/workflows/:wid` | Compartilha workflow |
+| `POST`   | `/communities/:id/workflows` | Compartilha workflow (id do workflow vai no corpo — reauditado em 2026-10-13) |
 | `DELETE` | `/communities/:id/workflows/:wid` | Remove compartilhamento |
 | `GET`    | `/communities/:id/messages` | Lista mensagens do chat da comunidade |
 | `POST`   | `/communities/:id/messages` | Envia mensagem |
@@ -291,14 +291,14 @@ listMessages / sendMessage / deleteMessage(req, res)
 | `PUT`    | `/projects/:id/members/:uid` | Altera papel (viewer/editor/admin) |
 | `DELETE` | `/projects/:id/members/:uid` | Remove membro |
 | `GET`    | `/projects/:id/datasets` | Lista datasets do projeto com seus papéis |
-| `POST`   | `/projects/:id/datasets/:did` | Associa dataset ao projeto com papel definido |
+| `POST`   | `/projects/:id/datasets` | Associa dataset ao projeto com papel definido (id do dataset vai no corpo — reauditado em 2026-10-13) |
 | `PUT`    | `/projects/:id/datasets/:did` | Altera papel do dataset no projeto |
 | `DELETE` | `/projects/:id/datasets/:did` | Desassocia dataset do projeto |
 | `GET`    | `/projects/:id/workflows` | Lista workflows do projeto |
-| `POST`   | `/projects/:id/workflows/:wid` | Associa workflow ao projeto |
+| `POST`   | `/projects/:id/workflows` | Associa workflow ao projeto (id do workflow vai no corpo — reauditado em 2026-10-13) |
 | `DELETE` | `/projects/:id/workflows/:wid` | Desassocia workflow |
 | `GET`    | `/projects/:id/articles` | Lista artigos do projeto |
-| `POST`   | `/projects/:id/articles/:aid` | Associa artigo ao projeto |
+| `POST`   | `/projects/:id/articles` | Associa artigo ao projeto (id do artigo vai no corpo — reauditado em 2026-10-13) |
 | `DELETE` | `/projects/:id/articles/:aid` | Desassocia artigo |
 | `GET`    | `/projects/:id/history` | Histórico de execuções e análises do projeto |
 
@@ -850,6 +850,7 @@ deleteNode(req, res)
 | `GET`    | `/workflows/:wid/edges` | Lista arestas do workflow |
 | `POST`   | `/workflows/:wid/edges` | Cria aresta com validação |
 | `DELETE` | `/workflows/:wid/edges/:eid` | Remove aresta |
+| `POST`   | `/workflows/:wid/validate` | Valida o workflow inteiro (todas as arestas) sem criar nenhuma — reauditado em 2026-10-13, não estava documentada |
 
 ### Funções
 
@@ -862,18 +863,30 @@ listEdges(req, res)
 createEdge(req, res)
   - Campos obrigatórios:
     source_node_key, source_port, target_node_key, target_port
-  - Validações executadas (via ShapeValidatorService):
+  - Validações executadas (via ShapeValidatorService.validateEdge — ver
+    a lista completa e atualizada em workflow.md § Validação de conexões):
     1. source_node e target_node existem no workflow
     2. source_port existe no output_schema da técnica de origem
     3. target_port existe no input_schema da técnica de destino
     4. Tipos são compatíveis (ex: tensor → tensor, scalar → scalar)
     5. Ordem do array é compatível com min_order/max_order do destino
-    6. requires_sample_axis é satisfeito
-    7. Compatibilidade semântica via technique_compatibilities
+       (só quando há datasetMeta conhecido)
+    6. requires_sample_axis é satisfeito (idem)
+    7. Compatibilidade semântica via technique_compatibilities —
+       implementada em 2026-10-13; blacklist opt-in, não bloqueia nada
+       enquanto a tabela estiver vazia
     8. Conexão não cria ciclo no grafo (DAG)
-  - Se inválida: retorna 422 com mensagem explícita do erro
-    (ex: "Inversa exige matriz quadrada. A entrada possui shape (3,2).")
+  - Se inválida: retorna 422 com a mensagem de erro da camada que falhou
   - Se válida: insere em workflow_edges, atualiza definition
+  - Checagens de compatibilidade matemática de shape (ex: "inversa exige
+    matriz quadrada") NÃO são feitas aqui — ver nota em workflow.md:
+    isso só é verificável depois que os dados correm, no validate()
+    de cada script Python
+
+validateWorkflow(req, res)
+  - Roda validateEdge para cada aresta já existente no workflow, sem
+    persistir nada — útil pra revalidar um workflow depois que o
+    parameter_schema ou input/output_schema de uma técnica muda
 
 deleteEdge(req, res)
   - Remove aresta
@@ -890,42 +903,48 @@ deleteEdge(req, res)
 
 ### Rotas
 
+> Reauditado em 2026-10-13: não existe rota "bare" `/executions` — execuções são sempre escopadas
+> a um workflow (`/workflows/:wid/executions`), porque é lá que o dispatch sabe qual workflow
+> rodar. `rerun`/`rerun-from` nunca foram implementados (a função não existe em
+> `execution.controller.js`) — removidos daqui; se precisar dessa funcionalidade, é trabalho novo,
+> não um gap de doc. As rotas de logs/métricas/promover output a dataset existem no código mas
+> nunca tinham sido documentadas.
+
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET`    | `/executions` | Lista execuções do usuário |
-| `POST`   | `/executions` | Dispara nova execução |
+| `GET`    | `/workflows/:wid/executions` | Lista execuções de um workflow |
+| `POST`   | `/workflows/:wid/executions` | Dispara nova execução desse workflow |
 | `GET`    | `/executions/:id` | Detalhe e status geral da execução |
 | `GET`    | `/executions/:id/nodes` | Status e outputs de cada nó |
-| `GET`    | `/executions/:id/nodes/:nkey` | Detalhe de nó específico (output, shape, dtype) |
+| `GET`    | `/executions/:id/nodes/:nid` | Detalhe de nó específico (output, shape, dtype) |
 | `POST`   | `/executions/:id/cancel` | Cancela execução em andamento |
-| `POST`   | `/executions/:id/rerun` | Re-executa com mesmos parâmetros |
-| `POST`   | `/executions/:id/rerun-from/:nkey` | Re-executa a partir de nó específico |
+| `POST`   | `/executions/:id/nodes/:nid/outputs/:port` | Promove uma porta de saída de um nó a dataset nomeado |
+| `GET`    | `/executions/:id/logs` | Log de execução (stdout/stderr dos nós, erros) |
+| `GET`    | `/executions/:id/metrics` | Métricas agregadas da execução (ver também `metric.controller.js`) |
 
 ### Funções
 
 ```
 listExecutions(req, res)
-  - Filtros: workflow_id, dataset_id, status, comparison_group,
-    project_id (via project_datasets)
-  - Retorna: id, label, status, started_at, finished_at,
-    workflow_id, dataset_id, comparison_group
+  - Lista execuções de um workflow (:wid na rota)
+  - Filtros: dataset_id, status, comparison_group
 
-createExecution(req, res)
-  - Campos: workflow_id, dataset_id (ou collection_id),
+dispatchExecution(req, res)
+  - Campos: dataset_id (ou collection_id),
     parameters (override de parâmetros por nó),
     random_seed, label, comparison_group
   - Valida que workflow está em status 'ready'
   - Valida compatibilidade do dataset com o primeiro nó do workflow
   - Cria execução com status = 'queued'
   - Cria execution_nodes para cada nó do workflow
-  - Enfileira job do tipo 'execute_workflow'
+  - Enfileira job via Redis (job.service.js) — consumido pelo worker Python
   - Retorna { execution_id, job_id }
 
 getExecution(req, res)
   - Retorna execução com status, parâmetros, dataset_id,
     started_at, finished_at, error_message
 
-getExecutionNodes(req, res)
+listExecutionNodes(req, res)
   - Retorna todos os execution_nodes com:
     node_key, technique, status, runtime_ms,
     output_type, output_shape, output_dtype
@@ -936,18 +955,16 @@ getExecutionNode(req, res)
     output_storage_path dependendo do tamanho
   - Inclui input_metadata para rastreabilidade
 
+saveNodeOutputAsDataset(req, res)
+  - Promove uma porta de saída de um nó já executado a um dataset novo e
+    nomeado — é assim que o usuário "salva" um resultado intermediário
+    (ex: train/validation/test do kennard_stone) sem precisar re-executar nada
+
 cancelExecution(req, res)
   - Atualiza status para 'cancelled'
-  - Sinaliza o worker para parar via Celery revoke
 
-rerun(req, res)
-  - Cria nova execução com mesmos parâmetros
-  - Define parent_execution_id para rastreabilidade
-
-rerunFrom(req, res)
-  - Re-executa a partir de nó específico
-  - Reutiliza outputs de nós anteriores já computados
-  - Útil quando apenas parâmetros downstream mudaram
+getExecutionLogs(req, res)
+  - Retorna o log da execução (saída/erros reportados pelo worker por nó)
 ```
 
 ---
@@ -967,6 +984,7 @@ rerunFrom(req, res)
 | `PUT`    | `/models/:id` | Atualiza nome, descrição |
 | `DELETE` | `/models/:id` | Soft delete |
 | `GET`    | `/models/:id/metrics` | Métricas de calibração, CV e validação externa |
+| `POST`   | `/models/:id/export` | Exporta o modelo pra um arquivo (pkl/onnx/joblib/pmml) — reauditado em 2026-10-13, não estava documentada |
 
 ### Funções
 
@@ -993,6 +1011,12 @@ getModelMetrics(req, res)
     calibration, cross_validation, external_validation
   - Inclui: r2, rmse, rmsec, rmsecv, rmsep, mae, bias, sep
     (regressão) ou accuracy, f1, roc_auc (classificação)
+
+exportModel(req, res)
+  - Exige model.status = 'ready'
+  - Campo opcional: format (pkl|onnx|joblib|pmml, default pkl)
+  - Enfileira job 'export_model' — exportação roda assíncrona
+  - Retorna { job_id } com 202 Accepted
 ```
 
 ---
@@ -1009,7 +1033,8 @@ getModelMetrics(req, res)
 |--------|------|-----------|
 | `GET`    | `/predictions` | Lista previsões do usuário |
 | `POST`   | `/predictions` | Dispara previsão com modelo + dataset |
-| `GET`    | `/predictions/:id` | Resultado da previsão |
+| `GET`    | `/predictions/:id` | Detalhe da previsão (status, modelo, dataset usados) |
+| `GET`    | `/predictions/:id/results` | Resultado da previsão — reauditado em 2026-10-13: é uma rota separada de `/predictions/:id`, não o mesmo payload |
 | `DELETE` | `/predictions/:id` | Remove previsão |
 
 ### Funções
@@ -1028,8 +1053,12 @@ createPrediction(req, res)
   - Retorna { prediction_id, job_id }
 
 getPrediction(req, res)
-  - Retorna results (JSON com valores preditos por amostra),
-    sample_count, model usado
+  - Retorna a previsão com model e dataset resolvidos (uuid, name),
+    mas NÃO os resultados em si — isso é getPredictionResults
+
+getPredictionResults(req, res)
+  - Exige prediction.status = 'completed'
+  - Retorna results (JSON com valores preditos por amostra)
 
 deletePrediction(req, res)
 ```
@@ -1046,8 +1075,8 @@ deletePrediction(req, res)
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET`    | `/executions/:eid/nodes/:nkey/metrics` | Métricas de um nó específico |
-| `GET`    | `/metrics/compare` | Compara métricas entre execuções (query params: execution_ids[]) |
+| `GET`    | `/executions/:id/nodes/:nid/metrics` | Métricas de um nó específico |
+| `POST`   | `/metrics/compare` | Compara métricas entre execuções (body: execution_ids[]) — reauditado em 2026-10-13: é POST no código, não GET (o corpo leva a lista de ids) |
 
 ### Funções
 
@@ -1068,78 +1097,89 @@ compareMetrics(req, res)
 
 **Responsabilidade:** agrupamento de execuções para comparação lado a lado — por exemplo, PARAFAC 2 vs 3 componentes, ou PLS vs N-PLS.
 
-**Tabelas:** `execution_comparisons`, `execution_comparison_items`
+**Tabelas:** `execution_comparisons` (ver nota abaixo — `execution_comparison_items` existe no
+schema mas não é usada pelo código real).
 
 ### Rotas
 
+> Reauditado em 2026-10-13: o prefixo real é `/execution-comparisons`, não `/comparisons`. Não
+> existe `PUT` nem as sub-rotas `/items` — a lista de execuções do grupo (`execution_uuids`) é
+> definida de uma vez só no `POST` de criação, não é incremental.
+
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET`    | `/comparisons` | Lista comparações do usuário |
-| `POST`   | `/comparisons` | Cria grupo de comparação |
-| `GET`    | `/comparisons/:id` | Detalhe com execuções e métricas |
-| `PUT`    | `/comparisons/:id` | Atualiza nome, descrição, conclusão |
-| `DELETE` | `/comparisons/:id` | Remove comparação (não as execuções) |
-| `POST`   | `/comparisons/:id/items` | Adiciona execução ao grupo |
-| `DELETE` | `/comparisons/:id/items/:eid` | Remove execução do grupo |
+| `GET`    | `/execution-comparisons` | Lista comparações do usuário |
+| `POST`   | `/execution-comparisons` | Cria grupo de comparação (recebe `execution_uuids[]` completo) |
+| `GET`    | `/execution-comparisons/:id` | Detalhe com execuções e métricas |
+| `DELETE` | `/execution-comparisons/:id` | Remove comparação (não as execuções) |
 
 ### Funções
 
 ```
-listComparisons / createComparison / getComparison /
-updateComparison / deleteComparison(req, res)
-  - CRUD padrão de execution_comparisons
+listComparisons(req, res)
+  - Lista as comparações do usuário autenticado
+
+createComparison(req, res)
+  - Campos: name, description, execution_uuids[] (mínimo 2),
+    metric_names[]
+  - Valida existência e permissão de cada execution_uuid
+  - Grava a lista inteira em execution_uuids (JSON) — não há
+    "adicionar item" incremental depois de criado
 
 getComparison(req, res)
-  - Retorna comparação com execuções e métricas de cada uma
+  - Retorna a comparação com execuções e métricas de cada uma
   - Organiza métricas em tabela comparativa
 
-addItem(req, res)
-  - Adiciona execution_id ao grupo com label e position
-
-removeItem(req, res)
-  - Remove execução do grupo; não cancela nem deleta a execução
+deleteComparison(req, res)
+  - Remove a comparação; não cancela nem deleta as execuções
 ```
 
 ---
 
 ## 19. `synthetic.controller.js`
 
-**Responsabilidade:** geração de dados sintéticos (req 7). Inicialmente espectros com gaussianas; estruturado para suportar VAE/GAN/difusão no futuro.
+**Responsabilidade:** geração de dados sintéticos (req 7) — espectros 1D com sinal + baseline
+dados por fórmula (validada via `FormulaParserService`, sem `eval`) e ruído.
 
-**Tabelas:** `jobs`, `datasets`
+> Reauditado em 2026-10-13: a API real é um CRUD simples sobre `/synthetic-datasets`, não as
+> rotas `/synthetic/spectra`, `/synthetic/multiway`, `/synthetic/eem`, `/synthetic/jobs/:jid`
+> documentadas antes. Não existem geradores separados pra multiway/EEM — é um único tipo de
+> geração (1D, por fórmula), reestruturado em algum ponto do desenvolvimento pra esse modelo mais
+> simples.
+
+**Tabelas:** `synthetic_datasets`, `jobs`
 
 ### Rotas
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `POST`   | `/synthetic/spectra` | Gera conjunto de espectros sintéticos |
-| `POST`   | `/synthetic/multiway` | Gera array N-way sintético |
-| `POST`   | `/synthetic/eem` | Gera dados EEM sintéticos |
-| `GET`    | `/synthetic/jobs/:jid` | Acompanha job de geração |
+| `GET`    | `/synthetic-datasets` | Lista datasets sintéticos do usuário |
+| `POST`   | `/synthetic-datasets` | Enfileira geração de um novo dataset sintético |
+| `GET`    | `/synthetic-datasets/:id` | Detalhe/status da geração |
+| `DELETE` | `/synthetic-datasets/:id` | Remove o registro |
 
 ### Funções
 
 ```
-generateSpectra(req, res)
-  - Parâmetros: n_samples, n_variables, peaks (array de gaussianas:
-    {center, width, height}), noise_level, noise_type,
-    outlier_fraction, reference_values (array para calibração)
-  - Enfileira job 'operate_dataset' com sub-tipo 'synthetic_spectra'
-  - Retorna { job_id }
-  - Ao concluir, job cria dataset normal com os dados gerados
+listSyntheticDatasets(req, res)
+  - Lista os synthetic_datasets do usuário autenticado
 
-generateMultiway(req, res)
-  - Parâmetros: shape (array N-dimensional), data_order,
-    sample_axis, generation_method ('parafac', 'random', 'gaussian'),
-    n_components, noise_level
-  - Gera tensor N-way e salva como dataset
+createSyntheticDataset(req, res)
+  - Campos: name, n_samples, n_variables, x_range_start/end,
+    noise_level, signal_formula, baseline_formula (ambas validadas
+    via FormulaParserService.validate — AST, nunca eval), tags
+  - Cria a linha em synthetic_datasets com status='pending'
+  - Enfileira job 'generate_synthetic' (job.service.js)
+  - Retorna { synthetic_dataset, job_id } com 202 Accepted
+  - Ao concluir, o worker gera os dados e marca status='ready',
+    preenchendo output_dataset_uuid
 
-generateEEM(req, res)
-  - Parâmetros específicos para excitação/emissão/fluorescência:
-    excitation_range, emission_range, n_components, noise_level
+getSyntheticDataset(req, res)
+  - Retorna status da geração e output_dataset_uuid quando pronto
 
-getSyntheticJob(req, res)
-  - Retorna status do job e dataset_id gerado (quando completo)
+deleteSyntheticDataset(req, res)
+  - Remove o registro de synthetic_datasets (não afeta o dataset
+    já gerado, se algum)
 ```
 
 ---
@@ -1152,11 +1192,17 @@ getSyntheticJob(req, res)
 
 ### Rotas
 
+> Reauditado em 2026-10-13: existem 2 rotas e 1 função reais que não estavam documentadas —
+> `GET /jobs/admin` (lista jobs de todos os usuários, pra administração) e
+> `POST /jobs/:id/retry` (reenfileira um job que falhou).
+
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `GET`    | `/jobs` | Lista jobs do usuário (recentes) |
+| `GET`    | `/jobs/admin` | Lista jobs de todos os usuários (admin) |
 | `GET`    | `/jobs/:id` | Status, progresso e resultado do job |
 | `POST`   | `/jobs/:id/cancel` | Cancela job em fila (se ainda não iniciado) |
+| `POST`   | `/jobs/:id/retry` | Reenfileira um job que falhou |
 
 ### Funções
 
@@ -1166,6 +1212,9 @@ listJobs(req, res)
   - Retorna: id, job_type, status, progress, queued_at, started_at,
     finished_at, entidade relacionada (workflow_id, dataset_id, etc.)
 
+listAllJobs(req, res)
+  - Mesmo formato de listJobs, mas sem o filtro por user_id (admin)
+
 getJob(req, res)
   - Retorna detalhes incluindo result (JSON) ou error_message
   - Inclui link para a entidade criada pelo job quando concluído
@@ -1174,6 +1223,10 @@ getJob(req, res)
 cancelJob(req, res)
   - Apenas jobs com status = 'queued' podem ser cancelados
   - Atualiza status para 'cancelled'
+
+retryJob(req, res)
+  - Apenas jobs com status = 'failed' podem ser reenfileirados
+  - Reenfileira o mesmo payload com um novo job_id
 ```
 
 ---
@@ -1191,6 +1244,8 @@ cancelJob(req, res)
 | `GET`    | `/ai-interactions` | Lista interações do usuário |
 | `POST`   | `/ai-interactions` | Dispara nova interação com IA |
 | `GET`    | `/ai-interactions/:id` | Resultado de interação específica |
+| `POST`   | `/ai-interactions/:id/feedback` | Usuário avalia a resposta da IA — reauditado em 2026-10-13, não estava documentada |
+| `DELETE` | `/ai-interactions/:id` | Remove a interação — reauditado em 2026-10-13, não estava documentada |
 
 ### Funções
 
@@ -1211,13 +1266,21 @@ createInteraction(req, res)
 
 getInteraction(req, res)
   - Retorna output (texto da IA), model usado, created_at
+
+submitFeedback(req, res)
+  - Usuário marca a resposta como útil/não útil (com comentário opcional)
+
+deleteInteraction(req, res)
+  - Remove o registro
 ```
 
 ---
 
 ## 22. `audit.controller.js`
 
-**Responsabilidade:** log de auditoria. Apenas para admins. Pode ser implementado depois.
+**Responsabilidade:** log de auditoria e estatísticas administrativas. Apenas para admins.
+Reauditado em 2026-10-13 — já está implementado (a nota anterior "pode ser implementado depois"
+estava desatualizada).
 
 **Tabelas:** `audit_logs`
 
@@ -1226,80 +1289,89 @@ getInteraction(req, res)
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `GET`    | `/audit-logs` | Lista logs (apenas admin) |
-| `GET`    | `/audit-logs/:entity_type/:entity_id` | Histórico de entidade específica |
+| `GET`    | `/audit-logs/:id` | Detalhe de um log específico |
+| `GET`    | `/audit-logs/resource/:type/:uuid` | Histórico de uma entidade específica (ex: `resource/dataset/<uuid>`) — reauditado em 2026-10-13: o path real é `resource/:type/:uuid`, não `:entity_type/:entity_id` |
+| `GET`    | `/admin/stats` | Estatísticas gerais da plataforma (admin) — reauditado em 2026-10-13, não estava documentada |
 
 ### Funções
 
 ```
-listLogs(req, res)
+listAuditLogs(req, res)
   - Apenas role = 'admin'
   - Filtros: user_id, entity_type, entity_id, action, date range
   - Retorna: action, entity_type, entity_id, before_data,
     after_data, user_id, created_at
 
-getEntityHistory(req, res)
-  - Histórico completo de uma entidade (ex: dataset/:id)
+getAuditLog(req, res)
+  - Detalhe de um log específico pelo id
+
+getResourceAuditLogs(req, res)
+  - Histórico completo de uma entidade, identificada por tipo + uuid
+
+getAdminStats(req, res)
+  - Contadores gerais (usuários, datasets, workflows, execuções…)
+    pro painel administrativo
 ```
 
 ---
 
-## Tabelas novas necessárias (gaps vs banco atual)
+## Tabelas que faltavam (gap já resolvido)
 
-As tabelas a seguir precisam ser adicionadas ao `database.md` e ao script SQL:
+> Reauditado em 2026-10-13: esta seção listava `projects`, `project_members`, `project_datasets`,
+> `project_workflows`, `project_articles`, `community_projects`, `workflow_versions` e os campos
+> `techniques.is_custom`/`user_id`/`custom_definition` e `datasets.dtype` como pendências de
+> schema. Todas já existem em `init.mysql` e estão documentadas em `database.md` — não há mais
+> gap aqui. Mantida como nota histórica só pra não perder o motivo de cada tabela ter sido
+> criada (ver `database.md` pros detalhes atuais de cada uma).
 
-### `projects`
-```sql
-id, uuid, user_id, name, description, visibility,
-status (active|archived), created_at, updated_at, deleted_at
+---
+
+## 23. `datasetOperation.controller.js`
+
+> Controller inteiro estava faltando nesta documentação (achado na reauditoria de 2026-10-13) —
+> adicionado aqui no fim, em vez de renumerar as seções 1-22 acima e arriscar quebrar referências
+> a elas em outros documentos.
+
+**Responsabilidade:** aplicar uma técnica do catálogo direto a um dataset, sem passar pelo editor
+de workflow (ex: usuário clica "Aplicar SNV" na tela do dataset). Por baixo das cobertas, cria um
+workflow real de 1 nó + uma execução (reaproveita toda a infraestrutura de execução/linhagem em
+vez de ter um caminho de código separado) e registra isso em `dataset_operations`.
+
+**Tabelas:** `dataset_operations`, `workflows`, `executions`, `dataset_lineage`
+
+### Rotas
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST`   | `/datasets/:id/operations` | Aplica uma técnica ao dataset |
+| `GET`    | `/datasets/:id/operations` | Lista operações já aplicadas a esse dataset |
+| `GET`    | `/operations/:id` | Detalhe/status de uma operação específica |
+
+### Funções
+
 ```
+createQuickOperation(req, res)
+  - Campos: technique_id (uuid), params, workflow_name (obrigatório —
+    nome do workflow de 1 nó criado por baixo), save_mode
+    ('new_dataset'|'in_place'), new_dataset_name,
+    extra_inputs (pra técnicas de 2+ entradas, ex: soma/produto_matricial —
+    cada entrada extra é { type: 'dataset', dataset_id } ou
+    { type: 'literal', value })
+  - Valida min_order/max_order da técnica contra a dimensionalidade
+    real do dataset
+  - Resolve extra_inputs (outro dataset do usuário, ou um valor literal)
+  - Cria workflow de 1 nó + dispara a execução, e grava a linha em
+    dataset_operations com status='pending'
+  - Quando a execução conclui, output_dataset_id é preenchido
+    (save_mode=new_dataset) ou o dataset original é atualizado in-place
 
-### `project_members`
-```sql
-id, project_id, user_id, role (viewer|editor|admin), joined_at
+listOperations(req, res)
+  - Lista as dataset_operations de um dataset, mais recentes primeiro
+
+getOperation(req, res)
+  - Detalhe de uma operação: status, error_message,
+    output_dataset_id quando concluída
 ```
-
-### `project_datasets`
-```sql
-id, project_id, dataset_id, purpose (training|validation|test|
-calibration|prediction|reference|other), added_by, added_at
-```
-> `purpose` fica aqui (não em `datasets`) porque o mesmo dataset pode ser "calibração" num projeto e "validação" em outro.
-
-### `project_workflows`
-```sql
-id, project_id, workflow_id, added_by, added_at
-```
-
-### `project_articles`
-```sql
-id, project_id, article_id, added_by, added_at
-```
-
-### `community_projects`
-```sql
-id, community_id, project_id, shared_by, shared_at
-```
-
-### `workflow_versions`
-```sql
-id, workflow_id, label, description, definition (JSON),
-created_by, created_at
-```
-
-### Campos adicionais em tabelas existentes
-
-**`techniques`:**
-```sql
-is_custom    TINYINT(1) DEFAULT 0
-user_id      BIGINT UNSIGNED NULL  -- dono se is_custom = 1
-custom_definition  JSON NULL        -- cadeia de operações
-```
-
-**`datasets`:**
-```sql
-dtype        VARCHAR(50) NULL  -- float32, float64, complex128...
-```
-> (mencionado em database.md, ausente no dump SQL)
 
 ---
 
@@ -1307,7 +1379,7 @@ dtype        VARCHAR(50) NULL  -- float32, float64, complex128...
 
 | Requisito | Controllers principais |
 |-----------|----------------------|
-| 1 — Gestão e importação de dados | `dataset`, `spectrum`, `collection` |
+| 1 — Gestão e importação de dados | `dataset`, `datasetOperation`, `spectrum`, `collection` |
 | 2 — Exploração e visualização | `dataset` (slice, preview), `spectrum` (plot), `collection` |
 | 3 — Workflow de análise | `workflow`, `workflowNode`, `workflowEdge`, `execution`, `technique` |
 | 4 — Artigos → workflows | `article`, `articleAnalysis`, `workflow` |
