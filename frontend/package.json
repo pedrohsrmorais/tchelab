@@ -18,10 +18,12 @@
     "framer-motion": "^14.0.0",
     "i18next": "^25.3.2",
     "lucide-react": "^1.50.0",
+    "plotly.js-cartesian-dist-min": "^4.1.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hot-toast": "^2.6.1",
     "react-i18next": "^15.5.3",
+    "react-plotly.js": "^4.1.0",
     "react-router-dom": "^7.18.4",
     "three": "^0.170.0",
     "zustand": "^5.0.15"

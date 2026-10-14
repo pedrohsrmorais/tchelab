@@ -13,10 +13,14 @@
  *   - Voxel 3D   (3 eixos livres) → células coloridas no espaço
  */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { X, Info, Layers, Download, Grid3X3, Box, Waves, Rows3, LineChart as LineChartIcon } from 'lucide-react';
+import { X, Info, Download, Grid3X3, Box, Waves, Rows3, LineChart as LineChartIcon, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { LineChartAcademic } from '../viz/LineChartAcademic';
+import { HeatmapAcademic } from '../viz/HeatmapAcademic';
+import { ChartLabelsEditor } from '../viz/ChartLabelsEditor';
 
 // ---------------------------------------------------------------------------
 // UTILITIES
@@ -297,134 +301,6 @@ function LineChart({ series, xLabels, exportRef }) {
           {tooltip.entries.map((en, i) => (
             <div key={i} style={{ color: en.color }}>{en.label}: {isNaN(en.v) ? '—' : Number(en.v).toPrecision(6)}</div>
           ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 2D HEATMAP (Canvas 2D)
-// ---------------------------------------------------------------------------
-
-const CELL_MAX = 80;
-
-function HeatMap2D({ matrix, rows, cols, axisLabels, exportRef }) {
-  const canvasRef = useRef(null);
-  const containerRef = useRef(null);
-  const [tooltip, setTooltip] = useState(null);
-  const [size, setSize] = useState({ w: 700, h: 480 });
-
-  useEffect(() => {
-    if (exportRef) exportRef.current = canvasRef.current;
-    return () => { if (exportRef) exportRef.current = null; };
-  }, [exportRef]);
-
-  useEffect(() => {
-    const ro = new ResizeObserver(entries => {
-      const e = entries[0];
-      if (e) setSize({ w: e.contentRect.width || 700, h: e.contentRect.height || 480 });
-    });
-    if (containerRef.current) ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  const [gMin, gMax] = useMemo(() => {
-    const flat = matrix.flatMap(r => r).filter(v => !isNaN(v));
-    if (!flat.length) return [0, 1];
-    return [Math.min(...flat), Math.max(...flat)];
-  }, [matrix]);
-
-  const { dm, dr, dc, sr, sc } = useMemo(() => {
-    const sr = rows > CELL_MAX ? Math.ceil(rows / CELL_MAX) : 1;
-    const sc = cols > CELL_MAX ? Math.ceil(cols / CELL_MAX) : 1;
-    const dm = [];
-    for (let r = 0; r < rows; r += sr) {
-      const row = [];
-      for (let c = 0; c < cols; c += sc) row.push(matrix[r]?.[c] ?? NaN);
-      dm.push(row);
-    }
-    return { dm, dr: Math.ceil(rows / sr), dc: Math.ceil(cols / sc), sr, sc };
-  }, [matrix, rows, cols]);
-
-  const PAD = { top: 20, left: 55, right: 20, bottom: 50 };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !dm.length) return;
-    const ctx = canvas.getContext('2d');
-    const W = size.w, H = size.h;
-    canvas.width = W; canvas.height = H;
-    const plotW = W - PAD.left - PAD.right;
-    const plotH = H - PAD.top - PAD.bottom;
-    const cw = plotW / dc, ch = plotH / dr;
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, W, H);
-    for (let r = 0; r < dr; r++) {
-      for (let c = 0; c < dc; c++) {
-        const v = dm[r]?.[c];
-        if (v == null || isNaN(v)) continue;
-        const t = gMax === gMin ? 0.5 : (v - gMin) / (gMax - gMin);
-        const [rr, gg, bb] = viridis(t);
-        ctx.fillStyle = `rgb(${rr},${gg},${bb})`;
-        ctx.fillRect(PAD.left + c * cw, PAD.top + r * ch, cw + 0.5, ch + 0.5);
-      }
-    }
-    ctx.fillStyle = 'rgba(148,163,184,0.85)';
-    ctx.font = '10px monospace';
-    const xTicks = Math.min(8, dc);
-    for (let i = 0; i <= xTicks; i++) {
-      const c = Math.round(i * (dc - 1) / Math.max(xTicks, 1));
-      ctx.textAlign = 'center';
-      ctx.fillText(String(axisLabels?.x?.[c * sc] ?? c * sc).slice(0, 8), PAD.left + (c + 0.5) * cw, H - PAD.bottom + 14);
-    }
-    const yTicks = Math.min(8, dr);
-    for (let i = 0; i <= yTicks; i++) {
-      const r = Math.round(i * (dr - 1) / Math.max(yTicks, 1));
-      ctx.textAlign = 'right';
-      ctx.fillText(String(axisLabels?.y?.[r * sr] ?? r * sr).slice(0, 8), PAD.left - 6, PAD.top + (r + 0.5) * ch + 4);
-    }
-    const barX = PAD.left, barY = H - PAD.bottom + 24, barW = plotW;
-    for (let x = 0; x < barW; x++) {
-      const [rr, gg, bb] = viridis(x / barW);
-      ctx.fillStyle = `rgb(${rr},${gg},${bb})`;
-      ctx.fillRect(barX + x, barY, 1, 10);
-    }
-    ctx.fillStyle = 'rgba(148,163,184,0.85)';
-    ctx.textAlign = 'left';
-    ctx.fillText(gMin.toPrecision(4), barX, barY + 22);
-    ctx.textAlign = 'right';
-    ctx.fillText(gMax.toPrecision(4), barX + barW, barY + 22);
-  }, [dm, dr, dc, gMin, gMax, size, axisLabels, sc, sr]);
-
-  const handleMouseMove = useCallback(e => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
-    const plotW = size.w - PAD.left - PAD.right;
-    const plotH = size.h - PAD.top - PAD.bottom;
-    const c = Math.floor((mx - PAD.left) / (plotW / dc));
-    const r = Math.floor((my - PAD.top) / (plotH / dr));
-    if (c >= 0 && c < dc && r >= 0 && r < dr) {
-      setTooltip({ x: e.clientX, y: e.clientY, r: r * sr, c: c * sc, v: matrix[r * sr]?.[c * sc] });
-    } else setTooltip(null);
-  }, [size, dc, dr, matrix, sr, sc]);
-
-  return (
-    <div ref={containerRef} className="relative w-full" style={{ height: '100%', minHeight: 400 }}>
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', height: '100%', borderRadius: 8, display: 'block' }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => setTooltip(null)}
-      />
-      {tooltip && (
-        <div className="fixed z-[200] pointer-events-none px-3 py-1.5 rounded-lg text-xs"
-          style={{ background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.15)',
-            left: tooltip.x + 12, top: tooltip.y - 28, color: '#e2e8f0', fontFamily: 'monospace' }}>
-          [{tooltip.r}, {tooltip.c}] = {isNaN(tooltip.v) ? '—' : Number(tooltip.v).toPrecision(6)}
         </div>
       )}
     </div>
@@ -967,11 +843,11 @@ function adjustRolesForNeed(prevRoles, need, ndim) {
 }
 
 // ---------------------------------------------------------------------------
-// VIZ MODAL — fullscreen
+// VIZ MODAL — casca fullscreen (header + Escape). O conteúdo em si mora em
+// VizWorkspace, que não sabe nada sobre estar dentro de um modal.
 // ---------------------------------------------------------------------------
 
-function VizModal({ title, subtitle, onClose, onExport, exporting, exportDisabled, children }) {
-  const { t } = useTranslation();
+function VizModal({ title, subtitle, onClose, headerExtra, children }) {
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -987,12 +863,7 @@ function VizModal({ title, subtitle, onClose, onExport, exporting, exportDisable
           {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onExport} disabled={exporting || exportDisabled} title={exportDisabled ? t('datasets.multiDim.exportDisabledTooltip') : undefined}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40"
-            style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>
-            <Download className="w-3.5 h-3.5" />
-            {exporting ? t('datasets.multiDim.exporting') : t('datasets.multiDim.savePdf')}
-          </button>
+          {headerExtra}
           <button onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
             <X className="w-4 h-4" />
@@ -1007,13 +878,23 @@ function VizModal({ title, subtitle, onClose, onExport, exporting, exportDisable
 }
 
 // ---------------------------------------------------------------------------
-// MAIN MODAL
+// VIZ WORKSPACE — todo o corpo de visualização (seletor de modo, eixos,
+// overlay de fatias, escolha do gráfico e export), independente de estar
+// dentro do modal fullscreen (MultiDimModal) ou de uma página própria
+// (DatasetVizPage). Só depende do `dataset`.
 // ---------------------------------------------------------------------------
 
-export default function MultiDimModal({ dataset, onClose }) {
+export function VizWorkspace({ dataset }) {
   const { t } = useTranslation();
   const canvasExportRef = useRef(null);
+  const lineChartRef = useRef(null);
+  const heatmapRef = useRef(null);
   const [exporting, setExporting] = useState(false);
+  const [markers, setMarkers] = useState(false);
+  const [chartTitle, setChartTitle] = useState(dataset?.name ?? '');
+  const [xAxisTitle, setXAxisTitle] = useState('');
+  const [yAxisTitle, setYAxisTitle] = useState('');
+  const [colorbarTitle, setColorbarTitle] = useState('');
 
   const { dims, tensor } = useMemo(() => {
     const meta = dataset?.metadata;
@@ -1110,6 +991,8 @@ export default function MultiDimModal({ dataset, onClose }) {
     }));
   }, [mode, sliced, overlayDim, overlayIndices, fixedDims, fixedIdx, tensor, dims, axisOrder, t]);
 
+  // Export por canvas (PDF "caseiro") — ainda usado pelos modos surface/voxel,
+  // que não têm um gráfico Plotly por trás (são Three.js puro via Scene3D).
   const handleExport = useCallback(() => {
     setExporting(true);
     try {
@@ -1126,44 +1009,63 @@ export default function MultiDimModal({ dataset, onClose }) {
     }
   }, [dataset, mode]);
 
-  useEffect(() => {
-    const handler = e => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  // Export de verdade (PNG alta resolução / SVG vetorial) via Plotly, só
+  // disponível nos modos line/heatmap, que agora usam LineChartAcademic /
+  // HeatmapAcademic.
+  const handleImageExport = useCallback((format) => {
+    const safe = (dataset?.name ?? 'dataset').replace(/[^a-z0-9]/gi, '_');
+    const filename = `${safe}_${mode}`;
+    if (mode === 'line') lineChartRef.current?.exportImage({ format, filename });
+    else if (mode === 'heatmap') heatmapRef.current?.exportImage({ format, filename });
+  }, [dataset, mode]);
 
   if (!hasData) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-        onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-        <div className="relative w-full max-w-md rounded-2xl overflow-hidden p-6"
-          style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1a2540 100%)', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10">
-            <X className="w-4 h-4" />
-          </button>
-          <div className="flex flex-col items-center justify-center py-6 gap-3 text-slate-500">
-            <Info className="w-10 h-10 opacity-40" />
-            <p className="text-sm text-center">
-              {!tensor
-                ? t('datasets.multiDim.noTensorData')
-                : t('datasets.multiDim.noDimensions')}
-            </p>
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-500 py-10">
+        <Info className="w-10 h-10 opacity-40" />
+        <p className="text-sm text-center">
+          {!tensor
+            ? t('datasets.multiDim.noTensorData')
+            : t('datasets.multiDim.noDimensions')}
+        </p>
       </div>
     );
   }
 
+  const isPlotlyMode = mode === 'line' || mode === 'heatmap';
+
   return (
-    <VizModal
-      title={t('datasets.multiDim.title')}
-      subtitle={`${dataset?.name} · ${dims.join(' × ')} (${ndim}D)`}
-      onClose={onClose}
-      onExport={handleExport}
-      exporting={exporting}
-      exportDisabled={mode === 'matrix'}>
-      <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full gap-4">
+      {/* Resumo do dataset + ações de export */}
+      <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-slate-500">{dataset?.name} · {dims.join(' × ')} ({ndim}D)</p>
+        {isPlotlyMode ? (
+          <div className="flex items-center gap-2">
+            <button onClick={() => handleImageExport('png')} title={t('datasets.multiDim.exportPngDesc')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+              style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <Download className="w-3.5 h-3.5" />
+              {t('datasets.multiDim.exportPng')}
+            </button>
+            <button onClick={() => handleImageExport('svg')} title={t('datasets.multiDim.exportSvgDesc')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+              style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <Download className="w-3.5 h-3.5" />
+              {t('datasets.multiDim.exportSvg')}
+            </button>
+          </div>
+        ) : (
+          <button onClick={handleExport} disabled={exporting || mode === 'matrix'}
+            title={mode === 'matrix' ? t('datasets.multiDim.exportDisabledTooltip') : undefined}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40"
+            style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>
+            <Download className="w-3.5 h-3.5" />
+            {exporting ? t('datasets.multiDim.exporting') : t('datasets.multiDim.savePdf')}
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-col h-full gap-4 flex-1 min-h-0">
         {/* Seletor de modo */}
         <div className="flex-shrink-0 flex flex-wrap gap-2">
           {availableModes.map(m => {
@@ -1225,6 +1127,25 @@ export default function MultiDimModal({ dataset, onClose }) {
           )}
         </div>
 
+        {/* Rótulos editáveis do gráfico (só line/heatmap, que são Plotly) */}
+        {isPlotlyMode && (
+          <div className="flex-shrink-0 flex flex-wrap items-center gap-3">
+            <ChartLabelsEditor
+              title={chartTitle} onTitleChange={setChartTitle}
+              xTitle={xAxisTitle} onXTitleChange={setXAxisTitle}
+              yTitle={yAxisTitle} onYTitleChange={setYAxisTitle}
+              colorbarTitle={colorbarTitle}
+              onColorbarTitleChange={mode === 'heatmap' ? setColorbarTitle : undefined}
+            />
+            {mode === 'line' && (
+              <label className="flex items-center gap-1.5 text-xs text-slate-400">
+                <input type="checkbox" checked={markers} onChange={e => setMarkers(e.target.checked)} />
+                {t('viz.markers')}
+              </label>
+            )}
+          </div>
+        )}
+
         {/* Conteúdo do modo */}
         <div className="flex-1 min-h-0">
           {!sliced ? (
@@ -1232,9 +1153,20 @@ export default function MultiDimModal({ dataset, onClose }) {
               {t(need > 1 ? 'datasets.multiDim.chooseAxesPlural' : 'datasets.multiDim.chooseAxesSingle', { count: need, axes: ['X', 'Y', 'Z'].slice(0, need).join(', ') })}
             </div>
           ) : mode === 'line' ? (
-            <LineChart series={lineSeries} xLabels={axisLabels?.x} exportRef={canvasExportRef} />
+            <LineChartAcademic
+              key="line"
+              ref={lineChartRef}
+              series={lineSeries.map(s => ({ label: s.label, values: s.values, color: s.color }))}
+              title={chartTitle} xTitle={xAxisTitle} yTitle={yAxisTitle}
+              markers={markers}
+            />
           ) : mode === 'heatmap' && sliced.kind === '2d' ? (
-            <HeatMap2D matrix={sliced.matrix} rows={sliced.rows} cols={sliced.cols} axisLabels={axisLabels} exportRef={canvasExportRef} />
+            <HeatmapAcademic
+              key="heatmap"
+              ref={heatmapRef}
+              z={sliced.matrix} x={axisLabels?.x} y={axisLabels?.y}
+              title={chartTitle} xTitle={xAxisTitle} yTitle={yAxisTitle} colorbarTitle={colorbarTitle}
+            />
           ) : mode === 'surface' && sliced.kind === '2d' ? (
             <Surface3D matrix={sliced.matrix} rows={sliced.rows} cols={sliced.cols} gMin={gMin} gMax={gMax} exportRef={canvasExportRef} />
           ) : mode === 'matrix' && sliced.kind === '2d' ? (
@@ -1244,6 +1176,39 @@ export default function MultiDimModal({ dataset, onClose }) {
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MAIN MODAL — casca fullscreen usada pelos 3 lugares que já chamam
+// <MultiDimModal dataset={...} onClose={...} /> (assinatura inalterada).
+// ---------------------------------------------------------------------------
+
+export default function MultiDimModal({ dataset, onClose }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const openFullPage = dataset?.uuid
+    ? (
+      <button
+        onClick={() => navigate(`/datasets/${dataset.uuid}/viz`)}
+        title={t('datasets.multiDim.openFullPage')}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+        style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <ExternalLink className="w-3.5 h-3.5" />
+        {t('datasets.multiDim.openFullPage')}
+      </button>
+    )
+    : null;
+
+  return (
+    <VizModal
+      title={t('datasets.multiDim.title')}
+      subtitle={dataset?.name}
+      onClose={onClose}
+      headerExtra={openFullPage}>
+      <VizWorkspace dataset={dataset} />
     </VizModal>
   );
 }

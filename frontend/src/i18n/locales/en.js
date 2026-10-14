@@ -359,6 +359,11 @@ export default {
       exportDisabledTooltip: 'Export unavailable in matrix view',
       exporting:             'Exporting…',
       savePdf:               'Save PDF',
+      exportPng:             'PNG (high resolution)',
+      exportSvg:             'SVG (vector)',
+      exportPngDesc:         'Raster image at 300+ DPI — ready to paste into slides/documents.',
+      exportSvgDesc:         'Editable vector — opens in Illustrator/Inkscape, ideal for paper submission.',
+      openFullPage:          'Open in its own page',
       axesLabel:             'Axes ({{desc}})',
       dimLabel:              'Dim {{index}}',
       fixed:                 'Fixed',
@@ -771,5 +776,20 @@ export default {
       failed:    'Failed',
       cancelled: 'Cancelled',
     },
+  },
+
+  // ── Academic visualization (publication-ready charts) ────────────────────
+  viz: {
+    pageTitle:            'Visualization',
+    backToDataset:        'Back to dataset',
+    chartTitlePlaceholder:'Chart title',
+    xAxisPlaceholder:     'X axis label',
+    yAxisPlaceholder:     'Y axis label',
+    colorbarPlaceholder:  'Colorbar label',
+    markers:              'Markers',
+    logScaleX:            'Log X',
+    logScaleY:            'Log Y',
+    notFound:              'Dataset not found.',
+    academicNote:          'Fixed white background and font — meant for a paper/presentation figure, independent of the platform theme.',
   },
 };

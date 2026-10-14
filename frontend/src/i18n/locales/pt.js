@@ -366,6 +366,11 @@ export default {
       exportDisabledTooltip: 'Exportação indisponível na visão matricial',
       exporting:             'Exportando…',
       savePdf:               'Salvar PDF',
+      exportPng:             'PNG (alta resolução)',
+      exportSvg:             'SVG (vetorial)',
+      exportPngDesc:         'Imagem raster em 300+ DPI — pronta pra colar em slides/documentos.',
+      exportSvgDesc:         'Vetorial editável — abre no Illustrator/Inkscape, ideal para submissão de artigo.',
+      openFullPage:          'Abrir em página própria',
       axesLabel:             'Eixos ({{desc}})',
       dimLabel:              'Dim {{index}}',
       fixed:                 'Fixo',
@@ -786,5 +791,20 @@ export default {
       failed:    'Falhou',
       cancelled: 'Cancelado',
     },
+  },
+
+  // ── Visualização acadêmica (gráficos publicáveis) ────────────────────────
+  viz: {
+    pageTitle:            'Visualização',
+    backToDataset:        'Voltar ao dataset',
+    chartTitlePlaceholder:'Título do gráfico',
+    xAxisPlaceholder:     'Rótulo do eixo X',
+    yAxisPlaceholder:     'Rótulo do eixo Y',
+    colorbarPlaceholder:  'Rótulo da barra de cor',
+    markers:              'Marcadores',
+    logScaleX:            'Log X',
+    logScaleY:            'Log Y',
+    notFound:              'Dataset não encontrado.',
+    academicNote:          'Fundo branco e fonte fixos — pensado pra figura de artigo/apresentação, independe do tema da plataforma.',
   },
 };

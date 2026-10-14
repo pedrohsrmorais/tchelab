@@ -16,6 +16,7 @@ const ProjectsPage       = lazy(() => import('./pages/ProjectsPage'));
 const ProjectDetailPage  = lazy(() => import('./pages/ProjectDetailPage'));
 const DatasetsPage       = lazy(() => import('./pages/DatasetsPage'));
 const DatasetDetailPage  = lazy(() => import('./pages/DatasetDetailPage'));
+const DatasetVizPage     = lazy(() => import('./pages/DatasetVizPage'));
 const CommunitiesPage    = lazy(() => import('./pages/CommunitiesPage'));
 const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
 const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
@@ -38,6 +39,7 @@ if (typeof window !== 'undefined') {
     import('./pages/ProjectDetailPage');
     import('./pages/DatasetsPage');
     import('./pages/DatasetDetailPage');
+    import('./pages/DatasetVizPage');
     import('./pages/CommunitiesPage');
     import('./pages/CommunityDetailPage');
     import('./pages/WorkflowsPage');
@@ -93,6 +95,7 @@ export default function App() {
           <Route path="projects/:id" element={<ProjectDetailPage />} />
           <Route path="datasets" element={<DatasetsPage />} />
           <Route path="datasets/:id" element={<DatasetDetailPage />} />
+          <Route path="datasets/:id/viz" element={<DatasetVizPage />} />
           <Route path="communities" element={<CommunitiesPage />} />
           <Route path="communities/:id" element={<CommunityDetailPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
