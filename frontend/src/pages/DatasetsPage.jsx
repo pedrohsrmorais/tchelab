@@ -2,6 +2,7 @@ import React, { useState, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Database, Search, Upload, FileSpreadsheet, FileText, ClipboardPaste, X, CheckCircle2, ArrowRight, Boxes, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useApi, useMutation } from '../hooks/useApi';
 import { api } from '../api';
 import EmptyState from '../components/ui/EmptyState';
@@ -12,6 +13,7 @@ const MultiDimModal = lazy(() => import('../components/datasets/MultiDimModal'))
 
 // Smart import modal
 function ImportModal({ open, onClose, onImported }) {
+  const { t } = useTranslation();
   const [step, setStep] = useState('method'); // method | config | preview
   const [method, setMethod] = useState(null); // 'file' | 'paste'
   const [file, setFile] = useState(null);
@@ -110,12 +112,12 @@ function ImportModal({ open, onClose, onImported }) {
   };
 
   const handlePasteNext = () => {
-    if (!pasteContent.trim()) { toast.error('Cole o conteúdo antes de continuar'); return; }
+    if (!pasteContent.trim()) { toast.error(t('datasets.importModal.pasteRequired')); return; }
 
     // Formato explicitamente escolhido como JSON: espera um array aninhado.
     if (pasteFormat === 'json') {
       const det = detectJsonTensor(pasteContent);
-      if (!det) { toast.error('JSON inválido. Esperado um array aninhado (ex: tensor 3D).'); return; }
+      if (!det) { toast.error(t('datasets.importModal.invalidJson')); return; }
       setTensorInfo(det);
       setTensorDims('');
       setStep('config');
@@ -142,14 +144,14 @@ function ImportModal({ open, onClose, onImported }) {
   };
 
   const handleImport = async () => {
-    if (!name.trim()) { toast.error('Nome obrigatório'); return; }
+    if (!name.trim()) { toast.error(t('datasets.importModal.nameRequired')); return; }
     let result;
     if (tensorInfo) {
       const dims = tensorDims.trim()
         ? tensorDims.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n > 0)
         : undefined;
       if (tensorDims.trim() && (!dims.length || dims.length < 2)) {
-        toast.error('Informe as dimensões separadas por vírgula, ex: 4,2,3,5');
+        toast.error(t('datasets.importModal.dimensionsInvalid'));
         return;
       }
       result = await importTensor({
@@ -177,7 +179,7 @@ function ImportModal({ open, onClose, onImported }) {
       result = await importDs(fd);
     }
     if (result) {
-      toast.success('Dataset importado com sucesso!');
+      toast.success(t('datasets.importModal.success'));
       onImported();
       onClose();
       resetState();
@@ -189,10 +191,10 @@ function ImportModal({ open, onClose, onImported }) {
     setName(''); setDescription(''); setPreviewRows([]); setPreviewHeaders([]); setTensorInfo(null); setTensorDims('');
   };
   const handleClose = () => { onClose(); resetState(); };
-  const stepLabel = { method: 'Escolha o método', config: 'Configurar importação' };
+  const stepLabel = { method: t('datasets.importModal.stepMethod'), config: t('datasets.importModal.stepConfig') };
 
   return (
-    <Modal open={open} onClose={handleClose} title="Importar Dataset" size="lg">
+    <Modal open={open} onClose={handleClose} title={t('datasets.importModal.importDataset')} size="lg">
       <div className="flex items-center gap-2 mb-6">
         {['method', 'config'].map((s, i) => (
           <React.Fragment key={s}>
@@ -219,12 +221,12 @@ function ImportModal({ open, onClose, onImported }) {
                   <Upload className="w-7 h-7 text-blue-400" />
                 </div>
                 <div>
-                  <div className="font-semibold text-white">Arquivo</div>
-                  <div className="text-xs text-slate-400 mt-1">CSV, XLSX, TXT</div>
+                  <div className="font-semibold text-white">{t('datasets.importModal.fileOption')}</div>
+                  <div className="text-xs text-slate-400 mt-1">{t('datasets.importModal.fileFormats')}</div>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <FileSpreadsheet className="w-3 h-3" /> <FileText className="w-3 h-3" />
-                  Suportados
+                  {t('datasets.importModal.fileSupported')}
                 </div>
               </div>
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden" onChange={e => { if (e.target.files[0]) { setMethod('file'); handleFileSelect(e.target.files[0]); } }} />
@@ -237,10 +239,10 @@ function ImportModal({ open, onClose, onImported }) {
                   <ClipboardPaste className="w-7 h-7 text-purple-400" />
                 </div>
                 <div>
-                  <div className="font-semibold text-white">Colar Dados</div>
-                  <div className="text-xs text-slate-400 mt-1">CSV, TSV, texto livre</div>
+                  <div className="font-semibold text-white">{t('datasets.importModal.pasteOption')}</div>
+                  <div className="text-xs text-slate-400 mt-1">{t('datasets.importModal.pasteFormats')}</div>
                 </div>
-                <div className="text-xs text-slate-500">Cole direto do Excel</div>
+                <div className="text-xs text-slate-500">{t('datasets.importModal.pasteFromExcel')}</div>
               </div>
             </div>
           </div>
@@ -249,12 +251,12 @@ function ImportModal({ open, onClose, onImported }) {
         {step === 'paste' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-blue-200 mb-1.5">Formato da colagem</label>
+              <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.importModal.pasteFormatLabel')}</label>
               <div className="flex gap-2">
                 {[
-                  { key: 'auto', label: 'Auto-detectar' },
-                  { key: 'csv', label: 'CSV / Tabela' },
-                  { key: 'json', label: 'JSON (tensor)' },
+                  { key: 'auto', label: t('datasets.importModal.autoDetect') },
+                  { key: 'csv', label: t('datasets.importModal.csvTable') },
+                  { key: 'json', label: t('datasets.importModal.jsonTensor') },
                 ].map(opt => (
                   <button key={opt.key} type="button" onClick={() => setPasteFormat(opt.key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${pasteFormat === opt.key ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}`}>
@@ -264,25 +266,25 @@ function ImportModal({ open, onClose, onImported }) {
               </div>
               <p className="text-xs text-slate-500 mt-1.5">
                 {pasteFormat === 'json'
-                  ? 'Cole um array JSON aninhado (ex: tensor 3D [[[...]]]).'
-                  : 'Blocos CSV separados por linha vazia ou linha iniciada em "#" são detectados automaticamente como tensor 3D/4D+.'}
+                  ? t('datasets.importModal.jsonHint')
+                  : t('datasets.importModal.csvHint')}
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-blue-200 mb-1.5">Cole seus dados abaixo</label>
+              <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.importModal.pasteDataLabel')}</label>
               <textarea
                 className="input-field font-mono text-xs resize-none h-48"
                 placeholder={pasteFormat === 'json'
-                  ? '[[[1,2,3],[4,5,6]],[[7,8,9],[10,11,12]]]'
-                  : "Col1,Col2,Col3\n1.2,3.4,5.6\n7.8,9.0,1.2\n\n# ou, para um tensor 3D, blocos separados por linha vazia:\n1,2,3\n4,5,6\n\n7,8,9\n10,11,12"}
+                  ? t('datasets.importModal.jsonPastePlaceholder')
+                  : t('datasets.importModal.csvPastePlaceholder')}
                 value={pasteContent}
                 onChange={e => setPasteContent(e.target.value)}
               />
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setStep('method')} className="btn-ghost flex-1">Voltar</button>
+              <button onClick={() => setStep('method')} className="btn-ghost flex-1">{t('common.back')}</button>
               <button onClick={handlePasteNext} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                Continuar <ArrowRight className="w-4 h-4" />
+                {t('datasets.importModal.continueBtn')} <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -293,49 +295,49 @@ function ImportModal({ open, onClose, onImported }) {
             {tensorInfo && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 text-xs text-purple-300">
                 <Boxes className="w-4 h-4 flex-shrink-0" />
-                Tensor detectado — shape inferido <span className="font-mono text-purple-200">[{tensorInfo.shape.join(' × ')}]</span>
+                {t('datasets.importModal.tensorDetected')} <span className="font-mono text-purple-200">[{tensorInfo.shape.join(' × ')}]</span>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome do Dataset *</label>
-                <input className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Amostras Solo 2024" />
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.importModal.datasetNameLabel')}</label>
+                <input className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder={t('datasets.importModal.datasetNamePlaceholder')} />
               </div>
               {tensorInfo ? (
                 <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Dimensões (opcional)</label>
-                  <input className="input-field font-mono" value={tensorDims} onChange={e => setTensorDims(e.target.value)} placeholder="ex: 4,2,3,5" />
-                  <p className="text-xs text-slate-500 mt-1">Deixe em branco para usar o shape 3D inferido automaticamente dos blocos.</p>
+                  <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.importModal.dimensionsOptional')}</label>
+                  <input className="input-field font-mono" value={tensorDims} onChange={e => setTensorDims(e.target.value)} placeholder={t('datasets.importModal.dimensionsPlaceholder')} />
+                  <p className="text-xs text-slate-500 mt-1">{t('datasets.importModal.dimensionsHint')}</p>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-1.5">Separador</label>
+                  <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.importModal.separatorLabel')}</label>
                   <select className="input-field" value={separator} onChange={e => { setSeparator(e.target.value); if (pasteContent) parsePreview(pasteContent, e.target.value); }}>
-                    <option value=",">Vírgula (,)</option>
-                    <option value=";">Ponto-vírgula (;)</option>
-                    <option value="\t">Tab</option>
-                    <option value=" ">Espaço</option>
+                    <option value=",">{t('datasets.importModal.separatorComma')}</option>
+                    <option value=";">{t('datasets.importModal.separatorSemicolon')}</option>
+                    <option value="\t">{t('datasets.importModal.separatorTab')}</option>
+                    <option value=" ">{t('datasets.importModal.separatorSpace')}</option>
                   </select>
                 </div>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-blue-200 mb-1.5">Descrição</label>
-              <input className="input-field" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição opcional..." />
+              <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('common.description')}</label>
+              <input className="input-field" value={description} onChange={e => setDescription(e.target.value)} placeholder={t('datasets.importModal.descriptionPlaceholder')} />
             </div>
 
             {tensorInfo ? (
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Pré-visualização (1ª fatia)</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.importModal.previewSlice')}</label>
                 <pre className="rounded-lg overflow-auto border border-white/10 p-3 text-xs text-slate-300 font-mono" style={{ maxHeight: '160px' }}>
                   {JSON.stringify(tensorInfo.tensor[0], null, 1)}
                 </pre>
-                <p className="text-xs text-slate-500 mt-1">{tensorInfo.shape.length} dimensões detectadas · {tensorInfo.shape.join(' × ')}</p>
+                <p className="text-xs text-slate-500 mt-1">{t('datasets.importModal.tensorDimsDetected', { count: tensorInfo.shape.length, shape: tensorInfo.shape.join(' × ') })}</p>
               </div>
             ) : previewHeaders.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Pré-visualização</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.preview')}</label>
                 <div className="rounded-lg overflow-auto border border-white/10" style={{ maxHeight: '160px' }}>
                   <table className="w-full text-xs">
                     <thead>
@@ -352,14 +354,14 @@ function ImportModal({ open, onClose, onImported }) {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">{previewHeaders.length} colunas detectadas</p>
+                <p className="text-xs text-slate-500 mt-1">{t('datasets.importModal.columnsDetectedCount', { count: previewHeaders.length })}</p>
               </div>
             )}
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setStep(method === 'paste' ? 'paste' : 'method')} className="btn-ghost flex-1">Voltar</button>
+              <button onClick={() => setStep(method === 'paste' ? 'paste' : 'method')} className="btn-ghost flex-1">{t('common.back')}</button>
               <button onClick={handleImport} disabled={importing || creating || importingTensor} className="btn-primary flex-1">
-                {importing || creating || importingTensor ? 'Importando...' : 'Importar Dataset'}
+                {importing || creating || importingTensor ? t('datasets.importModal.importing') : t('datasets.importModal.importDataset')}
               </button>
             </div>
           </div>
@@ -370,6 +372,7 @@ function ImportModal({ open, onClose, onImported }) {
 }
 
 function DatasetCard({ ds, onVisualize, visualizingUuid }) {
+  const { t } = useTranslation();
   const typeColors = { spectral: 'purple', tabular: 'blue', time_series: 'green', image: 'amber' };
   const dataType = ds.data_type || 'tabular';
   const color = typeColors[dataType] || 'blue';
@@ -397,13 +400,13 @@ function DatasetCard({ ds, onVisualize, visualizingUuid }) {
 
       <div className="flex-1">
         <h3 className="font-semibold text-white truncate">{ds.name}</h3>
-        <p className="text-sm text-slate-400 mt-1 line-clamp-2">{ds.description || 'Sem descrição'}</p>
+        <p className="text-sm text-slate-400 mt-1 line-clamp-2">{ds.description || t('common.noDescription')}</p>
       </div>
 
       <div className="text-xs text-slate-500 flex items-center gap-3">
-        {nSamples   !== null && <span><strong className="text-slate-400">{nSamples}</strong> amostras</span>}
-        {nVariables !== null && <span><strong className="text-slate-400">{nVariables}</strong> variáveis</span>}
-        {nSamples === null && nVariables === null && <span>Sem dados</span>}
+        {nSamples   !== null && <span><strong className="text-slate-400">{nSamples}</strong> {t('datasets.card.sampleCountLabel')}</span>}
+        {nVariables !== null && <span><strong className="text-slate-400">{nVariables}</strong> {t('datasets.card.variableCountLabel')}</span>}
+        {nSamples === null && nVariables === null && <span>{t('datasets.card.noData')}</span>}
       </div>
 
       {/* Ações */}
@@ -414,10 +417,10 @@ function DatasetCard({ ds, onVisualize, visualizingUuid }) {
           disabled={isLoading}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center disabled:opacity-60"
           style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}
-          title="Visualização multidimensional"
+          title={t('datasets.multiDimTooltip')}
         >
           {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Boxes className="w-3.5 h-3.5" />}
-          {isLoading ? 'Carregando…' : `Visualizar${ndim ? ` (${ndim}D)` : ''}`}
+          {isLoading ? t('datasets.card.loading') : `${t('datasets.card.visualize')}${ndim ? ` (${ndim}D)` : ''}`}
         </button>
 
         {/* Link para detalhes */}
@@ -426,7 +429,7 @@ function DatasetCard({ ds, onVisualize, visualizingUuid }) {
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center"
           style={{ background: 'rgba(59,130,246,0.08)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.15)' }}
         >
-          Detalhes
+          {t('common.details')}
           <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
@@ -435,6 +438,7 @@ function DatasetCard({ ds, onVisualize, visualizingUuid }) {
 }
 
 export default function DatasetsPage() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [vizDataset, setVizDataset] = useState(null); // dataset completo sendo visualizado
@@ -456,7 +460,7 @@ export default function DatasetsPage() {
       const full = res.data?.data ?? res.data;
       setVizDataset(full || ds);
     } catch {
-      toast.error('Não foi possível carregar os dados do dataset.');
+      toast.error(t('datasets.loadError'));
     } finally {
       setVisualizingUuid(null);
     }
@@ -466,17 +470,17 @@ export default function DatasetsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Datasets</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Seus conjuntos de dados para análise</p>
+          <h1 className="text-2xl font-bold text-white">{t('datasets.title')}</h1>
+          <p className="text-slate-400 text-sm mt-0.5">{t('datasets.subtitle')}</p>
         </div>
         <button onClick={() => setImportOpen(true)} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Importar Dados
+          <Plus className="w-4 h-4" /> {t('datasets.importData')}
         </button>
       </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input className="input-field pl-10" placeholder="Buscar datasets..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="input-field pl-10" placeholder={t('datasets.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       {loading ? (
@@ -484,9 +488,9 @@ export default function DatasetsPage() {
           {Array(6).fill(0).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : datasets.length === 0 ? (
-        <EmptyState icon={Database} title="Nenhum dataset"
-          description={search ? 'Tente outro termo.' : 'Importe seu primeiro dataset.'}
-          action={!search && <button onClick={() => setImportOpen(true)} className="btn-primary">Importar Dados</button>} />
+        <EmptyState icon={Database} title={t('datasets.empty.title')}
+          description={search ? t('datasets.empty.noResults') : t('datasets.empty.noData')}
+          action={!search && <button onClick={() => setImportOpen(true)} className="btn-primary">{t('datasets.importData')}</button>} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {datasets.map(ds => (

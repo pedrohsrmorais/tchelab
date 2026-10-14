@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { Brain, Search, Activity, CheckCircle2, XCircle, Clock, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import EmptyState from '../components/ui/EmptyState';
 import SkeletonCard from '../components/ui/SkeletonCard';
 
-const statusConfig = {
-  pending:  { label: 'Pendente',  color: 'amber', icon: Clock },
-  training: { label: 'Treinando', color: 'blue',  icon: Clock },
-  ready:    { label: 'Treinado',  color: 'green', icon: CheckCircle2 },
-  failed:   { label: 'Falhou',    color: 'red',   icon: XCircle },
-};
-
 function ModelCard({ model }) {
+  const { t, i18n } = useTranslation();
+  const statusConfig = {
+    pending:  { label: t('models.statusPending'),  color: 'amber', icon: Clock },
+    training: { label: t('models.statusTraining'), color: 'blue',  icon: Clock },
+    ready:    { label: t('models.statusReady'),    color: 'green', icon: CheckCircle2 },
+    failed:   { label: t('jobs.failed'),            color: 'red',   icon: XCircle },
+  };
   const status = statusConfig[model.status] || statusConfig.pending;
   const StatusIcon = status.icon;
   // metrics_cal/metrics_cv/metrics_ext são json — usa calibração como padrão de exibição
@@ -27,7 +28,7 @@ function ModelCard({ model }) {
       </div>
       <div className="flex-1">
         <h3 className="font-semibold text-white">{model.name}</h3>
-        <p className="text-sm text-slate-400 mt-1">{model.algorithm ?? 'Algoritmo não especificado'}</p>
+        <p className="text-sm text-slate-400 mt-1">{model.algorithm ?? t('models.algorithmUnspecified')}</p>
         {metrics && (
           <div className="flex items-center gap-3 mt-2">
             {metrics.r2 !== undefined && <span className="text-xs text-slate-500">R² <strong className="text-green-400">{Number(metrics.r2).toFixed(3)}</strong></span>}
@@ -36,7 +37,7 @@ function ModelCard({ model }) {
         )}
       </div>
       <div className="flex items-center justify-between text-xs text-slate-500">
-        <span>{new Date(model.created_at).toLocaleDateString('pt-BR')}</span>
+        <span>{new Date(model.created_at).toLocaleDateString(i18n.language)}</span>
         <ArrowRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-green-400 group-hover:translate-x-1 transition-all" />
       </div>
     </div>
@@ -44,6 +45,7 @@ function ModelCard({ model }) {
 }
 
 export default function ModelsPage() {
+  const { t, i18n } = useTranslation();
   const [search, setSearch] = useState('');
   const { data, loading } = useApi(api.models.list, []);
   const models = (data?.data ?? data ?? []).filter(m =>
@@ -54,18 +56,18 @@ export default function ModelsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Modelos</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Modelos quimiométricos treinados</p>
+          <h1 className="text-2xl font-bold text-white">{t('models.title')}</h1>
+          <p className="text-slate-400 text-sm mt-0.5">{t('models.subtitle')}</p>
         </div>
       </div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input className="input-field pl-10" placeholder="Buscar modelos..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="input-field pl-10" placeholder={t('models.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array(6).fill(0).map((_, i) => <SkeletonCard key={i} />)}</div>
       ) : models.length === 0 ? (
-        <EmptyState icon={Brain} title="Nenhum modelo" description={search ? 'Tente outro termo.' : 'Execute workflows para gerar modelos treinados.'} />
+        <EmptyState icon={Brain} title={t('models.emptyTitle')} description={search ? t('models.emptyNoResults') : t('models.emptyNoData')} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {models.map(m => <ModelCard key={m.uuid} model={m} />)}

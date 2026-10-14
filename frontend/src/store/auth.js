@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '../api';
 import toast from 'react-hot-toast';
+import i18n from '../i18n';
 
 export const useAuthStore = create(
   persist(
@@ -22,7 +23,7 @@ export const useAuthStore = create(
           return user;
         } catch (err) {
           set({ isLoading: false });
-          const msg = err?.response?.data?.error?.message || 'Credenciais inválidas.';
+          const msg = err?.response?.data?.error?.message || i18n.t('auth.invalidCredentials');
           toast.error(msg);
           return null;
         }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, FolderOpen, Search, Calendar, Users, Database, ChevronRight, Trash2, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useApi, useMutation } from '../hooks/useApi';
 import { api } from '../api';
 import EmptyState from '../components/ui/EmptyState';
@@ -9,6 +10,7 @@ import SkeletonCard from '../components/ui/SkeletonCard';
 import Modal from '../components/ui/Modal';
 
 function ProjectCard({ project, onDelete }) {
+  const { t, i18n } = useTranslation();
   return (
     <div
       className="card card-hover group"
@@ -19,20 +21,20 @@ function ProjectCard({ project, onDelete }) {
             <FolderOpen className="w-5 h-5 text-blue-400" />
           </div>
           <span className={`badge ${project.visibility === 'public' ? 'badge-green' : 'badge-blue'}`}>
-            {project.visibility === 'public' ? 'Público' : 'Privado'}
+            {project.visibility === 'public' ? t('projects.public') : t('projects.private')}
           </span>
         </div>
         <h3 className="font-semibold text-white mb-1 truncate">{project.name}</h3>
-        <p className="text-sm text-slate-400 line-clamp-2 mb-4 min-h-[2.5rem]">{project.description || 'Sem descrição'}</p>
+        <p className="text-sm text-slate-400 line-clamp-2 mb-4 min-h-[2.5rem]">{project.description || t('common.noDescription')}</p>
         <div className="flex items-center gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1"><Database className="w-3 h-3" /> {project.dataset_count ?? 0} datasets</span>
+          <span className="flex items-center gap-1"><Database className="w-3 h-3" /> {t('projects.datasetCountLabel', { count: project.dataset_count ?? 0 })}</span>
           <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />
-            {new Date(project.created_at).toLocaleDateString('pt-BR')}
+            {new Date(project.created_at).toLocaleDateString(i18n.language)}
           </span>
         </div>
       </Link>
       <div className="border-t border-white/5 px-5 py-3 flex items-center justify-between">
-        <span className="text-xs text-slate-500 truncate">{project.owner_email || 'Você'}</span>
+        <span className="text-xs text-slate-500 truncate">{project.owner_email || t('projects.you')}</span>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={(e) => { e.preventDefault(); onDelete(project); }}
             className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors">
@@ -46,27 +48,28 @@ function ProjectCard({ project, onDelete }) {
 }
 
 function CreateProjectModal({ open, onClose, onCreated }) {
+  const { t, i18n } = useTranslation();
   const [form, setForm] = useState({ name: '', description: '', is_public: false });
   const { mutate, loading } = useMutation(api.projects.create);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error('Nome obrigatório'); return; }
+    if (!form.name.trim()) { toast.error(t('projects.nameRequiredError')); return; }
     const { is_public, ...rest } = form;
     const result = await mutate({ ...rest, visibility: is_public ? 'public' : 'private' });
-    if (result) { toast.success('Projeto criado!'); onCreated(result); onClose(); setForm({ name: '', description: '', is_public: false }); }
+    if (result) { toast.success(t('projects.createdSuccess')); onCreated(result); onClose(); setForm({ name: '', description: '', is_public: false }); }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Novo Projeto" size="md">
+    <Modal open={open} onClose={onClose} title={t('projects.newProject')} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome do Projeto *</label>
-          <input className="input-field" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Análise de Solos 2024" />
+          <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('projects.nameLabel')}</label>
+          <input className="input-field" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t('projects.namePlaceholder')} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-blue-200 mb-1.5">Descrição</label>
-          <textarea className="input-field resize-none" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descreva o objetivo do projeto..." />
+          <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('common.description')}</label>
+          <textarea className="input-field resize-none" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t('projects.descriptionPlaceholder')} />
         </div>
         <label className="flex items-center gap-3 cursor-pointer">
           <div className="relative">
@@ -74,12 +77,12 @@ function CreateProjectModal({ open, onClose, onCreated }) {
             <div className={`w-10 h-5 rounded-full transition-colors ${form.is_public ? 'bg-blue-600' : 'bg-slate-600'}`} />
             <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.is_public ? 'translate-x-5' : ''}`} />
           </div>
-          <span className="text-sm text-slate-300">Projeto público</span>
+          <span className="text-sm text-slate-300">{t('projects.publicToggleLabel')}</span>
         </label>
         <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+          <button type="button" onClick={onClose} className="btn-ghost flex-1">{t('common.cancel')}</button>
           <button type="submit" disabled={loading} className="btn-primary flex-1">
-            {loading ? 'Criando...' : 'Criar Projeto'}
+            {loading ? t('projects.creating') : t('projects.create')}
           </button>
         </div>
       </form>
@@ -88,6 +91,7 @@ function CreateProjectModal({ open, onClose, onCreated }) {
 }
 
 export default function ProjectsPage() {
+  const { t, i18n } = useTranslation();
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -101,7 +105,7 @@ export default function ProjectsPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     const ok = await deleteProject(deleteTarget.uuid);
-    if (ok !== null) { toast.success('Projeto removido.'); refetch(); }
+    if (ok !== null) { toast.success(t('projects.removedSuccess')); refetch(); }
     setDeleteTarget(null);
   };
 
@@ -110,18 +114,18 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Projetos</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Organize suas análises em projetos</p>
+          <h1 className="text-2xl font-bold text-white">{t('projects.title')}</h1>
+          <p className="text-slate-400 text-sm mt-0.5">{t('projects.subtitle')}</p>
         </div>
         <button onClick={() => setCreateOpen(true)} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Novo Projeto
+          <Plus className="w-4 h-4" /> {t('projects.newProject')}
         </button>
       </div>
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input className="input-field pl-10" placeholder="Buscar projetos..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="input-field pl-10" placeholder={t('projects.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       {/* Grid */}
@@ -130,9 +134,9 @@ export default function ProjectsPage() {
           {Array(6).fill(0).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : projects.length === 0 ? (
-        <EmptyState icon={FolderOpen} title="Nenhum projeto encontrado"
-          description={search ? 'Tente outro termo de busca.' : 'Crie seu primeiro projeto para começar.'}
-          action={!search && <button onClick={() => setCreateOpen(true)} className="btn-primary">Criar Projeto</button>} />
+        <EmptyState icon={FolderOpen} title={t('projects.emptyTitle')}
+          description={search ? t('projects.empty.noResults') : t('projects.empty.noData')}
+          action={!search && <button onClick={() => setCreateOpen(true)} className="btn-primary">{t('projects.create')}</button>} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map(p => (
@@ -144,12 +148,12 @@ export default function ProjectsPage() {
       <CreateProjectModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refetch} />
 
       {/* Delete confirm */}
-      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Remover Projeto" size="sm">
-        <p className="text-slate-300 mb-6">Tem certeza que deseja remover <strong className="text-white">{deleteTarget?.name}</strong>? Esta ação não pode ser desfeita.</p>
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title={t('projects.removeTitle')} size="sm">
+        <p className="text-slate-300 mb-6">{t('projects.removeConfirmPrefix')} <strong className="text-white">{deleteTarget?.name}</strong>{t('projects.removeConfirmSuffix')}</p>
         <div className="flex gap-3">
-          <button onClick={() => setDeleteTarget(null)} className="btn-ghost flex-1">Cancelar</button>
+          <button onClick={() => setDeleteTarget(null)} className="btn-ghost flex-1">{t('common.cancel')}</button>
           <button onClick={handleDelete} disabled={deleting} className="btn-danger flex-1">
-            {deleting ? 'Removendo...' : 'Remover'}
+            {deleting ? t('projects.removing') : t('projects.remove')}
           </button>
         </div>
       </Modal>

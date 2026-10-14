@@ -1,19 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Zap, Send, Sparkles, Brain, FlaskConical, BarChart2, Database, Cpu, MessageSquare, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useMutation } from '../hooks/useApi';
 import { api } from '../api';
 
-const SUGGESTIONS = [
-  { icon: FlaskConical, text: 'Recomendar método de calibração para dados NIR', category: 'Análise' },
-  { icon: BarChart2, text: 'Explicar os loadings do PCA e o que significam', category: 'Interpretação' },
-  { icon: Brain, text: 'Sugerir pré-processamentos para espectros com ruído', category: 'Pré-proc' },
-  { icon: Database, text: 'Identificar outliers neste dataset de solos', category: 'Qualidade' },
-  { icon: Cpu, text: 'Comparar PLS vs SVR para esta aplicação', category: 'Modelagem' },
-  { icon: Sparkles, text: 'Gerar síntese de dados espectrais para augmentação', category: 'Sintético' },
-];
+function getSuggestions(t) {
+  return [
+    { icon: FlaskConical, text: t('ai.suggestions.calibration.text'), category: t('ai.suggestions.calibration.category') },
+    { icon: BarChart2, text: t('ai.suggestions.pcaLoadings.text'), category: t('ai.suggestions.pcaLoadings.category') },
+    { icon: Brain, text: t('ai.suggestions.preprocessing.text'), category: t('ai.suggestions.preprocessing.category') },
+    { icon: Database, text: t('ai.suggestions.outliers.text'), category: t('ai.suggestions.outliers.category') },
+    { icon: Cpu, text: t('ai.suggestions.plsVsSvr.text'), category: t('ai.suggestions.plsVsSvr.category') },
+    { icon: Sparkles, text: t('ai.suggestions.syntheticData.text'), category: t('ai.suggestions.syntheticData.category') },
+  ];
+}
 
-function Message({ msg }) {
+function Message({ msg, t }) {
   const isUser = msg.role === 'user';
   return (
     <div
@@ -26,7 +29,7 @@ function Message({ msg }) {
         {msg.loading ? (
           <div className="flex items-center gap-2">
             <span className="anim-spin inline-block w-3 h-3 border-2 border-purple-400/30 border-t-purple-400 rounded-full" />
-            Gerando resposta...
+            {t('ai.generatingResponse')}
           </div>
         ) : (
           <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
@@ -37,8 +40,10 @@ function Message({ msg }) {
 }
 
 export default function AIPage() {
+  const { t, i18n } = useTranslation();
+  const SUGGESTIONS = getSuggestions(t);
   const [messages, setMessages] = useState([
-    { id: 0, role: 'assistant', content: 'Olá! Sou o assistente de IA do TcheLab. Posso ajudar com análises quimiométricas, recomendações de métodos, interpretação de resultados e muito mais. Como posso ajudar?' }
+    { id: 0, role: 'assistant', content: t('ai.welcomeMessage') }
   ]);
   const [input, setInput] = useState('');
   const [tab, setTab] = useState('chat'); // chat | synthetic
@@ -59,7 +64,7 @@ export default function AIPage() {
 
     const result = await askAI({ message: text, context: 'chemometrics' });
     setMessages(m => m.map(msg => msg.id === loadingMsg.id
-      ? { ...msg, loading: false, content: result?.answer ?? result?.message ?? result?.data ?? 'Desculpe, não consegui processar sua pergunta.' }
+      ? { ...msg, loading: false, content: result?.answer ?? result?.message ?? result?.data ?? t('ai.fallbackAnswer') }
       : msg));
   };
 
@@ -68,11 +73,11 @@ export default function AIPage() {
     const { n_features, ...rest } = syntheticForm;
     const payload = {
       ...rest,
-      name: `Sintético ${syntheticForm.technique.toUpperCase()} ${new Date().toLocaleString('pt-BR')}`,
+      name: `${t('ai.syntheticNamePrefix')} ${syntheticForm.technique.toUpperCase()} ${new Date().toLocaleString(i18n.language)}`,
       n_variables: n_features,
     };
     const result = await generateSynthetic(payload);
-    if (result) toast.success('Dataset sintético gerado! Acesse a aba Datasets.');
+    if (result) toast.success(t('ai.syntheticGenerated'));
   };
 
   return (
@@ -88,20 +93,20 @@ export default function AIPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-white">TcheLab AI</h1>
+              <h1 className="text-2xl font-bold text-white">{t('ai.title')}</h1>
               <span className="badge badge-plus"><Zap className="w-3 h-3 inline mr-1" />PLUS</span>
             </div>
-            <p className="text-purple-300 text-sm">Assistente especializado em quimiometria</p>
+            <p className="text-purple-300 text-sm">{t('ai.subtitle')}</p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2">
-        {[{ key: 'chat', label: 'Assistente IA', icon: MessageSquare }, { key: 'synthetic', label: 'Dados Sintéticos', icon: Sparkles }].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.key ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-            <t.icon className="w-4 h-4" /> {t.label}
+        {[{ key: 'chat', label: t('ai.tabChat'), icon: MessageSquare }, { key: 'synthetic', label: t('ai.tabSynthetic'), icon: Sparkles }].map(tb => (
+          <button key={tb.key} onClick={() => setTab(tb.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === tb.key ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+            <tb.icon className="w-4 h-4" /> {tb.label}
           </button>
         ))}
       </div>
@@ -110,7 +115,7 @@ export default function AIPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Suggestions sidebar */}
           <div className="card p-4 space-y-2">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Sugestões</div>
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('ai.suggestionsLabel')}</div>
             {SUGGESTIONS.map((s, i) => (
               <button key={i} onClick={() => sendMessage(s.text)}
                 className="w-full text-left p-2.5 rounded-lg hover:bg-white/5 transition-colors group">
@@ -128,21 +133,21 @@ export default function AIPage() {
           {/* Chat area */}
           <div className="lg:col-span-3 card flex flex-col" style={{ height: '600px' }}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-              <span className="text-sm font-medium text-slate-300">Conversa</span>
-              <button onClick={() => setMessages([{ id: 0, role: 'assistant', content: 'Conversa reiniciada. Como posso ajudar?' }])}
+              <span className="text-sm font-medium text-slate-300">{t('ai.conversationLabel')}</span>
+              <button onClick={() => setMessages([{ id: 0, role: 'assistant', content: t('ai.chatCleared') }])}
                 className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1">
-                <RefreshCw className="w-3 h-3" /> Limpar
+                <RefreshCw className="w-3 h-3" /> {t('ai.clearChat')}
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map(msg => <Message key={msg.id} msg={msg} />)}
+              {messages.map(msg => <Message key={msg.id} msg={msg} t={t} />)}
               <div ref={messagesEndRef} />
             </div>
             <div className="border-t border-white/10 p-3">
               <form onSubmit={(e) => { e.preventDefault(); sendMessage(input); }} className="flex gap-2">
                 <input
                   className="input-field flex-1"
-                  placeholder="Pergunte sobre quimiometria..."
+                  placeholder={t('ai.askPlaceholder')}
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   disabled={thinking}
@@ -162,29 +167,29 @@ export default function AIPage() {
         <div className="max-w-xl">
           <div className="card p-6 space-y-5">
             <div>
-              <h2 className="text-lg font-bold text-white mb-1">Gerador de Dados Sintéticos</h2>
-              <p className="text-slate-400 text-sm">Gere datasets espectrais ou quimiométricos sintéticos para treino e validação.</p>
+              <h2 className="text-lg font-bold text-white mb-1">{t('ai.syntheticTitle')}</h2>
+              <p className="text-slate-400 text-sm">{t('ai.syntheticDesc')}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Técnica</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('models.technique')}</label>
                 <select className="input-field" value={syntheticForm.technique} onChange={e => setSyntheticForm(f => ({ ...f, technique: e.target.value }))}>
                   <option value="pca">PCA</option>
                   <option value="pls">PLS</option>
-                  <option value="spectral">Espectral NIR</option>
-                  <option value="multivariate">Multivariado</option>
+                  <option value="spectral">{t('ai.techniqueSpectral')}</option>
+                  <option value="multivariate">{t('ai.techniqueMultivariate')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Amostras</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.samples')}</label>
                 <input type="number" className="input-field" min={10} max={10000} value={syntheticForm.n_samples} onChange={e => setSyntheticForm(f => ({ ...f, n_samples: +e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Variáveis</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('datasets.variables')}</label>
                 <input type="number" className="input-field" min={2} max={1000} value={syntheticForm.n_features} onChange={e => setSyntheticForm(f => ({ ...f, n_features: +e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Nível de Ruído</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('ai.noiseLevel')}</label>
                 <input type="number" className="input-field" min={0} max={1} step={0.01} value={syntheticForm.noise_level} onChange={e => setSyntheticForm(f => ({ ...f, noise_level: +e.target.value }))} />
               </div>
             </div>
@@ -192,7 +197,7 @@ export default function AIPage() {
               className="btn-primary w-full flex items-center justify-center gap-2"
               style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)' }}>
               <Sparkles className="w-4 h-4" />
-              {generating ? 'Gerando...' : 'Gerar Dataset Sintético'}
+              {generating ? t('ai.generating') : t('ai.generateSyntheticDataset')}
             </button>
           </div>
         </div>

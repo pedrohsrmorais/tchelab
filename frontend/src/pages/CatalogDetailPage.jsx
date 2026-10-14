@@ -4,6 +4,7 @@ import {
   ArrowLeft, CheckCircle2, Hammer, BookOpen, Lightbulb,
   Cog, LogIn, LogOut as LogOutIcon, Tag,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import { getFamilyConfig, getPorts } from '../config/techniqueRegistry';
@@ -19,13 +20,14 @@ function safeJson(v, fallback) {
 }
 
 function StatusBadge({ active }) {
+  const { t } = useTranslation();
   return active ? (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-500/20 text-green-300">
-      <CheckCircle2 className="w-4 h-4" /> Ativo nesta versão beta
+      <CheckCircle2 className="w-4 h-4" /> {t('catalog.activeBeta')}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-amber-500/20 text-amber-300">
-      <Hammer className="w-4 h-4" /> Em desenvolvimento — ainda não selecionável no editor
+      <Hammer className="w-4 h-4" /> {t('catalog.inDevelopmentDesc')}
     </span>
   );
 }
@@ -42,11 +44,12 @@ function Section({ icon: Icon, title, children, iconColor = '#60a5fa' }) {
 }
 
 function PortTable({ title, ports, accent }) {
+  const { t } = useTranslation();
   if (!ports.length) {
     return (
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{title}</h3>
-        <p className="text-sm text-slate-500">Nenhuma porta documentada.</p>
+        <p className="text-sm text-slate-500">{t('catalog.noPortsDocumented')}</p>
       </div>
     );
   }
@@ -66,7 +69,7 @@ function PortTable({ title, ports, accent }) {
             {p.description ? (
               <p className="text-sm text-slate-300">{p.description}</p>
             ) : (
-              <p className="text-sm text-slate-500 italic">Sem descrição ainda.</p>
+              <p className="text-sm text-slate-500 italic">{t('catalog.noDescriptionYet')}</p>
             )}
           </div>
         ))}
@@ -76,6 +79,7 @@ function PortTable({ title, ports, accent }) {
 }
 
 export default function CatalogDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const { data, loading } = useApi(() => api.techniques.get(id), [id]);
   const tech = data?.data ?? data ?? null;
@@ -84,7 +88,7 @@ export default function CatalogDetailPage() {
     return <div className="anim-shimmer" style={{ height: 300, borderRadius: 16 }} />;
   }
   if (!tech) {
-    return <EmptyState icon={BookOpen} title="Técnica não encontrada" description="Pode ter sido removida ou o link está incorreto." />;
+    return <EmptyState icon={BookOpen} title={t('catalog.notFound')} description={t('catalog.notFoundDesc')} />;
   }
 
   const fam = getFamilyConfig(tech.family);
@@ -94,7 +98,7 @@ export default function CatalogDetailPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <Link to="/catalogo" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Voltar ao catálogo
+        <ArrowLeft className="w-4 h-4" /> {t('catalog.backToCatalog')}
       </Link>
 
       <div>
@@ -108,32 +112,32 @@ export default function CatalogDetailPage() {
         <div className="mt-3"><StatusBadge active={!!tech.active} /></div>
       </div>
 
-      <Section icon={BookOpen} title="O que é">
-        {tech.description || 'Sem descrição cadastrada ainda.'}
+      <Section icon={BookOpen} title={t('catalog.whatIsIt')}>
+        {tech.description || t('catalog.noDescriptionRegistered')}
       </Section>
 
       {tech.how_it_works && (
-        <Section icon={Cog} title="Como funciona" iconColor="#a78bfa">
+        <Section icon={Cog} title={t('catalog.howItWorks')} iconColor="#a78bfa">
           {tech.how_it_works}
         </Section>
       )}
 
       {tech.usage_tips && (
-        <Section icon={Lightbulb} title="Como usar na prática" iconColor="#facc15">
+        <Section icon={Lightbulb} title={t('catalog.usageTips')} iconColor="#facc15">
           {tech.usage_tips}
         </Section>
       )}
 
       <div className="card p-5 space-y-5">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-          <Tag className="w-4 h-4 text-blue-400" /> Input &amp; Output
+          <Tag className="w-4 h-4 text-blue-400" /> {t('catalog.inputOutput')}
         </h2>
-        <PortTable title={<span className="inline-flex items-center gap-1"><LogIn className="w-3 h-3" /> Entrada esperada</span>} ports={inputs} accent="#60a5fa" />
-        <PortTable title={<span className="inline-flex items-center gap-1"><LogOutIcon className="w-3 h-3" /> Saída produzida</span>} ports={outputs} accent="#4ade80" />
+        <PortTable title={<span className="inline-flex items-center gap-1"><LogIn className="w-3 h-3" /> {t('catalog.expectedInput')}</span>} ports={inputs} accent="#60a5fa" />
+        <PortTable title={<span className="inline-flex items-center gap-1"><LogOutIcon className="w-3 h-3" /> {t('catalog.producedOutput')}</span>} ports={outputs} accent="#4ade80" />
       </div>
 
       {tech.historical_note && (
-        <Section icon={Lightbulb} title="Curiosidade histórica" iconColor="#f59e0b">
+        <Section icon={Lightbulb} title={t('catalog.historicalNote')} iconColor="#f59e0b">
           {tech.historical_note}
         </Section>
       )}

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useOutlet, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Sidebar from './Sidebar';
 import { useAuthStore } from '../../store/auth';
 import { useTheme } from '../../context/ThemeContext';
 
 function ContentLoader() {
+  const { t } = useTranslation();
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '60vh' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
@@ -12,7 +14,7 @@ function ContentLoader() {
           <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.15)', animation: 'spin 2s linear infinite' }} />
           <div style={{ position: 'absolute', inset: 2, borderRadius: '50%', border: '2px solid transparent', borderTopColor: '#3b82f6', animation: 'spin 0.75s linear infinite' }} />
         </div>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', letterSpacing: '0.04em' }}>Carregando...</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', letterSpacing: '0.04em' }}>{t('common.loading')}</p>
       </div>
     </div>
   );

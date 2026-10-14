@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Library, Search, ArrowRight, CheckCircle2, Hammer } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import { getFamiliesList, getFamilyConfig } from '../config/techniqueRegistry';
@@ -13,18 +14,20 @@ import SkeletonCard from '../components/ui/SkeletonCard';
 const fetchAll = () => api.techniques.list({ include_inactive: 'true', limit: 200 });
 
 function StatusBadge({ active }) {
+  const { t } = useTranslation();
   return active ? (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
-      <CheckCircle2 className="w-3 h-3" /> Ativo
+      <CheckCircle2 className="w-3 h-3" /> {t('catalog.active')}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
-      <Hammer className="w-3 h-3" /> Em desenvolvimento
+      <Hammer className="w-3 h-3" /> {t('catalog.inDevelopment')}
     </span>
   );
 }
 
 function TechniqueCard({ tech }) {
+  const { t } = useTranslation();
   const fam = getFamilyConfig(tech.family);
   return (
     <Link
@@ -36,7 +39,7 @@ function TechniqueCard({ tech }) {
         <h3 className="font-semibold text-white leading-snug">{tech.name}</h3>
         <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
       </div>
-      <p className="text-sm text-slate-400 line-clamp-2">{tech.description || 'Sem descrição.'}</p>
+      <p className="text-sm text-slate-400 line-clamp-2">{tech.description || t('catalog.noDescription')}</p>
       <div className="flex items-center justify-between mt-auto pt-1">
         <span className="text-xs" style={{ color: fam?.color || '#94a3b8' }}>{fam?.labelStr || tech.family}</span>
         <StatusBadge active={!!tech.active} />
@@ -46,6 +49,7 @@ function TechniqueCard({ tech }) {
 }
 
 export default function CatalogPage() {
+  const { t } = useTranslation();
   const { data, loading } = useApi(fetchAll, []);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all | active | dev
@@ -82,10 +86,10 @@ export default function CatalogPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Library className="w-6 h-6 text-blue-400" /> Catálogo de Técnicas
+            <Library className="w-6 h-6 text-blue-400" /> {t('catalog.title')}
           </h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            {activeCount} ativas nesta versão beta · {devCount} em desenvolvimento
+            {t('catalog.subtitle', { active: activeCount, dev: devCount })}
           </p>
         </div>
       </div>
@@ -95,18 +99,18 @@ export default function CatalogPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             className="input-field pl-10"
-            placeholder="Buscar por nome, slug ou descrição..."
+            placeholder={t('catalog.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <select className="input-field sm:w-52" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="all">Todos os status</option>
-          <option value="active">Só ativas</option>
-          <option value="dev">Só em desenvolvimento</option>
+          <option value="all">{t('catalog.statusAll')}</option>
+          <option value="active">{t('catalog.statusActiveOnly')}</option>
+          <option value="dev">{t('catalog.statusDevOnly')}</option>
         </select>
         <select className="input-field sm:w-64" value={familyFilter} onChange={(e) => setFamilyFilter(e.target.value)}>
-          <option value="all">Todas as famílias</option>
+          <option value="all">{t('workflows.allFamilies')}</option>
           {families.map((f) => (
             <option key={f.slug} value={f.slug}>{f.labelStr}</option>
           ))}
@@ -118,7 +122,7 @@ export default function CatalogPage() {
           {Array(9).fill(0).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Library} title="Nenhuma técnica encontrada" description="Tente outro termo ou filtro." />
+        <EmptyState icon={Library} title={t('catalog.emptyTitle')} description={t('catalog.emptyDesc')} />
       ) : (
         <div className="space-y-8">
           {families

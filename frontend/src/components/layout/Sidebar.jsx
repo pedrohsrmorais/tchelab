@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme, THEMES } from '../../context/ThemeContext';
 import { useAuthStore } from '../../store/auth';
 import {
   LayoutDashboard, FolderKanban, Database, GitBranch, Beaker,
   BookOpen, Users, Cpu, Zap, Sparkles, ShieldCheck, Library,
-  LogOut, ChevronRight, Sun, Moon, Globe, ChevronDown,
+  LogOut, ChevronRight, Sun, Moon, Monitor, Globe, ChevronDown,
 } from 'lucide-react';
 
 // ── Sections ──────────────────────────────────────────────────────────────────
@@ -28,20 +28,25 @@ const LANGS = [
   { code: 'en', label: 'English'   },
 ];
 
+const THEME_ICONS = { dark: Moon, light: Sun, classic: Monitor };
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export function Sidebar({ collapsed, onToggle }) {
   const { t }               = useTranslation();
-  const { theme, toggle }   = useTheme();
+  const { theme, setTheme } = useTheme();
   const { user, logout, isPlus, isAdmin } = useAuthStore();
   const navigate            = useNavigate();
-  const [langOpen, setLangOpen] = useState(false);
+  const [langOpen, setLangOpen]   = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
 
   const isDark = theme === 'dark';
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
   const handleLang   = (code)   => { i18n.changeLanguage(code); try { localStorage.setItem('tchelab_lang', code); } catch {} setLangOpen(false); };
+  const handleTheme  = (name)   => { setTheme(name); setThemeOpen(false); };
 
-  const currentLang = LANGS.find(l => l.code === i18n.language) || LANGS[0];
+  const currentLang  = LANGS.find(l => l.code === i18n.language) || LANGS[0];
+  const ThemeIcon    = THEME_ICONS[theme] || Moon;
 
   return (
     <aside
@@ -70,8 +75,8 @@ export function Sidebar({ collapsed, onToggle }) {
       >
         <div style={{
           width: 34, height: 34, flexShrink: 0,
-          borderRadius: 9,
-          background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+          borderRadius: 'var(--radius-lg)',
+          background: theme === 'classic' ? 'var(--accent)' : 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 3px 10px rgba(37,99,235,0.45)',
         }}>
@@ -138,35 +143,88 @@ export function Sidebar({ collapsed, onToggle }) {
       {/* ── Theme + Lang ────────────────────────────────────────────────────── */}
       <div style={{ padding: '0.5rem', borderTop: `1px solid var(--border)` }}>
 
-        {/* Dark/light toggle */}
-        <button
-          onClick={toggle}
-          title={isDark ? t('common.lightMode') : t('common.darkMode')}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.625rem',
-            padding: '0.5rem 0.625rem',
-            borderRadius: 'var(--radius)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-            fontSize: '0.8rem',
-            fontWeight: 500,
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            transition: 'background 0.15s, color 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        >
-          {isDark
-            ? <Sun size={15} style={{ flexShrink: 0 }} />
-            : <Moon size={15} style={{ flexShrink: 0 }} />
-          }
-          {!collapsed && <span>{isDark ? t('common.lightMode') : t('common.darkMode')}</span>}
-        </button>
+        {/* Seletor de tema (dark / light / classic) */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setThemeOpen(v => !v)}
+            title={t('common.theme')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.625rem',
+              padding: '0.5rem 0.625rem',
+              borderRadius: 'var(--radius)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          >
+            <ThemeIcon size={15} style={{ flexShrink: 0 }} />
+            {!collapsed && (
+              <>
+                <span style={{ flex: 1 }}>{t(`themes.${theme}`)}</span>
+                <ChevronDown size={11} style={{ opacity: 0.5 }} />
+              </>
+            )}
+          </button>
+
+          {themeOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow)',
+                overflow: 'hidden',
+                zIndex: 50,
+                marginBottom: 4,
+              }}
+            >
+              {THEMES.map(name => {
+                const Icon = THEME_ICONS[name];
+                const active = theme === name;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => handleTheme(name)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 0.75rem',
+                      background: active ? 'var(--bg-hover)' : 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: active ? 'var(--text-accent)' : 'var(--text-secondary)',
+                      fontSize: '0.8rem',
+                      fontWeight: active ? 600 : 400,
+                      textAlign: 'left',
+                      transition: 'background 0.12s',
+                    }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'none'; }}
+                  >
+                    <Icon size={13} style={{ flexShrink: 0 }} />
+                    {t(`themes.${name}`)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Language picker */}
         <div style={{ position: 'relative' }}>
@@ -259,7 +317,7 @@ export function Sidebar({ collapsed, onToggle }) {
             <Avatar name={user?.name || user?.email} size={30} />
             <div style={{ overflow: 'hidden', flex: 1 }}>
               <p style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.name || 'Usuário'}
+                {user?.name || t('dashboard.defaultUserName')}
               </p>
               <p style={{ fontSize: '0.64rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user?.email}

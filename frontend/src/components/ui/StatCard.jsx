@@ -5,9 +5,9 @@ export function StatCard({ icon: Icon, label, value, sub, color = '#3b82f6', del
         <Icon size={20} color={color} />
       </div>
       <div>
-        <p style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.45)', marginBottom:'0.25rem', fontWeight:500 }}>{label}</p>
-        <p style={{ fontSize:'1.5rem', fontWeight:800, color:'#fff', lineHeight:1 }}>{value ?? '—'}</p>
-        {sub && <p style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.35)', marginTop:'0.25rem' }}>{sub}</p>}
+        <p style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'0.25rem', fontWeight:500 }}>{label}</p>
+        <p style={{ fontSize:'1.5rem', fontWeight:800, color:'var(--text-primary)', lineHeight:1 }}>{value ?? '—'}</p>
+        {sub && <p style={{ fontSize:'0.7rem', color:'var(--text-muted)', marginTop:'0.25rem' }}>{sub}</p>}
       </div>
     </div>
   )

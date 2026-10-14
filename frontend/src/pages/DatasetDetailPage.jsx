@@ -1,6 +1,7 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Database, GitBranch, Eye, BarChart2, Activity, Table, Boxes, Sigma } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import SkeletonCard from '../components/ui/SkeletonCard';
@@ -58,13 +59,14 @@ function StatCard({ label, value, sub }) {
 
 // Tab: data preview table
 function PreviewTab({ meta }) {
+  const { t, i18n } = useTranslation();
   const data = meta?.data;
   if (!data || !data.columns?.length) {
     return (
       <EmptyState
         icon={Table}
-        title="Sem dados para visualizar"
-        description="Este dataset ainda não possui dados importados."
+        title={t('datasets.detail.noDataTitle')}
+        description={t('datasets.detail.noDataDesc')}
       />
     );
   }
@@ -77,10 +79,10 @@ function PreviewTab({ meta }) {
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
         <span className="text-sm text-slate-400">
-          Mostrando {displayRows.length} de {matrix?.length ?? 0} amostras · {columns.length} variável{columns.length !== 1 ? 'is' : ''}
+          {t(columns.length !== 1 ? 'datasets.detail.showingPlural' : 'datasets.detail.showingSingle', { shown: displayRows.length, total: matrix?.length ?? 0, count: columns.length })}
         </span>
         {showClassCol && (
-          <span className="text-xs text-slate-500">Coluna de classe: <strong className="text-slate-300">{class_column}</strong></span>
+          <span className="text-xs text-slate-500">{t('datasets.detail.classColumn')} <strong className="text-slate-300">{class_column}</strong></span>
         )}
       </div>
       <div className="overflow-auto" style={{ maxHeight: '480px' }}>
@@ -125,13 +127,14 @@ function PreviewTab({ meta }) {
 
 // Tab: statistics from col_stats
 function StatsTab({ meta }) {
+  const { t, i18n } = useTranslation();
   const stats = meta?.col_stats;
   if (!stats?.length) {
     return (
       <EmptyState
         icon={BarChart2}
-        title="Estatísticas não disponíveis"
-        description="Importe um dataset para ver as estatísticas das variáveis."
+        title={t('datasets.detail.statsUnavailable')}
+        description={t('datasets.detail.statsUnavailableDesc')}
       />
     );
   }
@@ -139,13 +142,13 @@ function StatsTab({ meta }) {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-white/10">
-        <span className="text-sm text-slate-400">{stats.length} variável{stats.length !== 1 ? 'is' : ''} analisada{stats.length !== 1 ? 's' : ''}</span>
+        <span className="text-sm text-slate-400">{t(stats.length !== 1 ? 'datasets.detail.statsPlural' : 'datasets.detail.statsSingle', { count: stats.length })}</span>
       </div>
       <div className="overflow-auto" style={{ maxHeight: '480px' }}>
         <table className="w-full text-sm">
           <thead className="sticky top-0">
             <tr style={{ background: 'rgba(30, 58, 138, 0.4)' }}>
-              {['Variável', 'Mín', 'Máx', 'Média'].map(h => (
+              {[t('datasets.detail.colVariable'), t('datasets.detail.colMin'), t('datasets.detail.colMax'), t('datasets.detail.colMean')].map(h => (
                 <th key={h} className="px-4 py-2.5 text-left text-blue-300 font-medium text-xs border-b border-white/10">{h}</th>
               ))}
             </tr>
@@ -167,6 +170,7 @@ function StatsTab({ meta }) {
 }
 
 export default function DatasetDetailPage() {
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const [tab, setTab] = useState('preview');
   const [showViz, setShowViz] = useState(false);
@@ -206,8 +210,8 @@ export default function DatasetDetailPage() {
     return (
       <EmptyState
         icon={Database}
-        title="Dataset não encontrado"
-        description="Este dataset não existe ou foi removido."
+        title={t('datasets.detail.notFound')}
+        description={t('datasets.detail.notFoundDesc')}
       />
     );
   }
@@ -224,7 +228,7 @@ export default function DatasetDetailPage() {
       {/* Header */}
       <div>
         <Link to="/datasets" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm mb-4">
-          <ArrowLeft className="w-4 h-4" /> Voltar aos Datasets
+          <ArrowLeft className="w-4 h-4" /> {t('datasets.detail.backToDatasets')}
         </Link>
 
         <div className="card p-6">
@@ -236,7 +240,7 @@ export default function DatasetDetailPage() {
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <h1 className="text-2xl font-bold text-white">{ds.name}</h1>
-                  <p className="text-slate-400 mt-1">{ds.description || 'Sem descrição'}</p>
+                  <p className="text-slate-400 mt-1">{ds.description || t('common.noDescription')}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {ds.data_type  && <Badge color="purple">{ds.data_type}</Badge>}
@@ -246,33 +250,33 @@ export default function DatasetDetailPage() {
                     onClick={() => setShowViz(true)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                     style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.25)' }}
-                    title="Visualização multidimensional"
+                    title={t('datasets.multiDimTooltip')}
                   >
                     <Boxes className="w-3.5 h-3.5" />
-                    Visualizar {dimensions ? `(${dimensions.length}D)` : ''}
+                    {t('datasets.card.visualize')} {dimensions ? `(${dimensions.length}D)` : ''}
                   </button>
                   <button
                     onClick={() => setShowOp(true)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                     style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }}
-                    title="Realizar operação matricial"
+                    title={t('datasets.quickOp.title')}
                   >
                     <Sigma className="w-3.5 h-3.5" />
-                    Realizar operação matricial
+                    {t('datasets.quickOp.title')}
                   </button>
                 </div>
               </div>
               <div className="flex items-center gap-4 text-xs text-slate-500 mt-3 flex-wrap">
-                {nSamples   !== null && <span><strong className="text-slate-300">{nSamples}</strong> amostras</span>}
-                {nVariables !== null && <span><strong className="text-slate-300">{nVariables}</strong> variáveis</span>}
+                {nSamples   !== null && <span><strong className="text-slate-300">{nSamples}</strong> {t('datasets.card.sampleCountLabel')}</span>}
+                {nVariables !== null && <span><strong className="text-slate-300">{nVariables}</strong> {t('datasets.card.variableCountLabel')}</span>}
                 {ds.x_points != null && ds.x_min != null && (
-                  <span>Range: <strong className="text-slate-300">{ds.x_min}–{ds.x_max}</strong></span>
+                  <span>{t('datasets.detail.range')}: <strong className="text-slate-300">{ds.x_min}–{ds.x_max}</strong></span>
                 )}
-                {ds.file_format && <span>Formato: <strong className="text-slate-300">{ds.file_format.toUpperCase()}</strong></span>}
+                {ds.file_format && <span>{t('datasets.format')}: <strong className="text-slate-300">{ds.file_format.toUpperCase()}</strong></span>}
                 {classValues.length > 0 && (
-                  <span>Classes: <strong className="text-slate-300">{classValues.join(', ')}</strong></span>
+                  <span>{t('datasets.detail.classes')}: <strong className="text-slate-300">{classValues.join(', ')}</strong></span>
                 )}
-                <span>Criado em: <strong className="text-slate-300">{new Date(ds.created_at).toLocaleDateString('pt-BR')}</strong></span>
+                <span>{t('common.createdAt')}: <strong className="text-slate-300">{new Date(ds.created_at).toLocaleDateString(i18n.language)}</strong></span>
               </div>
             </div>
           </div>
@@ -282,26 +286,26 @@ export default function DatasetDetailPage() {
       {/* Stats row */}
       {(nSamples !== null || nVariables !== null || ds.x_points != null) && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Amostras"   value={nSamples}   sub="linhas importadas" />
-          <StatCard label="Variáveis"  value={nVariables} sub="colunas numéricas" />
-          {ds.x_points != null && <StatCard label="Pontos X"  value={ds.x_points} sub={ds.x_unit || 'por espectro'} />}
-          {classValues.length > 0 && <StatCard label="Classes" value={classValues.length} sub={classValues.join(', ')} />}
+          <StatCard label={t('datasets.samples')}   value={nSamples}   sub={t('datasets.detail.rowsImported')} />
+          <StatCard label={t('datasets.variables')}  value={nVariables} sub={t('datasets.detail.numericColumns')} />
+          {ds.x_points != null && <StatCard label={t('datasets.detail.xPoints')}  value={ds.x_points} sub={ds.x_unit || t('datasets.detail.perSpectrum')} />}
+          {classValues.length > 0 && <StatCard label={t('datasets.detail.classes')} value={classValues.length} sub={classValues.join(', ')} />}
         </div>
       )}
 
       {/* Tabs */}
       <div className="flex items-center gap-2 flex-wrap">
         <Tab active={tab === 'preview'} onClick={() => setTab('preview')}>
-          <Eye className="w-4 h-4 inline mr-1.5" />Dados
+          <Eye className="w-4 h-4 inline mr-1.5" />{t('datasets.detail.tabData')}
         </Tab>
         <Tab active={tab === 'stats'} onClick={() => setTab('stats')}>
-          <BarChart2 className="w-4 h-4 inline mr-1.5" />Estatísticas
+          <BarChart2 className="w-4 h-4 inline mr-1.5" />{t('datasets.detail.tabStats')}
         </Tab>
         <Tab active={tab === 'info'} onClick={() => setTab('info')}>
-          <Activity className="w-4 h-4 inline mr-1.5" />Informações
+          <Activity className="w-4 h-4 inline mr-1.5" />{t('datasets.detail.tabInfo')}
         </Tab>
         <Tab active={tab === 'lineage'} onClick={() => setTab('lineage')}>
-          <GitBranch className="w-4 h-4 inline mr-1.5" />Linhagem
+          <GitBranch className="w-4 h-4 inline mr-1.5" />{t('datasets.lineage')}
         </Tab>
       </div>
 
@@ -322,25 +326,25 @@ export default function DatasetDetailPage() {
       {/* Tab: Informações */}
       {tab === 'info' && (
         <div className="card p-6 space-y-1">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Metadados</h3>
-          <InfoRow label="UUID"            value={ds.uuid} />
-          <InfoRow label="Tipo de dado"    value={ds.data_type} />
-          <InfoRow label="Técnica"         value={ds.technique} />
-          <InfoRow label="Visibilidade"    value={ds.visibility} />
-          <InfoRow label="Formato"         value={ds.file_format} />
-          <InfoRow label="Dimensões"       value={dimensionStr} />
-          <InfoRow label="Pontos X"        value={ds.x_points != null ? String(ds.x_points) : null} />
-          <InfoRow label="X mínimo"        value={ds.x_min != null ? String(ds.x_min) : null} />
-          <InfoRow label="X máximo"        value={ds.x_max != null ? String(ds.x_max) : null} />
-          <InfoRow label="Unidade X"       value={ds.x_unit} />
-          <InfoRow label="Unidade Y"       value={ds.y_unit} />
-          <InfoRow label="Caminho"         value={ds.storage_path} />
-          <InfoRow label="Criado em"       value={new Date(ds.created_at).toLocaleString('pt-BR')} />
-          <InfoRow label="Atualizado em"   value={ds.updated_at ? new Date(ds.updated_at).toLocaleString('pt-BR') : null} />
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">{t('datasets.detail.metadata')}</h3>
+          <InfoRow label={t('datasets.detail.uuid')}            value={ds.uuid} />
+          <InfoRow label={t('datasets.detail.dataType')}    value={ds.data_type} />
+          <InfoRow label={t('workflows.technique')}         value={ds.technique} />
+          <InfoRow label={t('projects.visibility')}    value={ds.visibility} />
+          <InfoRow label={t('datasets.format')}         value={ds.file_format} />
+          <InfoRow label={t('datasets.detail.dimensions')}       value={dimensionStr} />
+          <InfoRow label={t('datasets.detail.xPoints')}        value={ds.x_points != null ? String(ds.x_points) : null} />
+          <InfoRow label={t('datasets.detail.xMin')}        value={ds.x_min != null ? String(ds.x_min) : null} />
+          <InfoRow label={t('datasets.detail.xMax')}        value={ds.x_max != null ? String(ds.x_max) : null} />
+          <InfoRow label={t('datasets.detail.xUnit')}       value={ds.x_unit} />
+          <InfoRow label={t('datasets.detail.yUnit')}       value={ds.y_unit} />
+          <InfoRow label={t('datasets.detail.path')}         value={ds.storage_path} />
+          <InfoRow label={t('common.createdAt')}       value={new Date(ds.created_at).toLocaleString(i18n.language)} />
+          <InfoRow label={t('datasets.detail.updatedAt')}   value={ds.updated_at ? new Date(ds.updated_at).toLocaleString(i18n.language) : null} />
 
           {modeLabels && (
             <div className="py-2.5 border-b border-white/5">
-              <span className="text-slate-500 text-sm block mb-2">Rótulos de modo</span>
+              <span className="text-slate-500 text-sm block mb-2">{t('datasets.detail.modeLabels')}</span>
               <div className="flex flex-wrap gap-2">
                 {(Array.isArray(modeLabels) ? modeLabels : [modeLabels]).map((label, i) => (
                   <Badge key={i} color="blue">{label}</Badge>
@@ -352,7 +356,7 @@ export default function DatasetDetailPage() {
           {metadata?.feature_headers?.length > 0 && (
             <div className="py-2.5">
               <span className="text-slate-500 text-sm block mb-2">
-                Colunas detectadas ({metadata.feature_headers.length})
+                {t('datasets.detail.columnsDetected', { count: metadata.feature_headers.length })}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {metadata.feature_headers.map((h, i) => (
@@ -367,7 +371,7 @@ export default function DatasetDetailPage() {
       {/* Tab: Linhagem */}
       {tab === 'lineage' && (
         <div className="card p-6">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Linhagem do Dataset</h3>
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">{t('datasets.detail.lineageTitle')}</h3>
           {lineageLoading ? (
             <SkeletonCard className="h-24" />
           ) : lineageList.length > 0 ? (
@@ -380,14 +384,14 @@ export default function DatasetDetailPage() {
                   </div>
                   {l.created_at && (
                     <span className="text-slate-500 text-xs ml-auto whitespace-nowrap">
-                      {new Date(l.created_at).toLocaleString('pt-BR')}
+                      {new Date(l.created_at).toLocaleString(i18n.language)}
                     </span>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-slate-400 text-sm">Nenhum histórico de linhagem disponível.</p>
+            <p className="text-slate-400 text-sm">{t('datasets.detail.noLineage')}</p>
           )}
         </div>
       )}

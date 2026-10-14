@@ -4,6 +4,7 @@ import {
   FlaskConical, FolderOpen, Database, Users, Cpu, BookOpen,
   Activity, TrendingUp, Clock, Zap, ArrowRight, CheckCircle2
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
@@ -12,20 +13,21 @@ import SkeletonCard from '../components/ui/SkeletonCard';
 
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { user, isPlus, isAdmin } = useAuthStore();
   const { data: stats, loading } = useApi(() => isAdmin() ? api.admin.stats() : null, []);
 
-  const firstName = user?.name?.split(' ')[0] || 'Usuário';
+  const firstName = user?.name?.split(' ')[0] || t('dashboard.defaultUserName');
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+  const greeting = hour < 12 ? t('dashboard.greetingMorning') : hour < 18 ? t('dashboard.greetingAfternoon') : t('dashboard.greetingEvening');
 
   const quickLinks = [
-    { to: '/projects', icon: FolderOpen, label: 'Projetos', color: 'brand', desc: 'Gerencie seus projetos' },
-    { to: '/datasets', icon: Database, label: 'Datasets', color: 'green', desc: 'Seus conjuntos de dados' },
-    { to: '/workflows', icon: Cpu, label: 'Workflows', color: 'purple', desc: 'Pipelines analíticos' },
-    { to: '/communities', icon: Users, label: 'Comunidades', color: 'amber', desc: 'Colabore com outros' },
-    { to: '/articles', icon: BookOpen, label: 'Artigos', color: 'red', desc: 'Base científica' },
-    ...(isPlus() ? [{ to: '/ai', icon: Zap, label: 'IA', color: 'blue', desc: 'Análise inteligente', plus: true }] : []),
+    { to: '/projects', icon: FolderOpen, label: t('nav.projects'), color: 'brand', desc: t('dashboard.descProjects') },
+    { to: '/datasets', icon: Database, label: t('nav.datasets'), color: 'green', desc: t('dashboard.descDatasets') },
+    { to: '/workflows', icon: Cpu, label: t('nav.workflows'), color: 'purple', desc: t('dashboard.descWorkflows') },
+    { to: '/communities', icon: Users, label: t('nav.communities'), color: 'amber', desc: t('dashboard.descCommunities') },
+    { to: '/articles', icon: BookOpen, label: t('nav.articles'), color: 'red', desc: t('dashboard.descArticles') },
+    ...(isPlus() ? [{ to: '/ai', icon: Zap, label: t('nav.ai'), color: 'blue', desc: t('dashboard.descAI'), plus: true }] : []),
   ];
 
   return (
@@ -36,7 +38,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-white mb-1">
             {greeting}, <span className="text-blue-400">{firstName}</span> 👋
           </h1>
-          <p className="text-slate-400">Bem-vindo ao seu painel de análises quimiométricas.</p>
+          <p className="text-slate-400">{t('dashboard.heroSubtitle')}</p>
         </div>
         {isPlus() && (
           <div className="badge badge-plus flex items-center gap-1.5">
@@ -48,17 +50,17 @@ export default function DashboardPage() {
       {/* Admin stats */}
       {isAdmin() && (
         <div>
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Visão Geral do Sistema</h2>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('dashboard.systemOverview')}</h2>
           {loading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : stats ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard icon={Users} label="Usuários" value={stats.users?.total ?? '–'} color="brand" />
-              <StatCard icon={FolderOpen} label="Projetos" value={stats.workflows ?? '–'} color="green" />
-              <StatCard icon={Database} label="Datasets" value={stats.datasets ?? '–'} color="purple" />
-              <StatCard icon={Activity} label="Jobs Ativos" value={stats.jobs?.running ?? '–'} sub={`${stats.jobs?.pending ?? 0} pendentes`} color="amber" />
+              <StatCard icon={Users} label={t('admin.usersSection')} value={stats.users?.total ?? '–'} color="brand" />
+              <StatCard icon={FolderOpen} label={t('nav.projects')} value={stats.workflows ?? '–'} color="green" />
+              <StatCard icon={Database} label={t('nav.datasets')} value={stats.datasets ?? '–'} color="purple" />
+              <StatCard icon={Activity} label={t('dashboard.activeJobs')} value={stats.jobs?.running ?? '–'} sub={t('dashboard.pendingSub', { count: stats.jobs?.pending ?? 0 })} color="amber" />
             </div>
           ) : null}
         </div>
@@ -66,7 +68,7 @@ export default function DashboardPage() {
 
       {/* Quick access */}
       <div>
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Acesso Rápido</h2>
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('dashboard.quickAccess')}</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {quickLinks.map(({ to, icon: Icon, label, color, desc, plus }) => (
             <Link key={to} to={to}>
@@ -92,13 +94,13 @@ export default function DashboardPage() {
 
       {/* Activity feed placeholder */}
       <div>
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Atividade Recente</h2>
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('dashboard.recentActivity')}</h2>
         <div className="card p-6">
           <div className="space-y-4">
             {[
-              { icon: CheckCircle2, text: 'Sistema inicializado com sucesso', time: 'agora', color: 'green' },
-              { icon: FlaskConical, text: 'Bem-vindo ao TcheLab', time: 'hoje', color: 'blue' },
-              { icon: TrendingUp, text: 'Plataforma pronta para análises', time: 'hoje', color: 'purple' },
+              { icon: CheckCircle2, text: t('dashboard.activitySystemInit'), time: t('dashboard.timeNow'), color: 'green' },
+              { icon: FlaskConical, text: t('common.welcome'), time: t('dashboard.timeToday'), color: 'blue' },
+              { icon: TrendingUp, text: t('dashboard.activityReady'), time: t('dashboard.timeToday'), color: 'purple' },
             ].map((a, i) => (
               <div
                 key={i}

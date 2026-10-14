@@ -284,7 +284,11 @@ export const COMPAT_MATRIX = {
  * local, espelhando a camada 4 — "tipo compatível" — do ShapeValidatorService).
  * @param {string} srcType  — tipo declarado na porta de saída (output_schema[port].type)
  * @param {string} tgtType  — tipo declarado na porta de entrada (input_schema[port].type)
- * @returns {{ valid: boolean, reason: string }}
+ * O `reason` retornado é só um fallback em português pra código que ainda não
+ * traduz (ex.: logs). Pra exibir ao usuário, use `reasonKey`/`reasonParams`
+ * com `t(reasonKey, reasonParams)` (chave `workflows.incompatibleTypes` em
+ * src/i18n/locales/{pt,en}.js) — ver uso em WorkflowEditorPage.jsx.
+ * @returns {{ valid: boolean, reason: string, reasonKey?: string, reasonParams?: object }}
  */
 export function isValidConnection(srcType, tgtType) {
   const s = srcType || ANY;
@@ -299,6 +303,8 @@ export function isValidConnection(srcType, tgtType) {
   return {
     valid: false,
     reason: `Tipo de saída "${s}" não é compatível com a entrada "${t}"`,
+    reasonKey: 'workflows.incompatibleTypes',
+    reasonParams: { source: s, target: t },
   };
 }
 

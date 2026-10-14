@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from './store/auth';
 import { PageLoader } from './components/ui/Spinner';
 
@@ -73,10 +74,11 @@ const PublicRoute = ({ children }) => {
 };
 
 export default function App() {
+  const { t } = useTranslation();
   return (
     // O Suspense externo cobre apenas o LoginPage (e o carregamento inicial
     // das páginas internas, que são lazy). O AppLayout em si nunca suspende.
-    <Suspense fallback={<PageLoader text="Carregando TcheLab..." />}>
+    <Suspense fallback={<PageLoader text={t('common.loadingApp')} />}>
       <Routes>
         <Route path="/login" element={
           <PublicRoute><LoginPage /></PublicRoute>

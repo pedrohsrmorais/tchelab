@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Database, Cpu, Users, Plus, Calendar, Globe, Lock, History } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useApi, useMutation } from '../hooks/useApi';
 import { api } from '../api';
 import SkeletonCard from '../components/ui/SkeletonCard';
@@ -18,6 +19,7 @@ function Tab({ active, onClick, children }) {
 }
 
 export default function ProjectDetailPage() {
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const [tab, setTab] = useState('datasets');
   const [addDatasetOpen, setAddDatasetOpen] = useState(false);
@@ -36,15 +38,15 @@ export default function ProjectDetailPage() {
   );
 
   if (!project) return (
-    <EmptyState icon={Database} title="Projeto não encontrado" description="Este projeto não existe ou você não tem acesso." />
+    <EmptyState icon={Database} title={t('projects.notFound')} description={t('projects.notFoundDesc')} />
   );
 
   const proj = project.data ?? project;
 
   const handleAddDataset = async () => {
-    if (!selectedDataset) { toast.error('Selecione um dataset'); return; }
+    if (!selectedDataset) { toast.error(t('projects.selectDatasetError')); return; }
     const ok = await addDataset(selectedDataset);
-    if (ok !== null) { toast.success('Dataset adicionado!'); setAddDatasetOpen(false); }
+    if (ok !== null) { toast.success(t('projects.datasetAddedSuccess')); setAddDatasetOpen(false); }
   };
 
   const datasetsList = datasets?.data ?? datasets ?? [];
@@ -56,7 +58,7 @@ export default function ProjectDetailPage() {
       {/* Header */}
       <div>
         <Link to="/projects" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm mb-4">
-          <ArrowLeft className="w-4 h-4" /> Voltar aos Projetos
+          <ArrowLeft className="w-4 h-4" /> {t('projects.backToProjects')}
         </Link>
         <div className="card p-6">
           <div className="flex items-start justify-between">
@@ -64,13 +66,13 @@ export default function ProjectDetailPage() {
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl font-bold text-white">{proj.name}</h1>
                 <span className={`badge ${proj.is_public ? 'badge-green' : 'badge-blue'}`}>
-                  {proj.is_public ? <><Globe className="w-3 h-3" /> Público</> : <><Lock className="w-3 h-3" /> Privado</>}
+                  {proj.is_public ? <><Globe className="w-3 h-3" /> {t('projects.public')}</> : <><Lock className="w-3 h-3" /> {t('projects.private')}</>}
                 </span>
               </div>
-              <p className="text-slate-400">{proj.description || 'Sem descrição'}</p>
+              <p className="text-slate-400">{proj.description || t('common.noDescription')}</p>
               <div className="flex items-center gap-1 text-xs text-slate-500 mt-3">
                 <Calendar className="w-3 h-3" />
-                Criado em {new Date(proj.created_at).toLocaleDateString('pt-BR')}
+                {t('common.createdAt')} {new Date(proj.created_at).toLocaleDateString(i18n.language)}
               </div>
             </div>
           </div>
@@ -79,23 +81,23 @@ export default function ProjectDetailPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-2">
-        <Tab active={tab === 'datasets'} onClick={() => setTab('datasets')}><Database className="w-4 h-4 inline mr-1.5" />Datasets</Tab>
-        <Tab active={tab === 'workflows'} onClick={() => setTab('workflows')}><Cpu className="w-4 h-4 inline mr-1.5" />Workflows</Tab>
-        <Tab active={tab === 'members'} onClick={() => setTab('members')}><Users className="w-4 h-4 inline mr-1.5" />Membros</Tab>
-        <Tab active={tab === 'history'} onClick={() => setTab('history')}><History className="w-4 h-4 inline mr-1.5" />Histórico</Tab>
+        <Tab active={tab === 'datasets'} onClick={() => setTab('datasets')}><Database className="w-4 h-4 inline mr-1.5" />{t('nav.datasets')}</Tab>
+        <Tab active={tab === 'workflows'} onClick={() => setTab('workflows')}><Cpu className="w-4 h-4 inline mr-1.5" />{t('nav.workflows')}</Tab>
+        <Tab active={tab === 'members'} onClick={() => setTab('members')}><Users className="w-4 h-4 inline mr-1.5" />{t('projects.members')}</Tab>
+        <Tab active={tab === 'history'} onClick={() => setTab('history')}><History className="w-4 h-4 inline mr-1.5" />{t('projects.history')}</Tab>
       </div>
 
       {/* Tab content */}
       {tab === 'datasets' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Datasets Vinculados</h2>
+            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">{t('projects.linkedDatasets')}</h2>
             <button onClick={() => setAddDatasetOpen(true)} className="btn-primary flex items-center gap-2 text-sm py-1.5">
-              <Plus className="w-3.5 h-3.5" /> Adicionar Dataset
+              <Plus className="w-3.5 h-3.5" /> {t('projects.addDataset')}
             </button>
           </div>
           {datasetsList.length === 0 ? (
-            <EmptyState icon={Database} title="Nenhum dataset" description="Adicione datasets a este projeto." action={<button onClick={() => setAddDatasetOpen(true)} className="btn-primary">Adicionar Dataset</button>} />
+            <EmptyState icon={Database} title={t('datasets.empty.title')} description={t('projects.noDatasetsDesc')} action={<button onClick={() => setAddDatasetOpen(true)} className="btn-primary">{t('projects.addDataset')}</button>} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {datasetsList.map(ds => {
@@ -109,7 +111,7 @@ export default function ProjectDetailPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="font-medium text-white truncate">{ds.name}</div>
-                        <div className="text-xs text-slate-400">{dims?.[0] ?? 0} linhas · {dims?.[1] ?? 0} colunas</div>
+                        <div className="text-xs text-slate-400">{t('projects.dimsLabel', { rows: dims?.[0] ?? 0, cols: dims?.[1] ?? 0 })}</div>
                       </div>
                     </div>
                   </Link>
@@ -121,30 +123,30 @@ export default function ProjectDetailPage() {
       )}
 
       {tab === 'workflows' && (
-        <EmptyState icon={Cpu} title="Workflows" description="Vincule workflows analíticos a este projeto." />
+        <EmptyState icon={Cpu} title={t('nav.workflows')} description={t('projects.workflowsTabDesc')} />
       )}
       {tab === 'members' && (
-        <EmptyState icon={Users} title="Membros" description="Gerencie os membros do projeto." />
+        <EmptyState icon={Users} title={t('projects.members')} description={t('projects.membersTabDesc')} />
       )}
       {tab === 'history' && (
-        <EmptyState icon={History} title="Histórico" description="Visualize o histórico de alterações." />
+        <EmptyState icon={History} title={t('projects.history')} description={t('projects.historyTabDesc')} />
       )}
 
       {/* Add dataset modal */}
-      <Modal open={addDatasetOpen} onClose={() => setAddDatasetOpen(false)} title="Adicionar Dataset" size="md">
+      <Modal open={addDatasetOpen} onClose={() => setAddDatasetOpen(false)} title={t('projects.addDataset')} size="md">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-blue-200 mb-1.5">Selecione um Dataset</label>
+            <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('projects.selectDatasetLabel')}</label>
             <select className="input-field" value={selectedDataset} onChange={e => setSelectedDataset(e.target.value)}>
-              <option value="">-- Escolha --</option>
+              <option value="">{t('communities.chooseOption')}</option>
               {available.map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
             </select>
-            {available.length === 0 && <p className="text-xs text-slate-400 mt-2">Todos os seus datasets já estão neste projeto. <Link to="/datasets" className="text-blue-400 hover:underline">Criar novo dataset</Link></p>}
+            {available.length === 0 && <p className="text-xs text-slate-400 mt-2">{t('projects.allDatasetsLinked')} <Link to="/datasets" className="text-blue-400 hover:underline">{t('projects.createNewDataset')}</Link></p>}
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setAddDatasetOpen(false)} className="btn-ghost flex-1">Cancelar</button>
+            <button onClick={() => setAddDatasetOpen(false)} className="btn-ghost flex-1">{t('common.cancel')}</button>
             <button onClick={handleAddDataset} disabled={adding || !selectedDataset} className="btn-primary flex-1">
-              {adding ? 'Adicionando...' : 'Adicionar'}
+              {adding ? t('projects.adding') : t('common.add')}
             </button>
           </div>
         </div>

@@ -20,12 +20,12 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
       <div
         onClick={e => e.stopPropagation()}
         className="anim-scale-in"
-        style={{ width:'100%', maxWidth:maxW, background:'rgba(15,23,42,0.95)', border:'1px solid rgba(255,255,255,0.1)',
-                 borderRadius:'1.25rem', overflow:'hidden', boxShadow:'0 25px 60px rgba(0,0,0,0.5)' }}>
+        style={{ width:'100%', maxWidth:maxW, background:'var(--bg-elevated)', border:'1px solid var(--border)',
+                 borderRadius:'var(--radius-xl)', overflow:'hidden', boxShadow:'var(--shadow-lg)' }}>
         {title && (
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'1.25rem 1.5rem',
-                        borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-            <h2 style={{ fontWeight:700, fontSize:'1.1rem', color:'#fff' }}>{title}</h2>
+                        borderBottom:'1px solid var(--border)' }}>
+            <h2 style={{ fontWeight:700, fontSize:'1.1rem', color:'var(--text-primary)' }}>{title}</h2>
             <button onClick={onClose} className="btn-ghost" style={{ padding:'0.25rem' }}>
               <X size={18} />
             </button>

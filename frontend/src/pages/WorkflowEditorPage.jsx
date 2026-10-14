@@ -49,10 +49,10 @@ function hexToRgb(hex) {
 }
 
 const EXEC_STATUS_META = {
-  pending:   { color: '#64748b', Icon: Clock,        label: 'Pendente' },
-  running:   { color: '#fbbf24', Icon: Loader2,      label: 'Executando' },
-  completed: { color: '#34d399', Icon: CheckCircle2, label: 'Concluído' },
-  failed:    { color: '#f87171', Icon: XCircle,      label: 'Falhou' },
+  pending:   { color: '#64748b', Icon: Clock },
+  running:   { color: '#fbbf24', Icon: Loader2 },
+  completed: { color: '#34d399', Icon: CheckCircle2 },
+  failed:    { color: '#f87171', Icon: XCircle },
 };
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -63,7 +63,9 @@ const EXEC_STATUS_META = {
 // paginação/família corrigido antes — mas digitar para filtrar continua
 // sendo melhor UX que um <select> simples quando o catálogo de datasets cresce).
 // ────────────────────────────────────────────────────────────────────────────────
-function DatasetCombobox({ datasets, value, onChange, placeholder = '— Selecionar dataset —' }) {
+function DatasetCombobox({ datasets, value, onChange, placeholder }) {
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder || t('workflows.selectDatasetPlaceholder');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const wrapRef = useRef(null);
@@ -91,7 +93,7 @@ function DatasetCombobox({ datasets, value, onChange, placeholder = '— Selecio
         value={open ? query : (selected?.name || '')}
         onChange={e => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => { setOpen(true); setQuery(''); }}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         style={{
           width: '100%',
           background: 'rgba(255,255,255,0.05)',
@@ -114,7 +116,7 @@ function DatasetCombobox({ datasets, value, onChange, placeholder = '— Selecio
             onClick={() => { onChange(''); setOpen(false); setQuery(''); }}
             style={{ padding: '5px 9px', fontSize: '0.76rem', color: 'var(--text-muted)', cursor: 'pointer' }}
           >
-            — Nenhum —
+            {t('workflows.noneOption')}
           </div>
           {filtered.map(d => (
             <div
@@ -136,7 +138,7 @@ function DatasetCombobox({ datasets, value, onChange, placeholder = '— Selecio
           ))}
           {filtered.length === 0 && (
             <div style={{ padding: '7px 9px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-              Nenhum dataset encontrado.
+              {t('workflows.noDatasetFound')}
             </div>
           )}
         </div>
@@ -155,6 +157,7 @@ function DatasetCombobox({ datasets, value, onChange, placeholder = '— Selecio
 // então não se perdem mais ao sair e voltar ao workflow.)
 // ────────────────────────────────────────────────────────────────────────────────
 function DatasetNode({ id, data, selected }) {
+  const { t } = useTranslation();
   const datasets = data.datasets || [];
   const selectedDs = datasets.find(d => d.uuid === data.datasetUuid);
 
@@ -177,11 +180,11 @@ function DatasetNode({ id, data, selected }) {
           <DbIcon size={13} color="#60a5fa" />
         </div>
         <span style={{ flex: 1, fontSize: '0.7rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Dataset
+          {t('workflows.dataset')}
         </span>
         <button
           className="nodrag"
-          title="Visualizar dataset"
+          title={t('workflows.previewDataset')}
           onClick={() => data.onPreview && data.onPreview(data.datasetUuid)}
           disabled={!data.datasetUuid}
           style={{
@@ -193,7 +196,7 @@ function DatasetNode({ id, data, selected }) {
         </button>
         <button
           className="nodrag"
-          title="Remover nó"
+          title={t('workflows.deleteNode')}
           onClick={() => data.onRemove && data.onRemove(id)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
         >
@@ -214,7 +217,7 @@ function DatasetNode({ id, data, selected }) {
       )}
       {!data.datasetUuid && (
         <p style={{ fontSize: '0.68rem', color: '#fbbf24', margin: '2px 0 0' }}>
-          ⚠ Nenhum dataset selecionado
+          {t('workflows.noDatasetSelected')}
         </p>
       )}
 
@@ -233,6 +236,7 @@ function DatasetNode({ id, data, selected }) {
 // Handle genérico por lado que escondia as portas reais da técnica.
 // ────────────────────────────────────────────────────────────────────────────────
 function TechniqueNode({ id, data, selected }) {
+  const { t } = useTranslation();
   const familyCfg = getFamilyConfig(data.family);
   const color  = familyCfg?.color  || '#64748b';
   const bg     = familyCfg?.bg     || 'rgba(100,116,139,0.1)';
@@ -284,7 +288,7 @@ function TechniqueNode({ id, data, selected }) {
         )}
         <button
           className="nodrag"
-          title={data.hasExecData ? 'Visualizar entrada/saída' : 'Execute o workflow para ver os dados'}
+          title={data.hasExecData ? t('workflows.viewIO') : t('workflows.viewIODisabledHint')}
           onClick={() => data.onViewIO && data.onViewIO(id)}
           disabled={!data.hasExecData}
           style={{
@@ -298,7 +302,7 @@ function TechniqueNode({ id, data, selected }) {
         </button>
         <button
           className="nodrag"
-          title="Configurar parâmetros"
+          title={t('workflows.configureParams')}
           onClick={() => data.onConfigure && data.onConfigure(id)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}
         >
@@ -306,7 +310,7 @@ function TechniqueNode({ id, data, selected }) {
         </button>
         <button
           className="nodrag"
-          title="Remover nó"
+          title={t('workflows.deleteNode')}
           onClick={() => data.onRemove && data.onRemove(id)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
         >
@@ -375,6 +379,7 @@ const NODE_TYPES = {
 // Technique Card no painel lateral
 // ────────────────────────────────────────────────────────────────────────────────
 function TechniqueCard({ tech, onAdd, lang }) {
+  const { t } = useTranslation();
   const [showInfo, setShowInfo] = useState(false);
   const familyCfg = getFamilyConfig(tech.family, lang);
   const inputSchema  = parseSchema(tech.input_schema);
@@ -497,7 +502,7 @@ function TechniqueCard({ tech, onAdd, lang }) {
                 transition: 'opacity 0.15s',
               }}
             >
-              + Adicionar ao canvas
+              {t('workflows.addToCanvas')}
             </button>
           </div>
         </div>
@@ -520,6 +525,7 @@ function TechniqueCard({ tech, onAdd, lang }) {
 // sinalizado em vermelho). Componente próprio porque usa hooks (useState),
 // que não podem ser chamados condicionalmente dentro de ConfigFieldInput.
 function ConfigObjectFieldInput({ spec, value, onChange, inputStyle }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(() => JSON.stringify(value ?? spec?.default ?? {}, null, 0));
   const [invalid, setInvalid] = useState(false);
   return (
@@ -527,7 +533,7 @@ function ConfigObjectFieldInput({ spec, value, onChange, inputStyle }) {
       className="input-field"
       style={{ ...inputStyle, borderColor: invalid ? 'var(--danger)' : undefined }}
       type="text"
-      placeholder="JSON, ex: {&quot;0&quot;: [0, 10, 1]}"
+      placeholder={t('workflows.jsonExamplePlaceholder')}
       value={draft}
       onChange={e => {
         const raw = e.target.value;
@@ -544,6 +550,7 @@ function ConfigObjectFieldInput({ spec, value, onChange, inputStyle }) {
 }
 
 function ConfigFieldInput({ type, spec, value, onChange }) {
+  const { t } = useTranslation();
   const inputStyle = { fontSize: '0.76rem', padding: '4px 8px', width: '100%' };
 
   // enum (qualquer tipo) → select
@@ -563,7 +570,9 @@ function ConfigFieldInput({ type, spec, value, onChange }) {
         onChange={e => onChange(castBack(e.target.value))}
       >
         <option value="">
-          {spec?.default !== undefined && spec?.default !== null ? `(padrão: ${String(spec.default)})` : '— selecione —'}
+          {spec?.default !== undefined && spec?.default !== null
+            ? t('workflows.defaultValueOption', { value: String(spec.default) })
+            : t('workflows.selectOption')}
         </option>
         {spec.enum.map(opt => (
           <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
@@ -581,7 +590,7 @@ function ConfigFieldInput({ type, spec, value, onChange }) {
           checked={!!checked}
           onChange={e => onChange(e.target.checked)}
         />
-        {checked ? 'Sim' : 'Não'}
+        {checked ? t('common.yes') : t('common.no')}
       </label>
     );
   }
@@ -616,7 +625,7 @@ function ConfigFieldInput({ type, spec, value, onChange }) {
               type="button"
               onClick={() => onChange(list.filter((_, i) => i !== idx))}
               className="btn-ghost"
-              title="Remover item"
+              title={t('workflows.removeItem')}
               style={{ padding: '2px 7px', fontSize: '0.78rem', lineHeight: 1 }}
             >
               ×
@@ -629,7 +638,7 @@ function ConfigFieldInput({ type, spec, value, onChange }) {
           className="btn-ghost"
           style={{ fontSize: '0.7rem', justifyContent: 'center', padding: '3px 6px' }}
         >
-          + adicionar item
+          {t('workflows.addItem')}
         </button>
       </div>
     );
@@ -676,6 +685,7 @@ function ConfigFieldInput({ type, spec, value, onChange }) {
 // Painel de configuração de parâmetros de um nó técnica
 // ────────────────────────────────────────────────────────────────────────────────
 function NodeConfigPanel({ node, onClose, onSave, saving }) {
+  const { t } = useTranslation();
   const schema = node?.data?.parameterSchema || {};
   const [values, setValues] = useState(() => ({ ...(node?.data?.parameters || {}) }));
 
@@ -702,7 +712,7 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
       </div>
 
       {fields.length === 0 && (
-        <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Esta técnica não tem parâmetros configuráveis.</p>
+        <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{t('workflows.noConfigurableParams')}</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto' }}>
@@ -726,7 +736,7 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
 
       <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
         <button onClick={onClose} className="btn-ghost" style={{ flex: 1, fontSize: '0.74rem', justifyContent: 'center' }}>
-          Cancelar
+          {t('common.cancel')}
         </button>
         <button
           onClick={() => onSave(node.id, Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined)))}
@@ -734,7 +744,7 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
           className="btn-primary"
           style={{ flex: 1, fontSize: '0.74rem', justifyContent: 'center' }}
         >
-          {saving ? <Loader2 size={12} className="anim-spin" /> : 'Salvar'}
+          {saving ? <Loader2 size={12} className="anim-spin" /> : t('common.save')}
         </button>
       </div>
     </div>
@@ -749,6 +759,7 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
 // salvar train/validation/test do kennard_stone como 3 datasets nomeados).
 // ────────────────────────────────────────────────────────────────────────────────
 function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
+  const { t } = useTranslation();
   if (!execution) return null;
   const nodes = execution.nodes || [];
 
@@ -761,14 +772,14 @@ function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
         <GitBranch size={13} style={{ color: 'var(--text-accent)' }} />
         <span style={{ flex: 1, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-          Execução #{execution.id ?? execution.uuid}
+          {t('workflows.executionNumber', { id: execution.id ?? execution.uuid })}
         </span>
         <span style={{
           fontSize: '0.64rem', fontWeight: 700, padding: '2px 7px', borderRadius: 999,
           color: EXEC_STATUS_META[execution.status]?.color || 'var(--text-muted)',
           background: 'rgba(255,255,255,0.05)',
         }}>
-          {execution.status}
+          {t(`executions.status.${execution.status}`, execution.status)}
         </span>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
           <X size={13} />
@@ -804,14 +815,14 @@ function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
                       {port}
                     </span>
                     <button
-                      title="Visualizar"
+                      title={t('workflows.preview')}
                       onClick={() => onPreviewPort(n, port, outputs[port])}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', padding: 2 }}
                     >
                       <Eye size={13} />
                     </button>
                     <button
-                      title="Salvar como dataset"
+                      title={t('workflows.saveAsDataset')}
                       onClick={() => onSavePort(n, port)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6ee7b7', padding: 2 }}
                     >
@@ -826,7 +837,7 @@ function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
       })}
 
       {nodes.length === 0 && (
-        <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Nenhum nó executado ainda.</p>
+        <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{t('workflows.noExecutedNodes')}</p>
       )}
     </div>
   );
@@ -841,6 +852,7 @@ function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
 // "Visualizar" (MultiDimModal) e, para saídas, "Salvar como dataset".
 // ────────────────────────────────────────────────────────────────────────────────
 function NodeIOPanel({ execNode, onClose, onPreviewPort, onSavePort }) {
+  const { t } = useTranslation();
   if (!execNode) return null;
   const meta = EXEC_STATUS_META[execNode.status] || EXEC_STATUS_META.pending;
   const inputs = safeJson(execNode.input_data, {}) || {};
@@ -870,11 +882,11 @@ function NodeIOPanel({ execNode, onClose, onPreviewPort, onSavePort }) {
       )}
 
       <p style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '4px 0 6px' }}>
-        Entrada
+        {t('workflows.inputLabel')}
       </p>
       {inputPorts.length === 0 && (
         <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8 }}>
-          Este nó não recebeu dados de entrada (ex: fonte primária do pipeline).
+          {t('workflows.noInputDataHint')}
         </p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
@@ -887,7 +899,7 @@ function NodeIOPanel({ execNode, onClose, onPreviewPort, onSavePort }) {
               {port}
             </span>
             <button
-              title="Visualizar"
+              title={t('workflows.preview')}
               onClick={() => onPreviewPort(execNode, port, inputs[port])}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', padding: 2 }}
             >
@@ -898,11 +910,11 @@ function NodeIOPanel({ execNode, onClose, onPreviewPort, onSavePort }) {
       </div>
 
       <p style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '4px 0 6px' }}>
-        Saída {execNode.status !== 'completed' && `(${meta.label.toLowerCase()})`}
+        {t('workflows.outputLabel')} {execNode.status !== 'completed' && `(${t(`executions.status.${execNode.status}`, execNode.status).toLowerCase()})`}
       </p>
       {outputPorts.length === 0 && (
         <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          {execNode.status === 'completed' ? 'Nenhuma porta de saída.' : 'Ainda não há saída — aguarde a execução terminar.'}
+          {execNode.status === 'completed' ? t('workflows.noOutputPorts') : t('workflows.outputPending')}
         </p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -915,14 +927,14 @@ function NodeIOPanel({ execNode, onClose, onPreviewPort, onSavePort }) {
               {port}
             </span>
             <button
-              title="Visualizar"
+              title={t('workflows.preview')}
               onClick={() => onPreviewPort(execNode, port, outputs[port])}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', padding: 2 }}
             >
               <Eye size={13} />
             </button>
             <button
-              title="Salvar como dataset"
+              title={t('workflows.saveAsDataset')}
               onClick={() => onSavePort(execNode, port)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6ee7b7', padding: 2 }}
             >
@@ -1026,7 +1038,7 @@ export default function WorkflowEditorPage() {
   onDatasetChangeRef.current = (nodeId, uuid, dsObj) => {
     setNodes(prev => prev.map(n =>
       n.id === nodeId
-        ? { ...n, data: { ...n.data, datasetUuid: uuid, label: dsObj?.name || 'Dataset de entrada' } }
+        ? { ...n, data: { ...n.data, datasetUuid: uuid, label: dsObj?.name || t('workflows.defaultDatasetLabel') } }
         : n
     ));
   };
@@ -1037,7 +1049,7 @@ export default function WorkflowEditorPage() {
       const res = await api.datasets.get(datasetUuid);
       setPreviewDataset(res?.data?.data ?? res?.data ?? res);
     } catch {
-      toast.error('Não foi possível carregar o dataset.');
+      toast.error(t('workflows.loadDatasetError'));
     }
   };
   const onRemoveNodeRef = useRef(null);
@@ -1100,7 +1112,7 @@ export default function WorkflowEditorPage() {
         type: 'dataset',
         position: dn.position || { x: 40, y: 180 },
         data: {
-          label: dn.label || 'Dataset de entrada',
+          label: dn.label || t('workflows.defaultDatasetLabel'),
           datasetUuid: dn.datasetUuid || '',
           datasets: datasetsList,
           onChange:  (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
@@ -1146,7 +1158,7 @@ export default function WorkflowEditorPage() {
       type:     'dataset',
       position: { x: 40, y: 180 },
       data: {
-        label: 'Dataset de entrada',
+        label: t('workflows.defaultDatasetLabel'),
         datasetUuid: '',
         datasets: datasetsList,
         onChange:  (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
@@ -1231,7 +1243,7 @@ export default function WorkflowEditorPage() {
 
     if (node.type === 'technique') {
       api.workflows.deleteNode(id, nodeId).catch(() => {
-        toast.error('Não foi possível remover o nó no servidor.');
+        toast.error(t('workflows.deleteNodeError'));
       });
       // Remove arestas reais conectadas a este nó (local + backend)
       edges.forEach(e => {
@@ -1257,7 +1269,7 @@ export default function WorkflowEditorPage() {
       });
     }
     setNodes(nds => nds.filter(n => n.id !== nodeId));
-  }, [nodes, edges, id, setEdges, setNodes]);
+  }, [nodes, edges, id, setEdges, setNodes, t]);
 
   // ── onNodesChange: aplica o default do React Flow + sincroniza remoções ────
   const onNodesChange = useCallback((changes) => {
@@ -1274,9 +1286,9 @@ export default function WorkflowEditorPage() {
       position_x: Math.round(node.position.x),
       position_y: Math.round(node.position.y),
     }).catch(() => {
-      toast.error('Não foi possível salvar a posição do nó.');
+      toast.error(t('workflows.savePositionError'));
     });
-  }, [id]);
+  }, [id, t]);
 
   // ── onEdgesChange: aplica o default + sincroniza remoções ───────────────────
   const onEdgesChange = useCallback((changes) => {
@@ -1296,12 +1308,12 @@ export default function WorkflowEditorPage() {
         });
       } else if (edge.data?.backendId) {
         api.workflows.deleteEdge(id, edge.data.backendId).catch(() => {
-          toast.error('Não foi possível remover a conexão no servidor.');
+          toast.error(t('workflows.deleteEdgeError'));
         });
       }
     });
     onEdgesChangeBase(changes);
-  }, [edges, id, onEdgesChangeBase]);
+  }, [edges, id, onEdgesChangeBase, t]);
 
   // ── onConnect — valida compatibilidade por PORTA e sincroniza com backend ───
   const onConnect = useCallback((params) => {
@@ -1309,7 +1321,7 @@ export default function WorkflowEditorPage() {
     const targetNode = nodes.find(n => n.id === params.target);
     if (!sourceNode || !targetNode) return;
     if (targetNode.type !== 'technique') {
-      toast.error('Só é possível conectar a entrada de uma técnica.');
+      toast.error(t('workflows.onlyTechniqueInputError'));
       return;
     }
 
@@ -1334,9 +1346,10 @@ export default function WorkflowEditorPage() {
     };
 
     if (sourceNode.type === 'dataset') {
-      const { valid, reason } = isValidConnection(ARRAY_TYPES.DATASET, tgtType);
+      const { valid, reasonKey, reasonParams } = isValidConnection(ARRAY_TYPES.DATASET, tgtType);
       if (!valid) {
-        toast.error(`Nó "${targetNode.data?.label}": ${reason}`, { duration: 4000 });
+        const reason = t(reasonKey, reasonParams);
+        toast.error(t('workflows.connectionErrorNode', { label: targetNode.data?.label, reason }), { duration: 4000 });
         return;
       }
       dropExisting();
@@ -1350,9 +1363,10 @@ export default function WorkflowEditorPage() {
 
     const sourcePort = params.sourceHandle || 'value';
     const srcPortDef = (sourceNode.data.outputPorts || []).find(p => p.name === sourcePort);
-    const { valid, reason } = isValidConnection(srcPortDef?.type, tgtType);
+    const { valid, reasonKey, reasonParams } = isValidConnection(srcPortDef?.type, tgtType);
     if (!valid) {
-      const msg = `Nó "${targetNode.data?.label}": ${reason}`;
+      const reason = t(reasonKey, reasonParams);
+      const msg = t('workflows.connectionErrorNode', { label: targetNode.data?.label, reason });
       toast.error(msg, { duration: 4000 });
       setErrors(prev => [...prev.filter(e => e !== msg), msg]);
       return;
@@ -1377,11 +1391,11 @@ export default function WorkflowEditorPage() {
     }).catch(err => {
       const msg = err?.response?.data?.error?.details?.[0]?.message
         || err?.response?.data?.error?.message
-        || 'O servidor rejeitou esta conexão.';
+        || t('workflows.connectionRejected');
       toast.error(msg, { duration: 4500 });
       setErrors(prev => [...prev.filter(e => e !== msg), msg]);
     });
-  }, [nodes, edges, id, setEdges]);
+  }, [nodes, edges, id, setEdges, t]);
 
   // ── Adicionar técnica ao canvas (cria de verdade no backend) ────────────────
   // `dropPosition`, quando informado (arrastar do painel lateral e soltar no
@@ -1422,11 +1436,11 @@ export default function WorkflowEditorPage() {
           onViewIO: (nid) => onViewIORef.current?.(nid),
         },
       }]);
-      toast.success(`${tech.name} adicionado`, { duration: 2000 });
+      toast.success(t('workflows.techniqueAddedToast', { name: tech.name }), { duration: 2000 });
     }).catch(() => {
-      toast.error('Não foi possível adicionar a técnica ao workflow.');
+      toast.error(t('workflows.addTechniqueError'));
     });
-  }, [id, setNodes]);
+  }, [id, setNodes, t]);
 
   // ── Salvar parâmetros de um nó ───────────────────────────────────────────────
   const handleSaveNodeConfig = useCallback(async (nodeId, parameters) => {
@@ -1434,19 +1448,19 @@ export default function WorkflowEditorPage() {
     try {
       await api.workflows.updateNode(id, nodeId, { parameters });
       setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data: { ...n.data, parameters } } : n));
-      toast.success('Parâmetros salvos.');
+      toast.success(t('workflows.paramsSaved'));
       setConfigNodeId(null);
     } catch {
-      toast.error('Não foi possível salvar os parâmetros.');
+      toast.error(t('workflows.saveParamsError'));
     } finally {
       setSavingConfig(false);
     }
-  }, [id, setNodes]);
+  }, [id, setNodes, t]);
 
   // ── Execute: resolve dataset_bindings (uuid → tensor real) e dispara ───────
   const handleDispatch = async () => {
     if (errors.length > 0) {
-      toast.error('Corrija os erros de conexão antes de executar.');
+      toast.error(t('workflows.fixConnectionErrors'));
       return;
     }
     setExec(true);
@@ -1463,7 +1477,7 @@ export default function WorkflowEditorPage() {
           const meta = safeJson(dsRow?.metadata, {});
           const tensor = meta?.data?.tensor ?? meta?.data?.matrix ?? null;
           if (!tensor) {
-            toast.error(`O dataset ligado à porta "${portName}" não tem dados numéricos.`);
+            toast.error(t('workflows.datasetNoNumericData', { port: portName }));
             setExec(false);
             return;
           }
@@ -1517,8 +1531,8 @@ export default function WorkflowEditorPage() {
         if (terminal.includes(execData.status)) {
           clearInterval(pollRef.current);
           pollRef.current = null;
-          if (execData.status === 'completed') toast.success('Execução concluída!');
-          else if (execData.status === 'failed') toast.error('A execução terminou com erro em algum nó.');
+          if (execData.status === 'completed') toast.success(t('workflows.executionCompleted'));
+          else if (execData.status === 'failed') toast.error(t('workflows.executionFailed'));
         }
       } catch {
         clearInterval(pollRef.current);
@@ -1527,7 +1541,7 @@ export default function WorkflowEditorPage() {
     };
     tick();
     pollRef.current = setInterval(tick, 1500);
-  }, [applyExecutionToNodes]);
+  }, [applyExecutionToNodes, t]);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
@@ -1582,17 +1596,17 @@ export default function WorkflowEditorPage() {
   }, []);
 
   const handleSavePort = useCallback((execNode, port) => {
-    const name = window.prompt(`Nome do dataset para a porta "${port}" (ex: "treino", "validação", "teste"):`, `${execNode.node_name || execNode.technique_slug}_${port}`);
+    const name = window.prompt(t('workflows.saveDatasetPromptLabel', { port }), `${execNode.node_name || execNode.technique_slug}_${port}`);
     if (!name || !name.trim()) return;
     // A rota exige o UUID da execução (resolveExecution busca por `uuid`,
     // não pelo id numérico) — execution.id é a PK numérica, não serve aqui.
     api.executions.saveNodeOutput(execution?.uuid, execNode.node_key, port, { name: name.trim() })
-      .then(() => toast.success(`Dataset "${name.trim()}" salvo!`))
+      .then(() => toast.success(t('workflows.datasetSavedToast', { name: name.trim() })))
       .catch(err => {
-        const msg = err?.response?.data?.error?.details?.[0]?.message || 'Não foi possível salvar este output como dataset.';
+        const msg = err?.response?.data?.error?.details?.[0]?.message || t('workflows.saveOutputError');
         toast.error(msg);
       });
-  }, [execution]);
+  }, [execution, t]);
 
   // ── Famílias e filtro do painel lateral ─────────────────────────────────────
   const families = getFamiliesList(lang);
@@ -1644,7 +1658,7 @@ export default function WorkflowEditorPage() {
 
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, lineHeight: 1 }}>
-            {workflow?.name || 'Workflow'}
+            {workflow?.name || t('workflows.defaultName')}
           </h1>
           {workflow?.description && (
             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
@@ -1656,26 +1670,26 @@ export default function WorkflowEditorPage() {
         {errors.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fca5a5', fontSize: '0.74rem' }}>
             <AlertCircle size={13} />
-            <span>{errors.length} erro{errors.length > 1 ? 's' : ''}</span>
+            <span>{t('workflows.errorCount', { count: errors.length })}</span>
           </div>
         )}
         {errors.length === 0 && nodes.filter(n => n.type === 'technique').length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#6ee7b7', fontSize: '0.74rem' }}>
             <CheckCircle2 size={13} />
-            <span>Pipeline válido</span>
+            <span>{t('workflows.pipelineValid')}</span>
           </div>
         )}
 
         {execution && (
           <button onClick={() => setShowResults(v => !v)} className="btn-ghost" style={{ fontSize: '0.78rem', gap: 5 }}>
             <GitBranch size={14} />
-            {showResults ? 'Ocultar resultados' : 'Resultados'}
+            {showResults ? t('workflows.hideResults') : t('workflows.results')}
           </button>
         )}
 
         <button onClick={() => setPanelOpen(v => !v)} className="btn-ghost" style={{ fontSize: '0.78rem', gap: 5 }}>
           <Settings2 size={14} />
-          {panelOpen ? 'Ocultar técnicas' : 'Técnicas'}
+          {panelOpen ? t('workflows.hideTechniques') : t('workflows.techniques')}
         </button>
 
         <button
@@ -1754,7 +1768,7 @@ export default function WorkflowEditorPage() {
                   color: 'var(--text-secondary)', fontSize: '0.8rem',
                 }}>
                   <GitBranch size={14} />
-                  <span>Arraste técnicas do painel lateral para o canvas</span>
+                  <span>{t('workflows.dragTechniquesHint')}</span>
                 </div>
               </Panel>
             )}
@@ -1899,7 +1913,7 @@ export default function WorkflowEditorPage() {
 
               {!techsLoading && groupedByFamily.length === 0 && (
                 <div style={{ padding: '24px 8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nenhuma técnica encontrada</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t('workflows.noTechniquesFound')}</p>
                 </div>
               )}
             </div>
@@ -1914,7 +1928,7 @@ export default function WorkflowEditorPage() {
                     type: 'dataset',
                     position: { x: 40, y: 60 + nodeCount.current * 110 },
                     data: {
-                      label: 'Dataset', datasetUuid: '',
+                      label: t('workflows.dataset'), datasetUuid: '',
                       datasets: datasetsList,
                       onChange: (nid, uuid, dsObj) => onDatasetChangeRef.current?.(nid, uuid, dsObj),
                       onPreview: (uuid) => onPreviewRef.current?.(uuid),

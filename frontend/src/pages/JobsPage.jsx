@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Search, RefreshCw, CheckCircle2, XCircle, Clock, Play, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import EmptyState from '../components/ui/EmptyState';
 import SkeletonCard from '../components/ui/SkeletonCard';
 
-const statusConfig = {
-  queued:    { label: 'Na fila',    color: 'slate', icon: Clock },
-  pending:   { label: 'Pendente',   color: 'amber', icon: Clock },
-  running:   { label: 'Executando', color: 'blue',  icon: Play },
-  done:      { label: 'Concluído',  color: 'green', icon: CheckCircle2 },
-  failed:    { label: 'Falhou',     color: 'red',   icon: XCircle },
-  cancelled: { label: 'Cancelado',  color: 'slate', icon: AlertCircle },
-};
-
 function JobRow({ job }) {
+  const { t, i18n } = useTranslation();
+  const statusConfig = {
+    queued:    { label: t('jobs.queued'),        color: 'slate', icon: Clock },
+    pending:   { label: t('jobs.statusPending'),  color: 'amber', icon: Clock },
+    running:   { label: t('jobs.running'),        color: 'blue',  icon: Play },
+    done:      { label: t('jobs.done'),           color: 'green', icon: CheckCircle2 },
+    failed:    { label: t('jobs.failed'),         color: 'red',   icon: XCircle },
+    cancelled: { label: t('jobs.cancelled'),      color: 'slate', icon: AlertCircle },
+  };
   const status = statusConfig[job.status] || statusConfig.pending;
   const StatusIcon = status.icon;
   return (
@@ -24,12 +25,12 @@ function JobRow({ job }) {
         <StatusIcon className={`w-4 h-4 text-${status.color}-400 ${job.status === 'running' ? 'anim-spin' : ''}`} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-white text-sm truncate">{job.name ?? `Job #${job.id ?? job.uuid?.slice(0, 8)}`}</div>
-        <div className="text-xs text-slate-400 mt-0.5 truncate">{job.job_type ?? 'execution'}</div>
+        <div className="font-medium text-white text-sm truncate">{job.name ?? t('jobs.jobNumberLabel', { id: job.id ?? job.uuid?.slice(0, 8) })}</div>
+        <div className="text-xs text-slate-400 mt-0.5 truncate">{job.job_type ?? t('jobs.defaultType')}</div>
       </div>
       <span className={`badge badge-${status.color} flex-shrink-0`}>{status.label}</span>
       <div className="text-xs text-slate-500 flex-shrink-0 hidden md:block">
-        {job.created_at && new Date(job.created_at).toLocaleString('pt-BR')}
+        {job.created_at && new Date(job.created_at).toLocaleString(i18n.language)}
       </div>
       {job.status === 'running' && job.progress != null && (
         <div className="w-20 flex-shrink-0">
@@ -44,6 +45,7 @@ function JobRow({ job }) {
 }
 
 export default function JobsPage() {
+  const { t, i18n } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const { data, loading, refetch } = useApi(api.jobs.list, []);
@@ -59,25 +61,34 @@ export default function JobsPage() {
     return matchSearch && matchStatus;
   });
 
+  const statusConfig = {
+    queued:    { label: t('jobs.queued') },
+    pending:   { label: t('jobs.statusPending') },
+    running:   { label: t('jobs.running') },
+    done:      { label: t('jobs.done') },
+    failed:    { label: t('jobs.failed') },
+    cancelled: { label: t('jobs.cancelled') },
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Jobs</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Monitor de execuções em andamento e finalizadas</p>
+          <h1 className="text-2xl font-bold text-white">{t('jobs.title')}</h1>
+          <p className="text-slate-400 text-sm mt-0.5">{t('jobs.subtitle')}</p>
         </div>
         <button onClick={refetch} className="btn-ghost flex items-center gap-2 text-sm">
-          <RefreshCw className="w-4 h-4" /> Atualizar
+          <RefreshCw className="w-4 h-4" /> {t('admin.refresh')}
         </button>
       </div>
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input className="input-field pl-10" placeholder="Buscar jobs..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="input-field pl-10" placeholder={t('jobs.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <select className="input-field w-40" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="">Todos status</option>
+          <option value="">{t('jobs.allStatuses')}</option>
           {Object.entries(statusConfig).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
       </div>
@@ -85,7 +96,7 @@ export default function JobsPage() {
       {loading ? (
         <div className="space-y-3">{Array(5).fill(0).map((_, i) => <SkeletonCard key={i} className="h-16" />)}</div>
       ) : jobs.length === 0 ? (
-        <EmptyState icon={Activity} title="Nenhum job" description={search || statusFilter ? 'Nenhum job com estes filtros.' : 'Nenhum job em execução no momento.'} />
+        <EmptyState icon={Activity} title={t('jobs.emptyTitle')} description={search || statusFilter ? t('jobs.emptyFiltered') : t('jobs.emptyNone')} />
       ) : (
         <div className="space-y-2">
           {jobs.map(j => <JobRow key={j.uuid ?? j.id} job={j} />)}

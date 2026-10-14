@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Users, MessageSquare, FolderOpen, Plus, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useApi, useMutation } from '../hooks/useApi';
 import { api } from '../api';
 import { useAuthStore } from '../store/auth';
@@ -24,6 +25,7 @@ function Avatar({ name, size = 8 }) {
 }
 
 export default function CommunityDetailPage() {
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const [tab, setTab] = useState('chat');
   const [message, setMessage] = useState('');
@@ -44,7 +46,7 @@ export default function CommunityDetailPage() {
   if (loading) return <div className="space-y-4"><SkeletonCard className="h-32" /><SkeletonCard className="h-96" /></div>;
 
   const community = raw?.data ?? raw;
-  if (!community) return <EmptyState icon={Users} title="Comunidade não encontrada" description="Esta comunidade não existe ou foi removida." />;
+  if (!community) return <EmptyState icon={Users} title={t('communities.notFound')} description={t('communities.notFoundDesc')} />;
 
   const messagesList = msgs?.data ?? msgs ?? [];
   const membersList = members?.data ?? members ?? [];
@@ -58,37 +60,37 @@ export default function CommunityDetailPage() {
   };
 
   const handleLinkProject = async () => {
-    if (!selectedProject) { toast.error('Selecione um projeto'); return; }
+    if (!selectedProject) { toast.error(t('communities.selectProjectError')); return; }
     const ok = await linkProject(selectedProject);
-    if (ok !== null) { toast.success('Projeto vinculado!'); setLinkProjectOpen(false); setSelectedProject(''); }
+    if (ok !== null) { toast.success(t('communities.projectLinked')); setLinkProjectOpen(false); setSelectedProject(''); }
   };
 
   return (
     <div className="space-y-6 flex flex-col h-full">
       <div>
         <Link to="/communities" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm mb-4">
-          <ArrowLeft className="w-4 h-4" /> Voltar às Comunidades
+          <ArrowLeft className="w-4 h-4" /> {t('communities.backToCommunities')}
         </Link>
         <div className="card p-6">
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white">{community.name}</h1>
-              <p className="text-slate-400 mt-1">{community.description || 'Sem descrição'}</p>
+              <p className="text-slate-400 mt-1">{community.description || t('common.noDescription')}</p>
               <div className="flex items-center gap-3 text-xs text-slate-500 mt-2">
-                <span><Users className="w-3 h-3 inline mr-1" />{membersList.length} membros</span>
+                <span><Users className="w-3 h-3 inline mr-1" />{t('communities.memberCount', { count: membersList.length })}</span>
               </div>
             </div>
             <button onClick={() => setLinkProjectOpen(true)} className="btn-primary text-sm flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" /> Vincular Projeto
+              <Plus className="w-3.5 h-3.5" /> {t('communities.linkProject')}
             </button>
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        <Tab active={tab === 'chat'} onClick={() => setTab('chat')}><MessageSquare className="w-4 h-4 inline mr-1.5" />Chat</Tab>
-        <Tab active={tab === 'projects'} onClick={() => setTab('projects')}><FolderOpen className="w-4 h-4 inline mr-1.5" />Projetos</Tab>
-        <Tab active={tab === 'members'} onClick={() => setTab('members')}><Users className="w-4 h-4 inline mr-1.5" />Membros</Tab>
+        <Tab active={tab === 'chat'} onClick={() => setTab('chat')}><MessageSquare className="w-4 h-4 inline mr-1.5" />{t('communities.tabChat')}</Tab>
+        <Tab active={tab === 'projects'} onClick={() => setTab('projects')}><FolderOpen className="w-4 h-4 inline mr-1.5" />{t('projects.title')}</Tab>
+        <Tab active={tab === 'members'} onClick={() => setTab('members')}><Users className="w-4 h-4 inline mr-1.5" />{t('communities.members')}</Tab>
       </div>
 
       {tab === 'chat' && (
@@ -96,7 +98,7 @@ export default function CommunityDetailPage() {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messagesList.length === 0 ? (
               <div className="h-full flex items-center justify-center">
-                <EmptyState icon={MessageSquare} title="Sem mensagens" description="Seja o primeiro a enviar uma mensagem!" />
+                <EmptyState icon={MessageSquare} title={t('communities.noMessagesTitle')} description={t('communities.noMessagesDesc')} />
               </div>
             ) : messagesList.map((msg, i) => {
               const isMe = msg.user_uuid === user?.uuid;
@@ -109,7 +111,7 @@ export default function CommunityDetailPage() {
                     <div className={`px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-slate-800 text-slate-200 rounded-tl-sm'}`}>
                       {msg.content}
                     </div>
-                    <span className="text-xs text-slate-600">{new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-xs text-slate-600">{new Date(msg.created_at).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
               );
@@ -118,7 +120,7 @@ export default function CommunityDetailPage() {
           </div>
           <div className="border-t border-white/10 p-3">
             <form onSubmit={handleSend} className="flex items-center gap-2">
-              <input className="input-field flex-1" placeholder="Escreva uma mensagem..." value={message} onChange={e => setMessage(e.target.value)} />
+              <input className="input-field flex-1" placeholder={t('communities.writeMessagePlaceholder')} value={message} onChange={e => setMessage(e.target.value)} />
               <button type="submit" disabled={sending || !message.trim()}
                 className="btn-primary p-2.5 flex-shrink-0">
                 <Send className="w-4 h-4" />
@@ -142,8 +144,8 @@ export default function CommunityDetailPage() {
               ))}
             </div>
           ) : (
-            <EmptyState icon={FolderOpen} title="Nenhum projeto vinculado" description="Vincule um projeto para compartilhar com a comunidade."
-              action={<button onClick={() => setLinkProjectOpen(true)} className="btn-primary">Vincular Projeto</button>} />
+            <EmptyState icon={FolderOpen} title={t('communities.noProjectsTitle')} description={t('communities.noProjectsDesc')}
+              action={<button onClick={() => setLinkProjectOpen(true)} className="btn-primary">{t('communities.linkProject')}</button>} />
           )}
         </div>
       )}
@@ -163,19 +165,19 @@ export default function CommunityDetailPage() {
         </div>
       )}
 
-      <Modal open={linkProjectOpen} onClose={() => setLinkProjectOpen(false)} title="Vincular Projeto" size="md">
+      <Modal open={linkProjectOpen} onClose={() => setLinkProjectOpen(false)} title={t('communities.linkProject')} size="md">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-blue-200 mb-1.5">Selecione um Projeto</label>
+            <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('communities.selectProjectLabel')}</label>
             <select className="input-field" value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
-              <option value="">-- Escolha --</option>
+              <option value="">{t('communities.chooseOption')}</option>
               {projectsList.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
             </select>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setLinkProjectOpen(false)} className="btn-ghost flex-1">Cancelar</button>
+            <button onClick={() => setLinkProjectOpen(false)} className="btn-ghost flex-1">{t('common.cancel')}</button>
             <button onClick={handleLinkProject} disabled={linking || !selectedProject} className="btn-primary flex-1">
-              {linking ? 'Vinculando...' : 'Vincular'}
+              {linking ? t('communities.linking') : t('communities.link')}
             </button>
           </div>
         </div>

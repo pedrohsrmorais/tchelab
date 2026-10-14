@@ -14,6 +14,7 @@
  */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { X, Info, Layers, Download, Grid3X3, Box, Waves, Rows3, LineChart as LineChartIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -437,6 +438,7 @@ function HeatMap2D({ matrix, rows, cols, axisLabels, exportRef }) {
 const MATRIX_CELL_LIMIT = 6000;
 
 function MatrixView({ matrix, rows, cols, axisLabels }) {
+  const { t } = useTranslation();
   const [compareMode, setCompareMode] = useState('rows'); // rows | cols
   const lineCount = compareMode === 'rows' ? rows : cols;
   const [idxA, setIdxA] = useState(0);
@@ -501,28 +503,28 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
         <div className="flex rounded-lg overflow-hidden border border-white/10">
           <button onClick={() => setCompareMode('rows')}
             className={`px-3 py-1.5 text-xs transition-colors ${compareMode === 'rows' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-            Comparar linhas
+            {t('datasets.multiDim.compareRows')}
           </button>
           <button onClick={() => setCompareMode('cols')}
             className={`px-3 py-1.5 text-xs transition-colors ${compareMode === 'cols' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-            Comparar colunas
+            {t('datasets.multiDim.compareCols')}
           </button>
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span style={{ color: '#fbbf24' }}>■</span> {compareMode === 'rows' ? 'Linha' : 'Coluna'} A
+          <span style={{ color: '#fbbf24' }}>■</span> {compareMode === 'rows' ? t('datasets.multiDim.rowWord') : t('datasets.multiDim.colWord')} A
           <select className="input-field py-1 px-2 text-xs" style={{ width: 70 }} value={idxA} onChange={e => setIdxA(Number(e.target.value))}>
             {Array.from({ length: lineCount }, (_, i) => <option key={i} value={i}>{i}</option>)}
           </select>
-          <span style={{ color: '#38bdf8' }}>■</span> {compareMode === 'rows' ? 'Linha' : 'Coluna'} B
+          <span style={{ color: '#38bdf8' }}>■</span> {compareMode === 'rows' ? t('datasets.multiDim.rowWord') : t('datasets.multiDim.colWord')} B
           <select className="input-field py-1 px-2 text-xs" style={{ width: 70 }} value={idxB} onChange={e => setIdxB(Number(e.target.value))}>
             {Array.from({ length: lineCount }, (_, i) => <option key={i} value={i}>{i}</option>)}
           </select>
         </div>
         {!tooBig && maxCell.ri !== -1 && (
           <div className="flex items-center gap-1.5 text-xs text-slate-500 sm:ml-auto">
-            <span style={{ color: '#fde725' }}>■</span> máx {fmt(maxCell.v)} [{rowLabel(maxCell.ri)}, {colLabel(maxCell.ci)}]
+            <span style={{ color: '#fde725' }}>■</span> {t('datasets.multiDim.maxWord')} {fmt(maxCell.v)} [{rowLabel(maxCell.ri)}, {colLabel(maxCell.ci)}]
             <span className="mx-1 text-slate-700">·</span>
-            <span style={{ color: '#a78bfa' }}>■</span> mín {fmt(minCell.v)} [{rowLabel(minCell.ri)}, {colLabel(minCell.ci)}]
+            <span style={{ color: '#a78bfa' }}>■</span> {t('datasets.multiDim.minWord')} {fmt(minCell.v)} [{rowLabel(minCell.ri)}, {colLabel(minCell.ci)}]
           </div>
         )}
       </div>
@@ -531,7 +533,7 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
         <div className="rounded-xl border border-white/10 overflow-auto p-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
           {tooBig ? (
             <div className="flex items-center justify-center h-full text-sm text-slate-500 text-center px-6">
-              Matriz grande demais ({rows}×{cols} = {rows * cols} valores) para exibir como números — use o Heatmap para esta fatia.
+              {t('datasets.multiDim.matrixTooBig', { rows, cols, total: rows * cols })}
             </div>
           ) : (
             <table className="border-collapse font-mono text-xs" style={{ color: '#cbd5e1' }}>
@@ -587,13 +589,13 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
 
         <div className="flex-shrink-0 rounded-xl border border-white/10 p-3" style={{ height: 180, background: 'rgba(255,255,255,0.03)' }}>
           <p className="text-xs text-slate-500 mb-1">
-            {compareMode === 'rows' ? 'Linha' : 'Coluna'} {idxA} × {compareMode === 'rows' ? 'Linha' : 'Coluna'} {idxB}
+            {compareMode === 'rows' ? t('datasets.multiDim.rowWord') : t('datasets.multiDim.colWord')} {idxA} × {compareMode === 'rows' ? t('datasets.multiDim.rowWord') : t('datasets.multiDim.colWord')} {idxB}
           </p>
           <div style={{ height: 'calc(100% - 18px)' }}>
             <LineChart
               series={[
-                { label: `${compareMode === 'rows' ? 'Linha' : 'Coluna'} ${idxA}`, values: getLine(idxA), color: '#fbbf24' },
-                { label: `${compareMode === 'rows' ? 'Linha' : 'Coluna'} ${idxB}`, values: getLine(idxB), color: '#38bdf8' },
+                { label: `${compareMode === 'rows' ? t('datasets.multiDim.rowWord') : t('datasets.multiDim.colWord')} ${idxA}`, values: getLine(idxA), color: '#fbbf24' },
+                { label: `${compareMode === 'rows' ? t('datasets.multiDim.rowWord') : t('datasets.multiDim.colWord')} ${idxB}`, values: getLine(idxB), color: '#38bdf8' },
               ]}
               xLabels={Array.from({ length: colWidth }, (_, i) => compareMode === 'rows' ? colLabel(i) : rowLabel(i))}
             />
@@ -609,6 +611,7 @@ function MatrixView({ matrix, rows, cols, axisLabels }) {
 // ---------------------------------------------------------------------------
 
 function Scene3D({ sizesForCamera, buildGroup, deps, exportRef }) {
+  const { t } = useTranslation();
   const mountRef = useRef(null);
 
   useEffect(() => {
@@ -731,7 +734,7 @@ function Scene3D({ sizesForCamera, buildGroup, deps, exportRef }) {
     <div className="relative w-full" style={{ height: '100%', minHeight: 400 }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', cursor: 'grab' }} />
       <div className="absolute top-3 right-4 text-xs text-slate-500 pointer-events-none">
-        Arraste para rotacionar · scroll para zoom
+        {t('datasets.multiDim.dragToRotate')}
       </div>
     </div>
   );
@@ -878,6 +881,7 @@ const ROLE_LABEL = { x: 'X', y: 'Y', z: 'Z' };
 const ROLE_COLOR = { x: '#60a5fa', y: '#f472b6', z: '#34d399' };
 
 function AxisPanel({ dims, roles, need, fixedIdx, onAssign, onFixedChange, onSwapXY }) {
+  const { t } = useTranslation();
   const roleOf = (di) => (['x', 'y', 'z'].slice(0, need).find(rn => roles[rn] === di)) ?? null;
 
   return (
@@ -887,23 +891,23 @@ function AxisPanel({ dims, roles, need, fixedIdx, onAssign, onFixedChange, onSwa
         return (
           <div key={di} className="flex items-center gap-2 px-3 py-2 rounded-lg"
             style={{ background: role ? `${ROLE_COLOR[role]}1f` : 'rgba(255,255,255,0.05)', border: `1px solid ${role ? ROLE_COLOR[role] + '55' : 'rgba(255,255,255,0.1)'}` }}>
-            <span className="text-xs font-semibold text-slate-400">Dim {di}</span>
+            <span className="text-xs font-semibold text-slate-400">{t('datasets.multiDim.dimLabel', { index: di })}</span>
             <span className="text-xs text-slate-500">({size})</span>
             <select
               value={role ?? 'fixed'}
               onChange={e => onAssign(di, e.target.value)}
               className="text-xs bg-transparent border-b focus:outline-none"
               style={{ color: role ? ROLE_COLOR[role] : '#93c5fd', borderColor: role ? ROLE_COLOR[role] + '55' : 'rgba(59,130,246,0.3)' }}>
-              <option value="fixed" style={{ background: '#1e293b' }}>Fixo</option>
+              <option value="fixed" style={{ background: '#1e293b' }}>{t('datasets.multiDim.fixed')}</option>
               {['x', 'y', 'z'].slice(0, need).map(rn => (
-                <option key={rn} value={rn} style={{ background: '#1e293b' }}>Eixo {ROLE_LABEL[rn]}</option>
+                <option key={rn} value={rn} style={{ background: '#1e293b' }}>{t('datasets.multiDim.axisPrefix')} {ROLE_LABEL[rn]}</option>
               ))}
             </select>
             {!role && (
               <select value={fixedIdx[di] ?? 0} onChange={e => onFixedChange(di, Number(e.target.value))}
                 className="text-xs bg-transparent text-slate-300 border-b border-white/15 focus:outline-none">
                 {Array.from({ length: size }, (_, i) => (
-                  <option key={i} value={i} style={{ background: '#1e293b' }}>índice {i}</option>
+                  <option key={i} value={i} style={{ background: '#1e293b' }}>{t('datasets.multiDim.indexOption', { index: i })}</option>
                 ))}
               </select>
             )}
@@ -912,7 +916,7 @@ function AxisPanel({ dims, roles, need, fixedIdx, onAssign, onFixedChange, onSwa
       })}
       {need === 2 && (
         <button onClick={onSwapXY} className="text-xs text-blue-400 hover:text-blue-300 underline ml-1">
-          ↔ trocar X/Y
+          {t('datasets.multiDim.swapXY')}
         </button>
       )}
     </div>
@@ -923,12 +927,14 @@ function AxisPanel({ dims, roles, need, fixedIdx, onAssign, onFixedChange, onSwa
 // MODOS DE VISUALIZAÇÃO
 // ---------------------------------------------------------------------------
 
+// Labels/descrições são traduzidos em runtime via t(`datasets.multiDim.modes.${key}.label|desc`),
+// já que este array é um módulo-level constant e não tem acesso ao `t()`.
 const MODES = [
-  { key: 'line', label: 'Linha', need: 1, icon: LineChartIcon, color: '#38bdf8', desc: 'Espectro/perfil ao longo de 1 eixo' },
-  { key: 'heatmap', label: 'Heatmap', need: 2, icon: Grid3X3, color: '#3b82f6', desc: 'Cor representa o valor' },
-  { key: 'surface', label: 'Surface 3D', need: 2, icon: Waves, color: '#22d3ee', desc: 'Altura + cor representam o valor' },
-  { key: 'matrix', label: 'Matriz', need: 2, icon: Rows3, color: '#a78bfa', desc: 'Números reais, compare linhas ou colunas' },
-  { key: 'voxel', need: 3, label: 'Voxel 3D', icon: Box, color: '#f472b6', desc: 'Células coloridas no espaço (3 eixos espaciais)' },
+  { key: 'line', need: 1, icon: LineChartIcon, color: '#38bdf8' },
+  { key: 'heatmap', need: 2, icon: Grid3X3, color: '#3b82f6' },
+  { key: 'surface', need: 2, icon: Waves, color: '#22d3ee' },
+  { key: 'matrix', need: 2, icon: Rows3, color: '#a78bfa' },
+  { key: 'voxel', need: 3, icon: Box, color: '#f472b6' },
 ];
 
 function defaultRoles(ndim, need) {
@@ -965,6 +971,7 @@ function adjustRolesForNeed(prevRoles, need, ndim) {
 // ---------------------------------------------------------------------------
 
 function VizModal({ title, subtitle, onClose, onExport, exporting, exportDisabled, children }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -980,11 +987,11 @@ function VizModal({ title, subtitle, onClose, onExport, exporting, exportDisable
           {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onExport} disabled={exporting || exportDisabled} title={exportDisabled ? 'Exportação indisponível na visão matricial' : undefined}
+          <button onClick={onExport} disabled={exporting || exportDisabled} title={exportDisabled ? t('datasets.multiDim.exportDisabledTooltip') : undefined}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40"
             style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>
             <Download className="w-3.5 h-3.5" />
-            {exporting ? 'Exportando…' : 'Salvar PDF'}
+            {exporting ? t('datasets.multiDim.exporting') : t('datasets.multiDim.savePdf')}
           </button>
           <button onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
@@ -1004,6 +1011,7 @@ function VizModal({ title, subtitle, onClose, onExport, exporting, exportDisable
 // ---------------------------------------------------------------------------
 
 export default function MultiDimModal({ dataset, onClose }) {
+  const { t } = useTranslation();
   const canvasExportRef = useRef(null);
   const [exporting, setExporting] = useState(false);
 
@@ -1093,14 +1101,14 @@ export default function MultiDimModal({ dataset, onClose }) {
   const lineSeries = useMemo(() => {
     if (mode !== 'line' || !sliced || sliced.kind !== 'line') return [];
     if (overlayDim == null || !overlayIndices.length) {
-      return [{ label: `fixo: ${fixedDims.map(d => `dim${d}=${fixedIdx[d] ?? 0}`).join(', ') || '—'}`, values: sliced.values }];
+      return [{ label: `${t('datasets.multiDim.fixedPrefix')}: ${fixedDims.map(d => `dim${d}=${fixedIdx[d] ?? 0}`).join(', ') || '—'}`, values: sliced.values }];
     }
     return overlayIndices.map((idx, i) => ({
       label: `dim${overlayDim}=${idx}`,
       values: sliceLineWithOverride(tensor, dims, axisOrder[0], fixedIdx, overlayDim, idx),
       color: SERIES_COLORS[i % SERIES_COLORS.length],
     }));
-  }, [mode, sliced, overlayDim, overlayIndices, fixedDims, fixedIdx, tensor, dims, axisOrder]);
+  }, [mode, sliced, overlayDim, overlayIndices, fixedDims, fixedIdx, tensor, dims, axisOrder, t]);
 
   const handleExport = useCallback(() => {
     setExporting(true);
@@ -1138,8 +1146,8 @@ export default function MultiDimModal({ dataset, onClose }) {
             <Info className="w-10 h-10 opacity-40" />
             <p className="text-sm text-center">
               {!tensor
-                ? 'Os dados numéricos deste dataset não foram carregados ou não suportam visualização matricial.'
-                : 'Dimensões do dataset não encontradas nos metadados.'}
+                ? t('datasets.multiDim.noTensorData')
+                : t('datasets.multiDim.noDimensions')}
             </p>
           </div>
         </div>
@@ -1149,7 +1157,7 @@ export default function MultiDimModal({ dataset, onClose }) {
 
   return (
     <VizModal
-      title="Visualização Multidimensional"
+      title={t('datasets.multiDim.title')}
       subtitle={`${dataset?.name} · ${dims.join(' × ')} (${ndim}D)`}
       onClose={onClose}
       onExport={handleExport}
@@ -1169,9 +1177,9 @@ export default function MultiDimModal({ dataset, onClose }) {
                   border: `1px solid ${active ? m.color + '77' : 'rgba(255,255,255,0.08)'}`,
                   color: active ? m.color : '#94a3b8',
                 }}
-                title={m.desc}>
+                title={t(`datasets.multiDim.modes.${m.key}.desc`)}>
                 <Icon className="w-3.5 h-3.5" />
-                {m.label}
+                {t(`datasets.multiDim.modes.${m.key}.label`)}
               </button>
             );
           })}
@@ -1179,7 +1187,7 @@ export default function MultiDimModal({ dataset, onClose }) {
 
         {/* Seleção de eixos */}
         <div className="flex-shrink-0 rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Eixos ({modeInfo?.desc})</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('datasets.multiDim.axesLabel', { desc: modeInfo ? t(`datasets.multiDim.modes.${modeInfo.key}.desc`) : '' })}</p>
           <AxisPanel dims={dims} roles={roles} need={need} fixedIdx={fixedIdx}
             onAssign={assignRole}
             onFixedChange={(di, v) => setFixedIdx(prev => ({ ...prev, [di]: v }))}
@@ -1187,15 +1195,15 @@ export default function MultiDimModal({ dataset, onClose }) {
 
           {mode === 'line' && fixedDims.length > 0 && (
             <div className="mt-3 pt-3 flex flex-wrap items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <span className="text-xs text-slate-500">Comparar múltiplas fatias:</span>
+              <span className="text-xs text-slate-500">{t('datasets.multiDim.compareMultipleSlices')}</span>
               <select className="input-field py-1 px-2 text-xs" style={{ width: 140 }}
                 value={overlayDim ?? ''} onChange={e => {
                   const v = e.target.value === '' ? null : Number(e.target.value);
                   setOverlayDim(v);
                   setOverlayIndices(v == null ? [] : [fixedIdx[v] ?? 0]);
                 }}>
-                <option value="">nenhuma</option>
-                {fixedDims.map(d => <option key={d} value={d}>dim {d} ({dims[d]})</option>)}
+                <option value="">{t('datasets.multiDim.none')}</option>
+                {fixedDims.map(d => <option key={d} value={d}>{t('datasets.multiDim.dimOption', { index: d, size: dims[d] })}</option>)}
               </select>
               {overlayDim != null && (
                 <div className="flex flex-wrap gap-1.5 max-w-xl">
@@ -1221,7 +1229,7 @@ export default function MultiDimModal({ dataset, onClose }) {
         <div className="flex-1 min-h-0">
           {!sliced ? (
             <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-              Escolha {need} eixo{need > 1 ? 's' : ''} ({['X', 'Y', 'Z'].slice(0, need).join(', ')}) para visualizar.
+              {t(need > 1 ? 'datasets.multiDim.chooseAxesPlural' : 'datasets.multiDim.chooseAxesSingle', { count: need, axes: ['X', 'Y', 'Z'].slice(0, need).join(', ') })}
             </div>
           ) : mode === 'line' ? (
             <LineChart series={lineSeries} xLabels={axisLabels?.x} exportRef={canvasExportRef} />

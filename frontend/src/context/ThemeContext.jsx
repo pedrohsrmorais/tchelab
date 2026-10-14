@@ -1,10 +1,17 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-const ThemeContext = createContext({ theme: 'dark', toggle: () => {} });
+export const THEMES = ['dark', 'light', 'classic'];
+
+const ThemeContext = createContext({ theme: 'dark', setTheme: () => {} });
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem('tchelab_theme') || 'dark'; } catch { return 'dark'; }
+  const [theme, setThemeState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tchelab_theme');
+      return THEMES.includes(saved) ? saved : 'dark';
+    } catch {
+      return 'dark';
+    }
   });
 
   useEffect(() => {
@@ -13,10 +20,15 @@ export function ThemeProvider({ children }) {
     try { localStorage.setItem('tchelab_theme', theme); } catch {}
   }, [theme]);
 
-  const toggle = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'));
+  const setTheme = (next) => {
+    if (THEMES.includes(next)) setThemeState(next);
+  };
+
+  // Mantido por compatibilidade com código antigo que só conhecia dark/light.
+  const toggle = () => setThemeState(t => (t === 'dark' ? 'light' : 'dark'));
 
   return (
-    <ThemeContext.Provider value={{ theme, toggle }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggle }}>
       {children}
     </ThemeContext.Provider>
   );

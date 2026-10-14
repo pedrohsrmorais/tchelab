@@ -7,8 +7,8 @@ export function EmptyState({ icon: Icon, title, description, action }) {
         </div>
       )}
       <div>
-        <h3 style={{ fontWeight:600, color:'#fff', marginBottom:'0.5rem' }}>{title}</h3>
-        {description && <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.875rem' }}>{description}</p>}
+        <h3 style={{ fontWeight:600, color:'var(--text-primary)', marginBottom:'0.5rem' }}>{title}</h3>
+        {description && <p style={{ color:'var(--text-muted)', fontSize:'0.875rem' }}>{description}</p>}
       </div>
       {action && action}
     </div>

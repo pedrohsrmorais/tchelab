@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, FlaskConical, Mail, Lock, User, ArrowRight, Sparkles, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/auth';
 
 // Utility style for inputs with left icon — ensures text never overlaps the icon
@@ -61,6 +62,7 @@ const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
 }));
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { login } = useAuthStore();
   const [tab, setTab] = useState('login'); // 'login' | 'register'
@@ -75,7 +77,7 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginForm.email || !loginForm.password) {
-      toast.error('Preencha todos os campos.');
+      toast.error(t('auth.fillAllFields'));
       return;
     }
     setLoading(true);
@@ -89,30 +91,30 @@ export default function LoginPage() {
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!regForm.name || !regForm.email || !regForm.password || !regForm.inviteCode) {
-      toast.error('Preencha todos os campos.');
+      toast.error(t('auth.fillAllFields'));
       return;
     }
     if (regForm.inviteCode.trim() !== INVITE_CODE) {
-      toast.error('Código de convite inválido.');
+      toast.error(t('auth.invalidInviteCode'));
       return;
     }
     if (regForm.password !== regForm.confirm) {
-      toast.error('As senhas não coincidem.');
+      toast.error(t('auth.passwordMismatch'));
       return;
     }
     if (regForm.password.length < 8) {
-      toast.error('Senha deve ter ao menos 8 caracteres.');
+      toast.error(t('auth.passwordMinLength'));
       return;
     }
     setLoading(true);
     try {
       const { api } = await import('../../api');
       await api.auth.register({ name: regForm.name, email: regForm.email, password: regForm.password });
-      toast.success('Conta criada! Faça login.');
+      toast.success(t('auth.accountCreated'));
       setTab('login');
       setLoginForm({ email: regForm.email, password: '' });
     } catch (err) {
-      toast.error(err?.response?.data?.error?.message || 'Erro ao criar conta.');
+      toast.error(err?.response?.data?.error?.message || t('auth.createAccountError'));
     } finally {
       setLoading(false);
     }
@@ -162,7 +164,7 @@ export default function LoginPage() {
           <p
             className="text-blue-300 mt-1 text-sm"
           >
-            Plataforma de Análises Quimiométricas
+            {t('auth.tagline')}
           </p>
         </div>
 
@@ -178,18 +180,18 @@ export default function LoginPage() {
         >
           {/* Tabs */}
           <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'rgba(30, 41, 59, 0.8)' }}>
-            {['login', 'register'].map(t => (
+            {['login', 'register'].map(tabKey => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
                 className="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200"
                 style={{
-                  background: tab === t ? 'linear-gradient(135deg, #1d4ed8, #2563eb)' : 'transparent',
-                  color: tab === t ? '#fff' : '#94a3b8',
-                  boxShadow: tab === t ? '0 4px 12px rgba(37, 99, 235, 0.4)' : 'none',
+                  background: tab === tabKey ? 'linear-gradient(135deg, #1d4ed8, #2563eb)' : 'transparent',
+                  color: tab === tabKey ? '#fff' : '#94a3b8',
+                  boxShadow: tab === tabKey ? '0 4px 12px rgba(37, 99, 235, 0.4)' : 'none',
                 }}
               >
-                {t === 'login' ? 'Entrar' : 'Criar Conta'}
+                {tabKey === 'login' ? t('auth.login') : t('auth.createAccount')}
               </button>
             ))}
           </div>
@@ -201,7 +203,7 @@ export default function LoginPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('auth.email')}</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                   <input
@@ -210,13 +212,13 @@ export default function LoginPage() {
                     onChange={e => setLoginForm(f => ({ ...f, email: e.target.value }))}
                     className="input-field"
                     style={iconInput}
-                    placeholder="seu@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     autoComplete="email"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('auth.password')}</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                   <input
@@ -225,7 +227,7 @@ export default function LoginPage() {
                     onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
                     className="input-field"
                     style={iconInputRight}
-                    placeholder="••••••••"
+                    placeholder={t('auth.passwordPlaceholder')}
                     autoComplete="current-password"
                   />
                   <button type="button" onClick={() => setShowPass(v => !v)}
@@ -243,11 +245,11 @@ export default function LoginPage() {
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <span className="anim-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                    Entrando...
+                    {t('auth.loggingIn')}
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    Entrar <ArrowRight className="w-4 h-4" />
+                    {t('auth.login')} <ArrowRight className="w-4 h-4" />
                   </span>
                 )}
               </button>
@@ -259,7 +261,7 @@ export default function LoginPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Nome</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('common.name')}</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                   <input
@@ -268,12 +270,12 @@ export default function LoginPage() {
                     onChange={e => setRegForm(f => ({ ...f, name: e.target.value }))}
                     className="input-field"
                     style={iconInput}
-                    placeholder="Seu nome completo"
+                    placeholder={t('auth.namePlaceholder')}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">E-mail</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('auth.email')}</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                   <input
@@ -282,12 +284,12 @@ export default function LoginPage() {
                     onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))}
                     className="input-field"
                     style={iconInput}
-                    placeholder="seu@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Senha</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('auth.password')}</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                   <input
@@ -296,7 +298,7 @@ export default function LoginPage() {
                     onChange={e => setRegForm(f => ({ ...f, password: e.target.value }))}
                     className="input-field"
                     style={iconInputRight}
-                    placeholder="Mín. 8 caracteres"
+                    placeholder={t('auth.minPasswordPlaceholder')}
                   />
                   <button type="button" onClick={() => setShowPass(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300 transition-colors">
@@ -305,7 +307,7 @@ export default function LoginPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Confirmar Senha</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('auth.confirmPassword')}</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                   <input
@@ -314,12 +316,12 @@ export default function LoginPage() {
                     onChange={e => setRegForm(f => ({ ...f, confirm: e.target.value }))}
                     className="input-field"
                     style={iconInput}
-                    placeholder="Repita a senha"
+                    placeholder={t('auth.confirmPasswordPlaceholder')}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-1.5">Código de Convite</label>
+                <label className="block text-sm font-medium text-blue-200 mb-1.5">{t('auth.inviteCode')}</label>
                 <div className="relative">
                   <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
                   <input
@@ -328,7 +330,7 @@ export default function LoginPage() {
                     onChange={e => setRegForm(f => ({ ...f, inviteCode: e.target.value }))}
                     className="input-field"
                     style={iconInput}
-                    placeholder="Código de acesso"
+                    placeholder={t('auth.inviteCodePlaceholder')}
                     autoComplete="off"
                   />
                 </div>
@@ -342,11 +344,11 @@ export default function LoginPage() {
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <span className="anim-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                    Criando conta...
+                    {t('auth.creatingAccount')}
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" /> Criar Conta
+                    <Sparkles className="w-4 h-4" /> {t('auth.createAccount')}
                   </span>
                 )}
               </button>
@@ -355,7 +357,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-blue-400/50 mt-6">
-          TcheLab © {new Date().getFullYear()} — Análises Quimiométricas
+          {t('auth.footer', { year: new Date().getFullYear() })}
         </p>
       </div>
     </div>

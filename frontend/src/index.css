@@ -77,6 +77,81 @@
   --shadow-lg:      0 8px 32px rgba(0,0,0,0.14);
 }
 
+/* ─── Design tokens: Classic (estilo MATLAB / desktop corporativo) ──────────── */
+/* Paleta branco/cinza, bordas quase quadradas, sombras planas, sem blur nem    */
+/* gradientes decorativos. As animações/transições não são removidas com      */
+/* `none` (isso quebraria código que espera o evento animationend/transitionend */
+/* disparar, como a transição de página em AppLayout.jsx) — em vez disso a     */
+/* duração é reduzida a ~0 mais abaixo, o que preserva o comportamento do JS   */
+/* mas visualmente remove o movimento.                                        */
+[data-theme="classic"] {
+  --bg-base:        #e4e4e4;
+  --bg-surface:     #ececec;
+  --bg-elevated:    #ffffff;
+  --bg-hover:       #dcdcdc;
+  --bg-card:        #ffffff;
+  --bg-card-hover:  #f5f5f5;
+
+  --border:         #b5b5b5;
+  --border-active:  #0a5fa8;
+  --border-strong:  #9a9a9a;
+
+  --text-primary:   #1a1a1a;
+  --text-secondary: #4d4d4d;
+  --text-muted:     #8a8a8a;
+  --text-accent:    #0a5fa8;
+
+  --accent:         #0a5fa8;
+  --accent-hover:   #0d6fc2;
+  --accent-glow:    rgba(10,95,168,0.25);
+
+  --success:        #1f7a3d;
+  --warning:        #b8860b;
+  --danger:         #b00020;
+  --info:           #2e6da4;
+
+  --radius-sm:      2px;
+  --radius:         3px;
+  --radius-lg:      4px;
+  --radius-xl:      4px;
+
+  --shadow-sm:      0 1px 2px rgba(0,0,0,0.18);
+  --shadow:         0 1px 3px rgba(0,0,0,0.22);
+  --shadow-lg:      0 2px 6px rgba(0,0,0,0.28);
+
+  --font-sans:      'Segoe UI', Tahoma, Arial, sans-serif;
+  --font-mono:      'Consolas', 'Courier New', monospace;
+}
+
+/* Sem blur/glass, sem gradientes de fundo, sem "lift" no hover dos cards */
+[data-theme="classic"] * {
+  backdrop-filter: none !important;
+}
+[data-theme="classic"] .mesh-bg {
+  background: var(--bg-surface) !important;
+}
+[data-theme="classic"] .glass,
+[data-theme="classic"] .glass-strong {
+  background: var(--bg-elevated) !important;
+}
+[data-theme="classic"] .card-hover:hover {
+  transform: none !important;
+}
+[data-theme="classic"] .badge {
+  border-radius: var(--radius-sm);
+}
+
+/* "Menos animações": duração quase zero em vez de `none`, pra não quebrar
+   código que espera o evento animationend/transitionend (ex.: troca de
+   página em AppLayout.jsx, que só atualiza o conteúdo quando a animação de
+   saída termina). Visualmente some o movimento; funcionalmente nada quebra. */
+[data-theme="classic"] * {
+  transition-duration: 0.001s !important;
+  transition-delay: 0s !important;
+  animation-duration: 0.001s !important;
+  animation-delay: 0s !important;
+}
+
 /* ─── Base reset ───────────────────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
@@ -387,9 +462,85 @@
 }
 .react-flow__attribution { display: none !important; }
 
+/* ─── Remapeamento de utilitários Tailwind "fixos" pro sistema de temas ────── */
+/* Boa parte da UI foi escrita usando classes Tailwind estáticas (text-white,
+   text-slate-400, bg-white/5, border-white/10...) pensando só no tema escuro
+   original, em vez das variáveis de tema (--text-primary, --bg-card etc) que
+   .card, .btn-primary e .badge já usam. Resultado: em light/classic esses textos e
+   bordas ficam quase invisíveis (texto branco em fundo branco). Em vez de
+   editar centenas de ocorrências de className espalhadas por ~20 arquivos,
+   essas classes são remapeadas aqui pros tokens de tema — mesma estratégia já
+   usada acima pra blur/animação do Classic. Dark não é tocado (mantém o visual
+   original, que já é correto pra ele). */
+[data-theme="light"] .text-white,
+[data-theme="classic"] .text-white,
+[data-theme="light"] .hover\:text-white:hover,
+[data-theme="classic"] .hover\:text-white:hover {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .text-slate-200,
+[data-theme="light"] .text-slate-300,
+[data-theme="classic"] .text-slate-200,
+[data-theme="classic"] .text-slate-300 {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .text-slate-400,
+[data-theme="light"] .text-slate-500,
+[data-theme="classic"] .text-slate-400,
+[data-theme="classic"] .text-slate-500 {
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] .text-slate-600,
+[data-theme="light"] .text-slate-700,
+[data-theme="classic"] .text-slate-600,
+[data-theme="classic"] .text-slate-700 {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .bg-white\/5,
+[data-theme="light"] .bg-white\/10,
+[data-theme="light"] .hover\:bg-white\/5:hover,
+[data-theme="light"] .hover\:bg-white\/10:hover,
+[data-theme="classic"] .bg-white\/5,
+[data-theme="classic"] .bg-white\/10,
+[data-theme="classic"] .hover\:bg-white\/5:hover,
+[data-theme="classic"] .hover\:bg-white\/10:hover {
+  background-color: var(--bg-hover) !important;
+}
+[data-theme="light"] .border-white\/5,
+[data-theme="light"] .border-white\/10,
+[data-theme="light"] .border-white\/15,
+[data-theme="light"] .border-white\/20,
+[data-theme="light"] .border-white\/30,
+[data-theme="classic"] .border-white\/5,
+[data-theme="classic"] .border-white\/10,
+[data-theme="classic"] .border-white\/15,
+[data-theme="classic"] .border-white\/20,
+[data-theme="classic"] .border-white\/30 {
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .bg-slate-600,
+[data-theme="light"] .bg-slate-700,
+[data-theme="light"] .bg-slate-800,
+[data-theme="classic"] .bg-slate-600,
+[data-theme="classic"] .bg-slate-700,
+[data-theme="classic"] .bg-slate-800 {
+  background-color: var(--bg-hover) !important;
+}
+
 /* ─── Light mode badge fix ─────────────────────────────────────────────────── */
 [data-theme="light"] .badge-blue   { background: rgba(59,130,246,0.12);  color: #1d4ed8; }
 [data-theme="light"] .badge-green  { background: rgba(16,185,129,0.12);  color: #059669; }
 [data-theme="light"] .badge-amber  { background: rgba(245,158,11,0.12);  color: #b45309; }
 [data-theme="light"] .badge-red    { background: rgba(239,68,68,0.12);   color: #b91c1c; }
 [data-theme="light"] .badge-purple { background: rgba(168,85,247,0.12);  color: #7c3aed; }
+[data-theme="light"] .badge-plus,
+[data-theme="classic"] .badge-plus {
+  background: linear-gradient(135deg, rgba(168,85,247,0.14), rgba(59,130,246,0.14));
+  color: #6d28d9;
+  border-color: rgba(168,85,247,0.35);
+}
+[data-theme="classic"] .badge-blue   { background: rgba(10,95,168,0.1);   color: #0a5fa8; }
+[data-theme="classic"] .badge-green  { background: rgba(31,122,61,0.1);   color: #1f7a3d; }
+[data-theme="classic"] .badge-amber  { background: rgba(184,134,11,0.1);  color: #8a6508; }
+[data-theme="classic"] .badge-red    { background: rgba(176,0,32,0.1);    color: #b00020; }
+[data-theme="classic"] .badge-purple { background: rgba(124,58,237,0.1);  color: #6d28d9; }

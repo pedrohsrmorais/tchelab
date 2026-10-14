@@ -12,6 +12,7 @@
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Sigma, Loader2, CheckCircle2, XCircle, ArrowRight, Database } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '../ui/Modal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../api';
@@ -26,18 +27,13 @@ function parseJsonField(value, fallback) {
 // enorme e sem contexto na cara do usuário.
 function groupBySubcategory(techniques) {
   const groups = {};
-  for (const t of techniques) {
-    const key = t.subcategory || t.family || 'Outras';
+  for (const tech of techniques) {
+    const key = tech.subcategory || tech.family || 'other';
     if (!groups[key]) groups[key] = [];
-    groups[key].push(t);
+    groups[key].push(tech);
   }
   return groups;
 }
-
-const SUBCATEGORY_LABELS = {
-  algebra_linear: 'Álgebra Linear',
-  estatistica_basica: 'Estatística Básica',
-};
 
 function ParamField({ name, spec, value, onChange }) {
   const type = spec?.type;
@@ -108,6 +104,7 @@ function ParamField({ name, spec, value, onChange }) {
 }
 
 export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
+  const { t } = useTranslation();
   const ndim = useMemo(() => {
     const dims = parseJsonField(dataset?.dimensions, null);
     return Array.isArray(dims) ? dims.length : null;
@@ -152,28 +149,28 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
   const inputSchema = useMemo(() => parseJsonField(selected?.input_schema, {}), [selected]);
   const extraKeys = useMemo(() => Object.keys(inputSchema || {}).slice(1), [inputSchema]);
 
-  const pickTechnique = useCallback((t) => {
-    setSelected(t);
+  const pickTechnique = useCallback((tech) => {
+    setSelected(tech);
     setParamValues({});
-    const schema = parseJsonField(t.parameter_schema, {});
+    const schema = parseJsonField(tech.parameter_schema, {});
     const defaults = {};
     for (const [k, spec] of Object.entries(schema || {})) {
       if (spec?.default !== undefined) defaults[k] = spec.default;
     }
     setParamValues(defaults);
     const extras = {};
-    for (const k of Object.keys(parseJsonField(t.input_schema, {}) || {}).slice(1)) {
+    for (const k of Object.keys(parseJsonField(tech.input_schema, {}) || {}).slice(1)) {
       extras[k] = { mode: 'literal', literalText: '', datasetId: '' };
     }
     setExtraInputs(extras);
-    setWorkflowName(`${t.name} em "${dataset?.name}"`);
+    setWorkflowName(`${tech.name} ${t('datasets.quickOp.workflowNameConnector')} "${dataset?.name}"`);
     setStep('configure');
-  }, [dataset]);
+  }, [dataset, t]);
 
   async function handleSubmit() {
     setSubmitError(null);
     if (!workflowName.trim()) {
-      setSubmitError('Dê um nome ao workflow desta operação (ex: "Transformação teste 1").');
+      setSubmitError(t('datasets.quickOp.nameWorkflowError'));
       return;
     }
 
@@ -182,11 +179,11 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
     for (const key of extraKeys) {
       const cfg = extraInputs[key] || {};
       if (cfg.mode === 'dataset') {
-        if (!cfg.datasetId) { setSubmitError(`Escolha um dataset para "${key}".`); return; }
+        if (!cfg.datasetId) { setSubmitError(t('datasets.quickOp.chooseDatasetError', { key })); return; }
         resolvedExtraInputs[key] = { type: 'dataset', dataset_id: cfg.datasetId };
       } else {
         let value = cfg.literalText;
-        if (value === '' || value == null) { setSubmitError(`Informe um valor para "${key}".`); return; }
+        if (value === '' || value == null) { setSubmitError(t('datasets.quickOp.provideValueError', { key })); return; }
         try { value = JSON.parse(value); } catch { /* mantém como número/string crua */
           const asNum = Number(value);
           if (!Number.isNaN(asNum)) value = asNum;
@@ -202,7 +199,7 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
       let v = paramValues[k];
       if (v === undefined || v === null || v === '') continue;
       if ((spec?.type === 'array' || spec?.type === 'object') && typeof v === 'string') {
-        try { v = JSON.parse(v); } catch { setSubmitError(`"${k}" precisa ser um JSON válido.`); return; }
+        try { v = JSON.parse(v); } catch { setSubmitError(t('datasets.quickOp.invalidJsonError', { key: k })); return; }
       }
       params[k] = v;
     }
@@ -240,7 +237,7 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
           return;
         }
         if (attempts < 40) setTimeout(tick, 1500);
-        else { setStep('error'); setSubmitError('A operação está demorando mais que o esperado. Verifique a lista de workflows.'); }
+        else { setStep('error'); setSubmitError(t('datasets.quickOp.timeoutError')); }
       } catch (e) {
         setStep('error');
         setSubmitError(e.response?.data?.error?.message || e.message);
@@ -250,37 +247,37 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
   }
 
   return (
-    <Modal open onClose={onClose} title="Realizar operação matricial" size="lg">
+    <Modal open onClose={onClose} title={t('datasets.quickOp.title')} size="lg">
       {step === 'pick' && (
         <div className="space-y-5">
           <p className="text-sm text-slate-400">
-            Escolha a operação a aplicar em <strong className="text-slate-200">{dataset?.name}</strong>.
-            {ndim != null && <> Este dataset tem <strong className="text-slate-200">{ndim}</strong> dimensão{ndim !== 1 ? 'ões' : ''}.</>}
+            {t('datasets.quickOp.chooseOperation', { name: dataset?.name })}
+            {ndim != null && <> {t(ndim !== 1 ? 'datasets.quickOp.dimensionCountPlural' : 'datasets.quickOp.dimensionCountSingle', { count: ndim })}</>}
           </p>
 
-          {loadingTech && <div className="flex items-center gap-2 text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Carregando técnicas…</div>}
+          {loadingTech && <div className="flex items-center gap-2 text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> {t('datasets.quickOp.loadingTechniques')}</div>}
 
           {!loadingTech && Object.keys(grouped).length === 0 && (
-            <p className="text-sm text-amber-400">Nenhuma operação compatível com as dimensões deste dataset foi encontrada.</p>
+            <p className="text-sm text-amber-400">{t('datasets.quickOp.noCompatibleOps')}</p>
           )}
 
           {Object.entries(grouped).map(([group, items]) => (
             <div key={group}>
               <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                {SUBCATEGORY_LABELS[group] || group}
+                {t(`datasets.quickOp.subcategories.${group}`, { defaultValue: group })}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {items.map((t) => (
+                {items.map((tech) => (
                   <button
-                    key={t.uuid}
-                    onClick={() => pickTechnique(t)}
+                    key={tech.uuid}
+                    onClick={() => pickTechnique(tech)}
                     className="text-left p-3 rounded-lg border border-white/10 hover:border-blue-400/50 hover:bg-blue-500/10 transition-all"
                   >
                     <div className="flex items-center gap-2">
                       <Sigma className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                      <span className="text-sm font-medium text-slate-200">{t.name}</span>
+                      <span className="text-sm font-medium text-slate-200">{tech.name}</span>
                     </div>
-                    {t.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{t.description}</p>}
+                    {tech.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{tech.description}</p>}
                   </button>
                 ))}
               </div>
@@ -291,7 +288,7 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
 
       {step === 'configure' && selected && (
         <div className="space-y-5">
-          <button onClick={() => setStep('pick')} className="text-xs text-slate-400 hover:text-white">← Escolher outra operação</button>
+          <button onClick={() => setStep('pick')} className="text-xs text-slate-400 hover:text-white">{t('datasets.quickOp.chooseAnother')}</button>
 
           <div className="flex items-center gap-2">
             <Sigma className="w-5 h-5 text-blue-400" />
@@ -301,16 +298,16 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
 
           {/* Nome do workflow — toda operação, mesmo rápida, fica salva como um workflow real */}
           <label className="block">
-            <span className="text-xs text-slate-400 block mb-1">Nome do workflow <span className="text-red-400">*</span></span>
+            <span className="text-xs text-slate-400 block mb-1">{t('datasets.quickOp.workflowNameLabel')} <span className="text-red-400">*</span></span>
             <input
               type="text"
               className="input-field w-full"
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder='Ex: "Transformação teste 1"'
+              placeholder={t('datasets.quickOp.workflowNamePlaceholder')}
             />
             <span className="text-[11px] text-slate-500 block mt-1">
-              Esta operação será salva como um workflow de verdade na sua lista de workflows, mesmo sendo executada aqui de forma rápida.
+              {t('datasets.quickOp.workflowNameHint')}
             </span>
           </label>
 
@@ -319,28 +316,28 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
             const cfg = extraInputs[key] || { mode: 'literal', literalText: '', datasetId: '' };
             return (
               <div key={key} className="p-3 rounded-lg border border-white/10 space-y-2">
-                <span className="text-xs text-slate-400 block">Segunda entrada ("{key}")</span>
+                <span className="text-xs text-slate-400 block">{t('datasets.quickOp.secondInput', { key })}</span>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setExtraInputs((p) => ({ ...p, [key]: { ...cfg, mode: 'literal' } }))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium ${cfg.mode === 'literal' ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400'}`}
                   >
-                    Valor literal
+                    {t('datasets.quickOp.literalValue')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setExtraInputs((p) => ({ ...p, [key]: { ...cfg, mode: 'dataset' } }))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium ${cfg.mode === 'dataset' ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400'}`}
                   >
-                    Outro dataset
+                    {t('datasets.quickOp.anotherDataset')}
                   </button>
                 </div>
                 {cfg.mode === 'literal' ? (
                   <input
                     type="text"
                     className="input-field w-full font-mono"
-                    placeholder='Ex: 1 ou [[1,0],[0,1]]'
+                    placeholder={t('datasets.quickOp.literalPlaceholder')}
                     value={cfg.literalText}
                     onChange={(e) => setExtraInputs((p) => ({ ...p, [key]: { ...cfg, literalText: e.target.value } }))}
                   />
@@ -350,7 +347,7 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
                     value={cfg.datasetId}
                     onChange={(e) => setExtraInputs((p) => ({ ...p, [key]: { ...cfg, datasetId: e.target.value } }))}
                   >
-                    <option value="">Selecione um dataset…</option>
+                    <option value="">{t('datasets.quickOp.selectDatasetPlaceholder')}</option>
                     {userDatasets.map((d) => (
                       <option key={d.uuid} value={d.uuid}>{d.name}</option>
                     ))}
@@ -363,7 +360,7 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
           {/* Parâmetros específicos da técnica */}
           {Object.keys(parameterSchema || {}).length > 0 && (
             <div className="space-y-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Parâmetros</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('workflows.paramSchema')}</span>
               {Object.entries(parameterSchema).map(([name, spec]) => (
                 <ParamField
                   key={name}
@@ -380,17 +377,17 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
               porque ~90% dos casos são pré-processamento e os dados
               originais não devem ser perdidos. */}
           <div className="space-y-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Resultado</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">{t('datasets.quickOp.resultLabel')}</span>
             <label className="flex items-start gap-2 p-3 rounded-lg border border-white/10 cursor-pointer" style={saveMode === 'new_dataset' ? { borderColor: 'rgba(96,165,250,0.5)', background: 'rgba(59,130,246,0.08)' } : {}}>
               <input type="radio" className="mt-1" checked={saveMode === 'new_dataset'} onChange={() => setSaveMode('new_dataset')} />
               <div>
-                <span className="text-sm text-slate-200 font-medium">Salvar resultado como novo dataset</span>
-                <p className="text-xs text-slate-500">Recomendado — preserva os dados originais. Ideal para pré-processamento.</p>
+                <span className="text-sm text-slate-200 font-medium">{t('datasets.quickOp.saveAsNew')}</span>
+                <p className="text-xs text-slate-500">{t('datasets.quickOp.saveAsNewHint')}</p>
                 {saveMode === 'new_dataset' && (
                   <input
                     type="text"
                     className="input-field w-full mt-2"
-                    placeholder={`Ex: "${dataset?.name} — ${selected.name}"`}
+                    placeholder={t('datasets.quickOp.newDatasetNamePlaceholder', { datasetName: dataset?.name, techniqueName: selected.name })}
                     value={newDatasetName}
                     onChange={(e) => setNewDatasetName(e.target.value)}
                   />
@@ -400,8 +397,8 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
             <label className="flex items-start gap-2 p-3 rounded-lg border border-white/10 cursor-pointer" style={saveMode === 'in_place' ? { borderColor: 'rgba(96,165,250,0.5)', background: 'rgba(59,130,246,0.08)' } : {}}>
               <input type="radio" className="mt-1" checked={saveMode === 'in_place'} onChange={() => setSaveMode('in_place')} />
               <div>
-                <span className="text-sm text-slate-200 font-medium">Aplicar neste dataset</span>
-                <p className="text-xs text-slate-500">Substitui os dados deste dataset pelo resultado da operação.</p>
+                <span className="text-sm text-slate-200 font-medium">{t('datasets.quickOp.applyInPlace')}</span>
+                <p className="text-xs text-slate-500">{t('datasets.quickOp.applyInPlaceHint')}</p>
               </div>
             </label>
           </div>
@@ -409,9 +406,9 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
           {submitError && <p className="text-sm text-red-400">{submitError}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
-            <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Cancelar</button>
+            <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">{t('common.cancel')}</button>
             <button onClick={handleSubmit} className="btn-primary px-4 py-2 text-sm inline-flex items-center gap-2">
-              Executar <ArrowRight className="w-4 h-4" />
+              {t('workflows.execute')} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -420,26 +417,26 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
       {step === 'running' && (
         <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
           <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-          <p className="text-sm text-slate-300">Executando "{selected?.name}"…</p>
-          <p className="text-xs text-slate-500">O workflow "{workflowName}" foi criado e está sendo processado.</p>
+          <p className="text-sm text-slate-300">{t('datasets.quickOp.runningOperation', { name: selected?.name })}</p>
+          <p className="text-xs text-slate-500">{t('datasets.quickOp.workflowCreated', { name: workflowName })}</p>
         </div>
       )}
 
       {step === 'done' && (
         <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
           <CheckCircle2 className="w-10 h-10 text-green-400" />
-          <p className="text-sm text-slate-200 font-medium">Operação concluída!</p>
+          <p className="text-sm text-slate-200 font-medium">{t('datasets.quickOp.completed')}</p>
           {resultOp?.output_dataset_name ? (
             <p className="text-sm text-slate-400 inline-flex items-center gap-1.5">
-              <Database className="w-4 h-4" /> Novo dataset: <strong className="text-slate-200">{resultOp.output_dataset_name}</strong>
+              <Database className="w-4 h-4" /> {t('datasets.quickOp.newDatasetLabel')} <strong className="text-slate-200">{resultOp.output_dataset_name}</strong>
             </p>
           ) : (
-            <p className="text-sm text-slate-400">O dataset foi atualizado com o resultado.</p>
+            <p className="text-sm text-slate-400">{t('datasets.quickOp.datasetUpdated')}</p>
           )}
           <div className="flex gap-2 mt-2">
-            <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Fechar</button>
+            <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">{t('common.close')}</button>
             {resultOp?.output_dataset_uuid && (
-              <a href={`/datasets/${resultOp.output_dataset_uuid}`} className="btn-primary px-4 py-2 text-sm">Abrir novo dataset</a>
+              <a href={`/datasets/${resultOp.output_dataset_uuid}`} className="btn-primary px-4 py-2 text-sm">{t('datasets.quickOp.openNewDataset')}</a>
             )}
           </div>
         </div>
@@ -448,11 +445,11 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
       {step === 'error' && (
         <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
           <XCircle className="w-10 h-10 text-red-400" />
-          <p className="text-sm text-slate-200 font-medium">Não foi possível concluir a operação.</p>
+          <p className="text-sm text-slate-200 font-medium">{t('datasets.quickOp.failed')}</p>
           {submitError && <p className="text-xs text-red-400 max-w-md">{submitError}</p>}
           <div className="flex gap-2 mt-2">
-            <button onClick={() => setStep('configure')} className="btn-ghost px-4 py-2 text-sm">Voltar</button>
-            <button onClick={onClose} className="btn-primary px-4 py-2 text-sm">Fechar</button>
+            <button onClick={() => setStep('configure')} className="btn-ghost px-4 py-2 text-sm">{t('common.back')}</button>
+            <button onClick={onClose} className="btn-primary px-4 py-2 text-sm">{t('common.close')}</button>
           </div>
         </div>
       )}
