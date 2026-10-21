@@ -615,6 +615,8 @@ export default {
     inputOutput:        'Input & Output',
     expectedInput:      'Entrada esperada',
     producedOutput:     'Saída produzida',
+    fullPage:           'Página completa',
+    viewDetails:        'Ver detalhes',
   },
 
   // ── Artigos ───────────────────────────────────────────────────────────────

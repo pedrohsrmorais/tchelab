@@ -26,6 +26,7 @@ import { api } from '../api';
 import { useApi } from '../hooks/useApi';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import MultiDimModal from '../components/datasets/MultiDimModal';
+import TechniqueModal from '../components/ui/TechniqueModal';
 import {
   FAMILIES, getFamilyConfig, getFamiliesList, isValidConnection, getPorts, parseSchema, ARRAY_TYPES,
 } from '../config/techniqueRegistry';
@@ -378,9 +379,8 @@ const NODE_TYPES = {
 // ────────────────────────────────────────────────────────────────────────────────
 // Technique Card no painel lateral
 // ────────────────────────────────────────────────────────────────────────────────
-function TechniqueCard({ tech, onAdd, lang }) {
+function TechniqueCard({ tech, onAdd, onInfo, lang }) {
   const { t } = useTranslation();
-  const [showInfo, setShowInfo] = useState(false);
   const familyCfg = getFamilyConfig(tech.family, lang);
   const inputSchema  = parseSchema(tech.input_schema);
   const outputSchema = parseSchema(tech.output_schema);
@@ -430,7 +430,7 @@ function TechniqueCard({ tech, onAdd, lang }) {
           </p>
         </div>
         <button
-          onClick={e => { e.stopPropagation(); setShowInfo(v => !v); }}
+          onClick={e => { e.stopPropagation(); onInfo && onInfo(tech); }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, flexShrink: 0 }}
           onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; }}
           onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; }}
@@ -457,56 +457,6 @@ function TechniqueCard({ tech, onAdd, lang }) {
         )}
       </div>
 
-      {showInfo && (
-        <div style={{ overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-            {tech.description && (
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 6px', lineHeight: 1.5 }}>
-                {tech.description}
-              </p>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div>
-                <p style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Input</p>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', margin: 0 }}>
-                  {inputSchema.type}{inputSchema.shape && <span style={{ color: 'var(--text-muted)' }}> {inputSchema.shape}</span>}
-                </p>
-                {inputSchema.description && <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{inputSchema.description}</p>}
-              </div>
-              <div>
-                <p style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Output</p>
-                <p style={{ fontSize: '0.7rem', color: familyCfg?.color || 'var(--text-secondary)', fontFamily: 'var(--font-mono)', margin: 0 }}>
-                  {outputSchema.type}{outputSchema.shape && <span style={{ color: 'var(--text-muted)' }}> {outputSchema.shape}</span>}
-                </p>
-                {outputSchema.description && <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{outputSchema.description}</p>}
-              </div>
-            </div>
-            {tech.tags && tech.tags.length > 0 && (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                {safeJson(tech.tags, []).map(tag => (
-                  <span key={tag} style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: 999, background: 'var(--bg-hover)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={() => onAdd(tech)}
-              style={{
-                marginTop: 8, width: '100%', padding: '5px 0',
-                background: familyCfg?.bg || 'rgba(37,99,235,0.1)',
-                border: `1px solid ${familyCfg?.border || 'var(--border-active)'}`,
-                borderRadius: 7, cursor: 'pointer',
-                fontSize: '0.74rem', fontWeight: 600,
-                color: familyCfg?.color || 'var(--text-accent)',
-                transition: 'opacity 0.15s',
-              }}
-            >
-              {t('workflows.addToCanvas')}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -983,6 +933,9 @@ export default function WorkflowEditorPage() {
 
   // Preview de dataset (nó dataset OU porta de resultado)
   const [previewDataset, setPreviewDataset] = useState(null);
+
+  // Técnica selecionada para exibição no TechniqueModal (botão ⓘ na sidebar).
+  const [sidebarModalTech, setSidebarModalTech] = useState(null);
 
   // Painel "visualizar entrada/saída" de um nó técnica específico (botão
   // de olho no próprio nó do canvas — ver NodeIOPanel).
@@ -1904,7 +1857,7 @@ export default function WorkflowEditorPage() {
                   {(familiesOpen[group.slug] || searchQuery || selectedFamily) && (
                     <div style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4 }}>
                       {group.techs.map(tech => (
-                        <TechniqueCard key={tech.uuid || tech.id || tech.slug} tech={tech} onAdd={handleAddTechnique} lang={lang} />
+                        <TechniqueCard key={tech.uuid || tech.id || tech.slug} tech={tech} onAdd={handleAddTechnique} onInfo={setSidebarModalTech} lang={lang} />
                       ))}
                     </div>
                   )}
@@ -1951,6 +1904,13 @@ export default function WorkflowEditorPage() {
       {previewDataset && (
         <MultiDimModal dataset={previewDataset} onClose={() => setPreviewDataset(null)} />
       )}
+
+      {/* ── Modal de detalhes da técnica (botão ⓘ no painel lateral) ── */}
+      <TechniqueModal
+        open={!!sidebarModalTech}
+        onClose={() => setSidebarModalTech(null)}
+        technique={sidebarModalTech}
+      />
     </div>
   );
 }

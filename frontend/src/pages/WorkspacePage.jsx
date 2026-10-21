@@ -21,6 +21,7 @@ import React, {
 } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import client from '../api/client';
+import TechniqueModal from '../components/ui/TechniqueModal';
 import {
   Play, Trash2, Plus, Eye, Terminal, RefreshCw,
   X, ChevronDown, Search, Upload, FileText,
@@ -584,7 +585,7 @@ function ImportModal({ onClose, onImported, s, theme }) {
 // ─── Painel de info de técnica ────────────────────────────────────────────────
 
 /** Renderiza a descrição completa de uma técnica: how_it_works, inputs, outputs, tips */
-function TechInfoPanel({ tech, s, theme }) {
+function TechInfoPanel({ tech, s, theme, onOpenModal }) {
   const cl = theme === 'classic';
   const [collapsed, setCollapsed] = useState(false);
 
@@ -722,6 +723,27 @@ function TechInfoPanel({ tech, s, theme }) {
               📖 {tech.historical_note}
             </p>
           )}
+
+          {/* Open full modal */}
+          {onOpenModal && (
+            <button
+              onClick={onOpenModal}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                width: '100%', padding: '4px 0',
+                background: 'none',
+                border: `1px solid ${borderColor}`,
+                borderRadius: cl ? 2 : 'var(--radius-sm)',
+                cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600,
+                color: cl ? '#4a7fbf' : 'var(--text-accent)',
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+            >
+              <Info size={11} /> Ver detalhes completos
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -753,6 +775,7 @@ export default function WorkspacePage() {
   const [history, setHistory]           = useState([]);
   const [activePanel, setActivePanel]   = useState('operation'); // 'operation'|'editor'
   const [varSort, setVarSort]           = useState('name'); // 'name'|'size'|'class'
+  const [techModalOpen, setTechModalOpen] = useState(false);
 
   const pollRef    = useRef(null);
   const consoleRef = useRef(null);
@@ -1275,7 +1298,7 @@ export default function WorkspacePage() {
 
                 {/* Painel de documentação da técnica */}
                 {selectedTech && (
-                  <TechInfoPanel tech={selectedTech} s={s} theme={theme} />
+                  <TechInfoPanel tech={selectedTech} s={s} theme={theme} onOpenModal={() => setTechModalOpen(true)} />
                 )}
 
                 {/* Entradas */}
@@ -1418,6 +1441,13 @@ export default function WorkspacePage() {
           }}
         />
       )}
+
+      {/* Modal de detalhes da técnica selecionada */}
+      <TechniqueModal
+        open={techModalOpen && !!selectedTech}
+        onClose={() => setTechModalOpen(false)}
+        technique={selectedTech}
+      />
 
       {/* Keyframes */}
       <style>{`

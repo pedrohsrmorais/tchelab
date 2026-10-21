@@ -2029,6 +2029,160 @@ UPDATE techniques SET tags = '["matlab","math","basic","workspace"]'
 WHERE slug IN ('var','abs','sort','cumsum','diff','corr','cov','fft','log','exp','sqrt','linspace',
                'round','floor','ceil','sign','mod','cumprod','unique');
 
+-- =============================================================================
+-- Auditoria de input_schema / output_schema (2026-10-21)
+-- Alinha os nomes das portas no banco com as chaves que o Python execute()
+-- de fato retorna / lê — auditoria feita confrontando cada scripts.py com os
+-- schemas armazenados.
+-- Estratégia: substitui o schema inteiro (sem JSON_MERGE_PATCH) porque os
+-- schemas antigos têm chaves erradas que não devem sobreviver.
+-- Idempotente: rodar de novo sobrescreve com os mesmos valores corretos.
+-- =============================================================================
+SET NAMES utf8mb4;
+
+-- ── Família 01 — Dados ────────────────────────────────────────────────────────
+
+-- importacao: arquivo vem de params.file_path, não de porta de entrada.
+-- Saída real: {dataset, shape, dtype, sample_axis}
+UPDATE techniques SET
+  input_schema  = '{}',
+  output_schema = '{"dataset": {"type": "ndarray", "description": "Dados importados como array NumPy."}, "shape": {"type": "array", "description": "Shape do array importado, ex: [200, 1024]."}, "dtype": {"type": "string", "description": "Tipo numérico, ex: float64."}, "sample_axis": {"type": "integer", "description": "Eixo das amostras conforme parâmetro sample_axis."}}'
+WHERE slug = 'importacao';
+
+-- limpeza: saída real é {X_clean, removed_indices} — removed_indices faltava
+UPDATE techniques SET
+  output_schema = '{"X_clean": {"type": "ndarray", "description": "Dados sem as amostras/variáveis problemáticas."}, "removed_indices": {"type": "array", "description": "Índices das linhas/colunas removidas."}}'
+WHERE slug = 'limpeza';
+
+-- selecao_amostras: chave real é X_sel, não X_selected
+UPDATE techniques SET
+  output_schema = '{"X_sel": {"type": "ndarray", "description": "Subconjunto de amostras selecionado."}}'
+WHERE slug = 'selecao_amostras';
+
+-- selecao_variaveis: chave real é X_sel + selected_indices, não X_selected
+UPDATE techniques SET
+  output_schema = '{"X_sel": {"type": "ndarray", "description": "Subconjunto de variáveis selecionado."}, "selected_indices": {"type": "array", "description": "Índices das variáveis mantidas."}}'
+WHERE slug = 'selecao_variaveis';
+
+-- concatenacao: entradas reais são A e B (não arrays); saída result está correta
+UPDATE techniques SET
+  input_schema = '{"A": {"type": "ndarray", "description": "Primeiro array a concatenar."}, "B": {"type": "ndarray", "description": "Segundo array a concatenar (mesmo shape em todos os eixos exceto o de concatenação)."}}'
+WHERE slug = 'concatenacao';
+
+-- stack: entradas reais são A e B; saída real é result (não stacked)
+UPDATE techniques SET
+  input_schema  = '{"A": {"type": "ndarray", "description": "Primeiro array a empilhar."}, "B": {"type": "ndarray", "description": "Segundo array, de shape idêntico a A."}}',
+  output_schema = '{"result": {"type": "ndarray", "description": "Array resultante com um eixo a mais que os de entrada."}}'
+WHERE slug = 'stack';
+
+-- split: entrada real é X (não A); saída é dinâmica: part_1, part_2, … part_N
+UPDATE techniques SET
+  input_schema  = '{"X": {"type": "ndarray", "description": "Array a dividir."}}',
+  output_schema = '{"part_N": {"type": "ndarray", "description": "Saída dinâmica: as portas se chamam part_1, part_2, … part_N, onde N é determinado pelo parâmetro indices_or_sections."}}'
+WHERE slug = 'split';
+
+-- reshape: chave real é X_r, não X_reshaped
+UPDATE techniques SET
+  output_schema = '{"X_r": {"type": "ndarray", "description": "Array reorganizado no novo shape."}}'
+WHERE slug = 'reshape';
+
+-- slice: chave real é X_sl, não A_slice
+UPDATE techniques SET
+  output_schema = '{"X_sl": {"type": "ndarray", "description": "Sub-região selecionada do array original."}}'
+WHERE slug = 'slice';
+
+-- ── Família 02 — Pré-processamento ───────────────────────────────────────────
+
+-- snv: saída real é X_snv, não X
+UPDATE techniques SET
+  output_schema = '{"X_snv": {"type": "ndarray", "description": "Espectros SNV-corrigidos (cada espectro centrado e escalado pelo próprio desvio padrão)."}}'
+WHERE slug = 'snv';
+
+-- msc: saída real é {X_msc, reference_used}, não X
+UPDATE techniques SET
+  output_schema = '{"X_msc": {"type": "ndarray", "description": "Espectros corrigidos por MSC."}, "reference_used": {"type": "ndarray", "description": "Espectro de referência usado na correção (normalmente a média do conjunto de treino)."}}'
+WHERE slug = 'msc';
+
+-- savitzky_golay: saída real é X_sg, não X
+UPDATE techniques SET
+  output_schema = '{"X_sg": {"type": "ndarray", "description": "Espectros suavizados ou derivados pelo filtro Savitzky-Golay."}}'
+WHERE slug = 'savitzky_golay';
+
+-- baseline: saída real é X_bl, não X
+UPDATE techniques SET
+  output_schema = '{"X_bl": {"type": "ndarray", "description": "Espectros com linha de base estimada e removida."}}'
+WHERE slug = 'baseline';
+
+-- centering: saída real é {X_c, mean_}, não apenas X
+UPDATE techniques SET
+  output_schema = '{"X_c": {"type": "ndarray", "description": "Dados centrados na média (cada coluna com média zero)."}, "mean_": {"type": "ndarray", "description": "Vetor de médias por coluna usado na centralização — necessário para aplicar em novos dados."}}'
+WHERE slug = 'centering';
+
+-- autoscaling: saída real é {X_as, mean_, std_}, não X
+UPDATE techniques SET
+  output_schema = '{"X_as": {"type": "ndarray", "description": "Dados centrados e escalados (média 0, variância 1 por coluna)."}, "mean_": {"type": "ndarray", "description": "Médias por coluna usadas no centramento."}, "std_": {"type": "ndarray", "description": "Desvios padrão por coluna usados no escalonamento."}}'
+WHERE slug = 'autoscaling';
+
+-- ── Família 03 — Exploratória ─────────────────────────────────────────────────
+
+-- pca: saída real inclui explained_variance_ratio que estava faltando
+UPDATE techniques SET
+  output_schema = '{"scores": {"type": "ndarray", "description": "Coordenadas das amostras nos componentes principais."}, "loadings": {"type": "ndarray", "description": "Peso de cada variável em cada componente."}, "explained_variance": {"type": "array", "description": "Variância absoluta explicada por cada componente."}, "explained_variance_ratio": {"type": "array", "description": "Fração da variância total explicada por cada componente (soma ≤ 1)."}}'
+WHERE slug = 'pca';
+
+-- ── Família 04 — Regressão 1D ─────────────────────────────────────────────────
+
+-- pls: entrada usa inputs["Y"] com Y maiúsculo (não y minúsculo);
+--      saída real é {model, x_scores, x_loadings, y_loadings, x_weights, regression_vector, metrics_cal}
+UPDATE techniques SET
+  input_schema  = '{"X": {"type": "ndarray", "description": "Matriz de variáveis preditoras (amostras × variáveis)."}, "Y": {"type": "ndarray", "description": "Variável(is) resposta (amostras × respostas) — Y maiúsculo."}}',
+  output_schema = '{"model": {"type": "object", "description": "Objeto do modelo PLS treinado com pesos internos."}, "x_scores": {"type": "ndarray", "description": "Scores de X (projeção das amostras no espaço latente)."}, "x_loadings": {"type": "ndarray", "description": "Loadings de X."}, "y_loadings": {"type": "ndarray", "description": "Loadings de Y."}, "x_weights": {"type": "ndarray", "description": "Pesos de X."}, "regression_vector": {"type": "array", "description": "Vetor de regressão (coeficientes espectrais)."}, "metrics_cal": {"type": "object", "description": "Métricas de calibração: RMSEC, R2C, bias."}}'
+WHERE slug = 'pls';
+
+-- ── Família 07 — Decomposição Multiway ───────────────────────────────────────
+
+-- parafac: saída real é {model, weights, factors, fit, core_consistency}
+--          não {scores, loadings, residuals, core_consistency, explained_variance}
+UPDATE techniques SET
+  output_schema = '{"model": {"type": "object", "description": "Metadados do modelo: type e rank."}, "weights": {"type": "array", "description": "Pesos normalizados de cada componente."}, "factors": {"type": "array", "description": "Lista de matrizes de fatores, uma por modo do tensor."}, "fit": {"type": "number", "description": "Qualidade do ajuste (1 - ||X - X_rec|| / ||X||), de 0 a 1."}, "core_consistency": {"type": "number", "description": "Diagnóstico de consistência do núcleo (0–100) — valores baixos sugerem componentes demais."}}'
+WHERE slug = 'parafac';
+
+-- tucker3: saída real é {model, core, factors, fit}
+--          não {core, loadings}
+UPDATE techniques SET
+  output_schema = '{"model": {"type": "object", "description": "Metadados: type e ranks por modo."}, "core": {"type": "ndarray", "description": "Tensor núcleo da decomposição Tucker."}, "factors": {"type": "array", "description": "Lista de matrizes de loadings, uma por modo."}, "fit": {"type": "number", "description": "Qualidade do ajuste (1 - ||X - X_rec|| / ||X||), de 0 a 1."}}'
+WHERE slug = 'tucker3';
+
+-- ── Família 12 — Validação de Modelos ────────────────────────────────────────
+
+-- cross_validation: saída real é {model, metrics_cv, n_splits}
+--                   não {metrics}
+UPDATE techniques SET
+  output_schema = '{"model": {"type": "object", "description": "Metadados do modelo validado: tipo e estratégia de CV."}, "metrics_cv": {"type": "object", "description": "Métricas agregadas das K rodadas (RMSECV/R2 para regressão, acurácia/balanced_accuracy para classificação)."}, "n_splits": {"type": "integer", "description": "Número efetivo de divisões realizadas."}}'
+WHERE slug = 'cross_validation';
+
+-- ── Família 01 — Álgebra Linear ──────────────────────────────────────────────
+
+-- determinante: saída real é {det}, não {result}
+UPDATE techniques SET
+  output_schema = '{"det": {"type": "number", "description": "Determinante da matriz (escalar)."}}'
+WHERE slug = 'determinante';
+
+-- autovalores: saída real é {eigenvalues: {real, imag}}, não {result}
+UPDATE techniques SET
+  output_schema = '{"eigenvalues": {"type": "object", "description": "Autovalores da matriz — objeto com chaves \\"real\\" e \\"imag\\" (listas de floats, pois autovalores podem ser complexos)."}}'
+WHERE slug = 'autovalores';
+
+-- autovetores: saída real é {eigenvectors}, não {result}
+UPDATE techniques SET
+  output_schema = '{"eigenvectors": {"type": "ndarray", "description": "Autovetores da matriz, um por coluna — shape (n, n)."}}'
+WHERE slug = 'autovetores';
+
+-- eig: saída real é {eigenvalues, eigenvectors}, não {autovalores, autovetores}
+UPDATE techniques SET
+  output_schema = '{"eigenvalues": {"type": "object", "description": "Autovalores — objeto com chaves \\"real\\" e \\"imag\\"."}, "eigenvectors": {"type": "ndarray", "description": "Autovetores correspondentes, um por coluna."}}'
+WHERE slug = 'eig';
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

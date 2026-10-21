@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Library, Search, ArrowRight, CheckCircle2, Hammer } from 'lucide-react';
+import { Library, Search, ArrowRight, CheckCircle2, Hammer, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import { getFamiliesList, getFamilyConfig } from '../config/techniqueRegistry';
 import EmptyState from '../components/ui/EmptyState';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import TechniqueModal from '../components/ui/TechniqueModal';
 
 // Busca tudo (ativas + "em desenvolvimento") — o Catálogo é a documentação
 // completa, diferente do editor de workflow (que só lista active=1).
@@ -26,25 +27,41 @@ function StatusBadge({ active }) {
   );
 }
 
-function TechniqueCard({ tech }) {
+function TechniqueCard({ tech, onInfo }) {
   const { t } = useTranslation();
   const fam = getFamilyConfig(tech.family);
   return (
-    <Link
-      to={`/catalogo/${tech.uuid}`}
-      className="card card-hover p-5 flex flex-col gap-3 group"
-      style={{ borderLeft: `3px solid ${fam?.color || '#64748b'}` }}
+    <div
+      className="card p-5 flex flex-col gap-3 group"
+      style={{ borderLeft: `3px solid ${fam?.color || '#64748b'}`, position: 'relative' }}
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold text-white leading-snug">{tech.name}</h3>
-        <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={(e) => { e.preventDefault(); onInfo(tech); }}
+            title={t('catalog.viewDetails')}
+            className="btn-ghost"
+            style={{ padding: '3px 5px', color: 'var(--text-muted)' }}
+          >
+            <Info className="w-4 h-4" />
+          </button>
+          <Link
+            to={`/catalogo/${tech.uuid}`}
+            className="btn-ghost"
+            style={{ padding: '3px 5px', color: 'var(--text-muted)' }}
+            title={t('catalog.fullPage')}
+          >
+            <ArrowRight className="w-4 h-4 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        </div>
       </div>
       <p className="text-sm text-slate-400 line-clamp-2">{tech.description || t('catalog.noDescription')}</p>
       <div className="flex items-center justify-between mt-auto pt-1">
         <span className="text-xs" style={{ color: fam?.color || '#94a3b8' }}>{fam?.labelStr || tech.family}</span>
         <StatusBadge active={!!tech.active} />
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -54,6 +71,7 @@ export default function CatalogPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all | active | dev
   const [familyFilter, setFamilyFilter] = useState('all');
+  const [modalTech, setModalTech] = useState(null);
 
   const all = useMemo(() => data?.data ?? data ?? [], [data]);
   const families = useMemo(() => getFamiliesList(), []);
@@ -135,12 +153,18 @@ export default function CatalogPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {grouped[f.slug]
                     .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((t) => <TechniqueCard key={t.uuid} tech={t} />)}
+                    .map((t) => <TechniqueCard key={t.uuid} tech={t} onInfo={setModalTech} />)}
                 </div>
               </div>
             ))}
         </div>
       )}
+
+      <TechniqueModal
+        open={!!modalTech}
+        onClose={() => setModalTech(null)}
+        technique={modalTech}
+      />
     </div>
   );
 }
