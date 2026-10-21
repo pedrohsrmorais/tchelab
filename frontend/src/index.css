@@ -496,6 +496,19 @@
 [data-theme="classic"] .text-slate-700 {
   color: var(--text-muted) !important;
 }
+/* Cores "claras" do Tailwind (pensadas pro fundo escuro) viram variantes escuras no Light/Classic —
+   sem isso, badges como "Ativo"/"Em desenvolvimento" ficavam quase ilegíveis (verde/âmbar claro em fundo claro). */
+[data-theme="light"] .text-blue-200,   [data-theme="classic"] .text-blue-200,
+[data-theme="light"] .text-blue-300,   [data-theme="classic"] .text-blue-300   { color: #1d4ed8 !important; }
+[data-theme="light"] .text-blue-400,   [data-theme="classic"] .text-blue-400   { color: #2563eb !important; }
+[data-theme="light"] .text-purple-200, [data-theme="classic"] .text-purple-200,
+[data-theme="light"] .text-purple-300, [data-theme="classic"] .text-purple-300 { color: #6d28d9 !important; }
+[data-theme="light"] .text-purple-400, [data-theme="classic"] .text-purple-400 { color: #7c3aed !important; }
+[data-theme="light"] .text-green-300,  [data-theme="classic"] .text-green-300  { color: #047857 !important; }
+[data-theme="light"] .text-green-400,  [data-theme="classic"] .text-green-400  { color: #059669 !important; }
+[data-theme="light"] .text-amber-300,  [data-theme="classic"] .text-amber-300,
+[data-theme="light"] .text-amber-400,  [data-theme="classic"] .text-amber-400  { color: #b45309 !important; }
+[data-theme="light"] .text-red-400,    [data-theme="classic"] .text-red-400    { color: #dc2626 !important; }
 [data-theme="light"] .bg-white\/5,
 [data-theme="light"] .bg-white\/10,
 [data-theme="light"] .hover\:bg-white\/5:hover,

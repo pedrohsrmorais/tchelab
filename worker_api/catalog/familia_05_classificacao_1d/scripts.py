@@ -191,7 +191,9 @@ class SIMCA(BaseScript):
                     best_cls = cls
             y_pred.append(best_cls if best_cls is not None else "unknown")
 
-        y_pred = np.array(y_pred)
+        # Rótulos numéricos + "unknown" viravam um array misto (int/str) e o sklearn recusava
+        # ("Mix of label input types"). Para as métricas, tudo é comparado como string.
+        y_pred = np.array([str(v) for v in y_pred])
         # For metrics, treat "unknown" as wrong
         y_pred_for_metrics = np.where(y_pred == "unknown", "__unknown__", y_pred)
 
@@ -200,7 +202,7 @@ class SIMCA(BaseScript):
             "thresholds": thresholds,
             "classes": classes.tolist(),
             "distances": {cls: distances[cls] for cls in classes},
-            "metrics_cal": _clf_metrics(y, y_pred_for_metrics),
+            "metrics_cal": _clf_metrics(np.asarray(y).astype(str), y_pred_for_metrics),
         }
 
 
@@ -505,7 +507,14 @@ class PLSOC(BaseScript):
         # Generate pseudo-negatives as random permutations of the target data
         rng = np.random.default_rng(random_state)
         n_neg = max(Xc.shape[0], 10)
-        X_neg = rng.permutation(Xc.ravel()).reshape(n_neg, Xc.shape[1]) if Xc.shape[0] > 1 else rng.normal(size=(n_neg, Xc.shape[1]))
+        if Xc.shape[0] <= 1:
+            X_neg = rng.normal(size=(n_neg, Xc.shape[1]))
+        elif n_neg == Xc.shape[0]:
+            X_neg = rng.permutation(Xc.ravel()).reshape(n_neg, Xc.shape[1])
+        else:
+            # classe-alvo com < 10 amostras: n_neg (=10) > n_c, então o reshape de uma permutação
+            # de n_c*p valores em (n_neg, p) quebrava. Sorteia com reposição dos valores observados.
+            X_neg = rng.choice(Xc.ravel(), size=(n_neg, Xc.shape[1]), replace=True)
 
         X_train = np.vstack([Xc, X_neg])
         y_train = np.array([1.0] * len(Xc) + [0.0] * n_neg)
@@ -534,7 +543,12 @@ class PLSOC(BaseScript):
             "model": {"type": "pls_oc", "target_class": str(target_class), "n_components": nc},
             "threshold_T2": float(f_thresh),
             "T2_scores": T2.tolist(),
-            "metrics_cal": _clf_metrics(y, y_pred),
+            # one-class: o "verdadeiro" é binário (classe-alvo vs. resto), senão amostras de outras
+            # classes corretamente rejeitadas contavam como erro; strings evitam mistura int/str.
+            "metrics_cal": _clf_metrics(
+                np.where(y == target_class, str(target_class), f"not_{target_class}"),
+                np.asarray(y_pred).astype(str),
+            ),
         }
 
 

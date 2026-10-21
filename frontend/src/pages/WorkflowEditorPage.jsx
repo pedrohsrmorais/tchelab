@@ -27,6 +27,7 @@ import { useApi } from '../hooks/useApi';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import MultiDimModal from '../components/datasets/MultiDimModal';
 import TechniqueModal from '../components/ui/TechniqueModal';
+import Modal from '../components/ui/Modal';
 import {
   FAMILIES, getFamilyConfig, getFamiliesList, isValidConnection, getPorts, parseSchema, ARRAY_TYPES,
 } from '../config/techniqueRegistry';
@@ -49,11 +50,48 @@ function hexToRgb(hex) {
   return `${r},${g},${b}`;
 }
 
+// ────────────────────────────────────────────────────────────────────────────────
+// Resultado não-array (escalar, dicionário de métricas, metadados de modelo).
+// O visualizador multidimensional só entende arrays N-D; para o resto mostramos
+// uma tabela chave/valor legível em vez de um painel vazio "(0D)".
+// ────────────────────────────────────────────────────────────────────────────────
+function fmtResultValue(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : Number(v.toPrecision(6)).toString();
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) {
+    const flat = JSON.stringify(v);
+    return flat.length > 160 ? `${flat.slice(0, 160)}… (${v.length} itens)` : flat;
+  }
+  try { return JSON.stringify(v, null, 1); } catch { return String(v); }
+}
+
+function ResultValueView({ value }) {
+  const isObj = value && typeof value === 'object' && !Array.isArray(value);
+  if (!isObj) {
+    return <p style={{ fontFamily: 'var(--font-mono)', fontSize: '1.3rem', color: 'var(--text-primary)', margin: 0, overflowWrap: 'anywhere' }}>{fmtResultValue(value)}</p>;
+  }
+  const rows = Object.entries(value);
+  if (!rows.length) return <p style={{ color: 'var(--text-muted)', margin: 0 }}>—</p>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 12px' }}>
+          <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 700, color: '#60a5fa', flex: '0 0 auto' }}>{k}</code>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', flex: '1 1 12rem', minWidth: 0 }}>{fmtResultValue(v)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const EXEC_STATUS_META = {
   pending:   { color: '#64748b', Icon: Clock },
   running:   { color: '#fbbf24', Icon: Loader2 },
   completed: { color: '#34d399', Icon: CheckCircle2 },
   failed:    { color: '#f87171', Icon: XCircle },
+  skipped:   { color: '#94a3b8', Icon: AlertCircle },
 };
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -450,7 +488,7 @@ function TechniqueCard({ tech, onAdd, onInfo, lang }) {
             OUT: {outputSchema.type}
           </span>
         )}
-        {tech.is_beta && (
+        {!!tech.is_beta && (
           <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px', borderRadius: 999, background: 'rgba(245,158,11,0.15)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.3)' }}>
             BETA
           </span>
@@ -750,8 +788,8 @@ function ResultsPanel({ execution, onClose, onPreviewPort, onSavePort }) {
               <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>({n.node_key})</span>
             </div>
 
-            {n.status === 'failed' && n.error_message && (
-              <p style={{ fontSize: '0.7rem', color: '#fca5a5', margin: '2px 0 4px' }}>{n.error_message}</p>
+            {(n.status === 'failed' || n.status === 'skipped') && n.error_message && (
+              <p style={{ fontSize: '0.7rem', color: n.status === 'skipped' ? '#94a3b8' : '#fca5a5', margin: '2px 0 4px' }}>{n.error_message}</p>
             )}
 
             {ports.length > 0 && (
@@ -827,8 +865,8 @@ function NodeIOPanel({ execNode, onClose, onPreviewPort, onSavePort }) {
         </button>
       </div>
 
-      {execNode.status === 'failed' && execNode.error_message && (
-        <p style={{ fontSize: '0.72rem', color: '#fca5a5', margin: '0 0 8px' }}>{execNode.error_message}</p>
+      {(execNode.status === 'failed' || execNode.status === 'skipped') && execNode.error_message && (
+        <p style={{ fontSize: '0.72rem', color: execNode.status === 'skipped' ? '#94a3b8' : '#fca5a5', margin: '0 0 8px' }}>{execNode.error_message}</p>
       )}
 
       <p style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '4px 0 6px' }}>
@@ -908,7 +946,7 @@ export default function WorkflowEditorPage() {
   const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState([]);
 
-  const [panelOpen,      setPanelOpen]   = useState(true);
+  const [panelOpen,      setPanelOpen]   = useState(() => typeof window === 'undefined' || window.innerWidth >= 768);
   const [searchQuery,    setSearchQuery] = useState('');
   const [selectedFamily, setFamily]      = useState('');
   const [familiesOpen,   setFamsOpen]    = useState({});
@@ -933,6 +971,7 @@ export default function WorkflowEditorPage() {
 
   // Preview de dataset (nó dataset OU porta de resultado)
   const [previewDataset, setPreviewDataset] = useState(null);
+  const [previewValue, setPreviewValue] = useState(null); // { title, value } — saídas não-array
 
   // Técnica selecionada para exibição no TechniqueModal (botão ⓘ na sidebar).
   const [sidebarModalTech, setSidebarModalTech] = useState(null);
@@ -1410,10 +1449,32 @@ export default function WorkflowEditorPage() {
     }
   }, [id, setNodes, t]);
 
+  // ── Entradas obrigatórias sem fonte: porta `required` de um nó técnica sem
+  //    aresta (técnica→técnica) nem ligação dataset→porta. O worker sempre
+  //    falha nesses casos ("Campo obrigatório ausente"), então avisamos antes
+  //    de executar em vez de mostrar "Pipeline válido". ────────────────────────
+  const missingInputs = useMemo(() => {
+    const out = [];
+    for (const n of nodes) {
+      if (n.type !== 'technique') continue;
+      for (const p of (n.data?.inputPorts || [])) {
+        if (p.required === false) continue;
+        const fed = edges.some(e => e.target === n.id && e.targetHandle === p.name);
+        if (!fed) out.push({ node: n.data?.label || n.id, port: p.name });
+      }
+    }
+    return out;
+  }, [nodes, edges]);
+
   // ── Execute: resolve dataset_bindings (uuid → tensor real) e dispara ───────
   const handleDispatch = async () => {
     if (errors.length > 0) {
       toast.error(t('workflows.fixConnectionErrors'));
+      return;
+    }
+    if (missingInputs.length > 0) {
+      const first = missingInputs[0];
+      toast.error(t('workflows.missingInputsToast', { node: first.node, port: first.port, count: missingInputs.length - 1 }), { duration: 5000 });
       return;
     }
     setExec(true);
@@ -1536,6 +1597,10 @@ export default function WorkflowEditorPage() {
 
   // ── Resultados: visualizar porta / salvar porta como dataset ───────────────
   const handlePreviewPort = useCallback((execNode, port, value) => {
+    if (!Array.isArray(value)) {
+      setPreviewValue({ title: `${execNode.node_name || execNode.technique_slug} · ${port}`, value });
+      return;
+    }
     const dims = (() => {
       const d = []; let cur = value;
       while (Array.isArray(cur)) { d.push(cur.length); cur = cur[0]; }
@@ -1626,7 +1691,13 @@ export default function WorkflowEditorPage() {
             <span>{t('workflows.errorCount', { count: errors.length })}</span>
           </div>
         )}
-        {errors.length === 0 && nodes.filter(n => n.type === 'technique').length > 0 && (
+        {errors.length === 0 && missingInputs.length > 0 && (
+          <div title={missingInputs.map(m => `${m.node}.${m.port}`).join(', ')} style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fcd34d', fontSize: '0.74rem' }}>
+            <AlertCircle size={13} />
+            <span>{t('workflows.missingInputsBadge', { count: missingInputs.length })}</span>
+          </div>
+        )}
+        {errors.length === 0 && missingInputs.length === 0 && nodes.filter(n => n.type === 'technique').length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#6ee7b7', fontSize: '0.74rem' }}>
             <CheckCircle2 size={13} />
             <span>{t('workflows.pipelineValid')}</span>
@@ -1904,6 +1975,10 @@ export default function WorkflowEditorPage() {
       {previewDataset && (
         <MultiDimModal dataset={previewDataset} onClose={() => setPreviewDataset(null)} />
       )}
+
+      <Modal open={!!previewValue} onClose={() => setPreviewValue(null)} title={previewValue?.title} size="md">
+        {previewValue && <ResultValueView value={previewValue.value} />}
+      </Modal>
 
       {/* ── Modal de detalhes da técnica (botão ⓘ no painel lateral) ── */}
       <TechniqueModal

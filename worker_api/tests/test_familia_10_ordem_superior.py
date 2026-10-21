@@ -13,14 +13,6 @@ def _tensor_y(n=20, shape=(8, 6)):
     return X, y
 
 
-def _skip_tensorly_compat(slug):
-    """Return a skip result if tensorly API is incompatible."""
-    return type("R", (), {
-        "passed": True, "slug": slug, "duration_ms": 0,
-        "error": None,
-        "__repr__": lambda s: f"[SKIP] {slug} (tensorly API incompatible with installed version)"
-    })()
-
 
 def _base_checks():
     return [
@@ -35,8 +27,6 @@ def test_segunda_ordem():
     X, y = _tensor_y()
     result = smoke("segunda_ordem", {"X": X, "y": y}, {"n_components": 2},
         _base_checks())
-    if not result.passed and "kruskal_to_tensor" in str(result.error):
-        return _skip_tensorly_compat("segunda_ordem")
     return result
 
 
@@ -46,8 +36,6 @@ def test_terceira_ordem():
     y = rng.normal(0, 1, 12).tolist()
     result = smoke("terceira_ordem", {"X": X, "y": y}, {"n_components": 2},
         _base_checks())
-    if not result.passed and "kruskal_to_tensor" in str(result.error):
-        return _skip_tensorly_compat("terceira_ordem")
     return result
 
 
@@ -55,8 +43,6 @@ def test_ordem_superior_generica():
     X, y = _tensor_y()
     result = smoke("ordem_superior_generica", {"X": X, "y": y},
         {"n_components": 2}, _base_checks())
-    if not result.passed and "kruskal_to_tensor" in str(result.error):
-        return _skip_tensorly_compat("ordem_superior_generica")
     return result
 
 

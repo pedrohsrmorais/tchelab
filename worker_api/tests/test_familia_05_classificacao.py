@@ -86,8 +86,26 @@ def test_one_class_svm():
          list_len("decision_scores", 40)])
 
 
+def test_simca_rotulos_numericos_com_unknown():
+    """Regressão: rótulos int + amostras 'unknown' viravam array misto e o sklearn recusava."""
+    rng = np.random.default_rng(1)
+    X = np.abs(rng.normal(1, .3, (24, 30)))
+    y = [i % 3 for i in range(24)]
+    return smoke("simca", {"X": X.tolist(), "y": y}, {"n_components": 2}, _base_checks())
+
+
+def test_pls_oc_classe_pequena():
+    """Regressão: classe-alvo com < 10 amostras quebrava no reshape dos pseudo-negativos."""
+    rng = np.random.default_rng(1)
+    X = np.abs(rng.normal(1, .3, (24, 30)))
+    y = [i % 3 for i in range(24)]  # 8 amostras por classe
+    return smoke("pls_oc", {"X": X.tolist(), "y": y}, {"n_components": 2}, _base_checks())
+
+
 def run():
     results = [
+        test_simca_rotulos_numericos_com_unknown(),
+        test_pls_oc_classe_pequena(),
         test_lda(),
         test_qda(),
         test_knn(),

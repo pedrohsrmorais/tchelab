@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 export function Modal({ open, onClose, title, children, size = 'md' }) {
@@ -19,7 +20,9 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
 
   const maxW = { sm: '28rem', md: '40rem', lg: '56rem', xl: '72rem' }[size] || '40rem'
 
-  return (
+  // Portal em document.body: um ancestral com transform/filter/animation (ex.: .anim-fade-in
+  // das páginas) transforma `position: fixed` em relativo a ele, e o modal sumia fora da tela.
+  return createPortal(
     <div
       onClick={onClose}
       style={{ position:'fixed', inset:0, zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:'max(0.5rem, 2vw)',
@@ -50,7 +53,8 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
         )}
         <div style={{ padding:'clamp(1rem, 4vw, 1.5rem)', flex:'1 1 auto', minHeight:0, overflowY:'auto' }}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

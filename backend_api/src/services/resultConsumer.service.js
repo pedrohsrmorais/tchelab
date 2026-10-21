@@ -43,6 +43,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const redis = require('../config/redis.config');
+const { advanceExecution } = require('./executionPipeline.service');
 
 const RESULT_CHANNEL = process.env.RESULT_CHANNEL || 'tchelab_resultados';
 // Tem que ser compatível com worker_api/config.py (mesma env var nos dois
@@ -152,6 +153,9 @@ async function handleResultMessage(raw) {
       ],
     );
 
+    // Libera os nós seguintes (ou marca como 'skipped' se este falhou) antes
+    // de decidir se a execução acabou.
+    await advanceExecution(executionId);
     await finalizeExecutionIfDone(executionId);
   } catch (err) {
     console.error('[ResultConsumer] erro ao processar resultado:', err);
@@ -198,8 +202,17 @@ async function reconcile() {
     const [staleNodes] = await db.query(
       `SELECT en.id, en.execution_id
        FROM execution_nodes en
+       JOIN workflow_nodes wn ON wn.id = en.workflow_node_id
        WHERE en.status IN ('pending','running')
-         AND en.created_at < (NOW() - INTERVAL ? SECOND)`,
+         AND en.created_at < (NOW() - INTERVAL ? SECOND)
+         -- nó ainda aguardando um nó anterior (encadeamento): não é timeout dele
+         AND NOT EXISTS (
+           SELECT 1 FROM workflow_edges we
+           JOIN workflow_nodes swn ON swn.workflow_id = we.workflow_id AND swn.node_key = we.source_node_key
+           JOIN execution_nodes sen ON sen.workflow_node_id = swn.id AND sen.execution_id = en.execution_id
+           WHERE we.workflow_id = wn.workflow_id AND we.target_node_key = wn.node_key
+             AND sen.status IN ('pending','running')
+         )`,
       [staleCutoffSeconds],
     );
     const touchedExecutions = new Set();
@@ -229,6 +242,7 @@ async function reconcile() {
       touchedExecutions.add(node.execution_id);
     }
     for (const executionId of touchedExecutions) {
+      await advanceExecution(executionId);
       await finalizeExecutionIfDone(executionId);
     }
   } catch (err) {

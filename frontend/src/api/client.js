@@ -19,7 +19,11 @@ client.interceptors.response.use(
   r => r,
   async err => {
     const orig = err.config
-    if (err.response?.status === 401 && !orig._retry) {
+    // 401 em login/cadastro/refresh/recuperação é "credenciais inválidas", não "sessão expirada":
+    // tentar refresh + reload aqui apagava o toast de erro e o formulário (usuário via a página
+    // "piscar" sem nenhuma mensagem). O erro segue para quem chamou, que mostra o toast.
+    const isAuthCall = /\/auth\/(login|register|refresh|forgot-password|reset-password)/.test(orig?.url || '')
+    if (err.response?.status === 401 && !orig._retry && !isAuthCall) {
       orig._retry = true
       if (refreshing) {
         return new Promise((res, rej) => queue.push({ res, rej })).then(t => {
@@ -51,7 +55,7 @@ client.interceptors.response.use(
         // que 422 de novo... um loop de reload infinito, várias vezes por
         // segundo, que foi o que esgotou o rate limit em produção.
         localStorage.removeItem('tchelab-auth')
-        window.location.href = '/login'
+        if (window.location.pathname !== '/login') window.location.href = '/login'
       } finally { refreshing = false }
     }
     return Promise.reject(err)

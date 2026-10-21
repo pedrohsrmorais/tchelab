@@ -33,7 +33,7 @@ const LANGS = [
 const THEME_ICONS = { dark: Moon, light: Sun, classic: Monitor };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function Sidebar({ collapsed, onToggle }) {
+export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = false }) {
   const { t }               = useTranslation();
   const { theme, setTheme } = useTheme();
   const { user, logout, isPlus, isAdmin } = useAuthStore();
@@ -52,13 +52,21 @@ export function Sidebar({ collapsed, onToggle }) {
 
   return (
     <aside
+      aria-hidden={mobile && !mobileOpen ? true : undefined}
       style={{
-        width: collapsed ? 68 : 240,
-        minHeight: '100vh',
+        width: mobile ? 260 : (collapsed ? 68 : 240),
+        minHeight: mobile ? undefined : '100vh',
+        ...(mobile ? {
+          position: 'fixed', top: 0, left: 0, bottom: 0, height: '100dvh', zIndex: 60,
+          transform: mobileOpen ? 'translateX(0)' : 'translateX(-105%)',
+          boxShadow: mobileOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
+          visibility: mobileOpen ? 'visible' : 'hidden',
+          transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s',
+        } : {}),
         background: isDark ? 'rgba(10,15,30,0.97)' : 'rgba(248,250,252,0.98)',
         borderRight: `1px solid var(--border)`,
         display: 'flex', flexDirection: 'column',
-        flexShrink: 0, position: 'sticky', top: 0,
+        flexShrink: 0, ...(mobile ? {} : { position: 'sticky', top: 0 }),
         overflow: 'hidden',
         backdropFilter: 'blur(20px)',
         transition: 'width 0.28s cubic-bezier(0.16, 1, 0.3, 1)',

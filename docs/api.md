@@ -902,6 +902,17 @@ deleteEdge(req, res)
 
 **Responsabilidade:** disparo e monitoramento de execuções de workflows. Uma execução roda todos os nós do grafo em ordem topológica.
 
+> **Encadeamento de nós (2026-10-21).** O dispatch (`dispatchExecutionCore`) cria um `execution_node`
+> `pending` para cada nó, mas só **enfileira os nós raiz** (sem aresta de entrada), usando
+> `dataset_bindings` como entrada. Cada resultado recebido pelo `resultConsumer.service.js` chama
+> `executionPipeline.service.js::advanceExecution`, que (a) libera os nós cujas dependências
+> terminaram, montando `inputs[target_port] = outputs_do_nó_anterior[source_port]` (somado aos
+> bindings de dataset do próprio nó) e (b) marca como `skipped` — transitivamente — os nós que
+> dependem de um nó `failed`/`skipped`. O "claim" de cada nó é um `UPDATE ... started_at` atômico
+> (sem enfileirar duas vezes). A reconciliação por timeout ignora nós ainda aguardando um nó anterior.
+> Antes disso todos os nós iam para a fila de uma vez só com os bindings e qualquer nó alimentado por
+> outro nó falhava com "Campo obrigatório ausente".
+
 **Tabelas:** `executions`, `execution_nodes`, `jobs`
 
 ### Rotas

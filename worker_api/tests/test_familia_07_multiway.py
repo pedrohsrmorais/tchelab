@@ -31,11 +31,7 @@ def test_parafac():
                               "error": None, "__repr__": lambda s: "[SKIP] parafac (tensorly not installed)"})()
     T = _tensor()
     result = smoke("parafac", {"X": T}, {"n_components": 2},
-        [has_keys("factors", "reconstruction_error")])
-    if not result.passed and "kruskal_to_tensor" in str(result.error):
-        # tensorly version incompatibility
-        return type("R", (), {"passed": True, "slug": "parafac", "duration_ms": 0,
-                              "error": None, "__repr__": lambda s: "[SKIP] parafac (tensorly API incompatible)"})()
+        [has_keys("factors", "weights", "fit")])
     return result
 
 

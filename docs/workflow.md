@@ -108,6 +108,11 @@ scalar → matrix     ✗
 
 Vocabulário de tipos: `matrix`, `tensor`, `vector`, `scalar`, `model`, `figures`, `labels`. A comparação é por igualdade estrita; uma porta **sem** `type` (operações que aceitam qualquer ordem, ou saídas em dicionário/lista) funciona como curinga e conecta com qualquer porta. Convenção do catálogo: operações só-2D → `matrix`; multiway (≥3 modos) → `tensor`; `y` → `vector`; modelos → `model`.
 
+> **Entradas obrigatórias sem fonte (2026-10-21).** Além da checagem de tipo, o editor avisa
+> ("N entradas obrigatórias sem fonte", em âmbar) e bloqueia o **Executar** enquanto uma porta
+> `required` de um nó técnica não tiver aresta de entrada nem ligação de dataset — o worker sempre
+> falharia com "Campo obrigatório ausente". Portas marcadas `required: false` não entram nessa regra.
+
 ### 5. Ordem analítica
 O `data_order` do array de entrada satisfaz `min_order` e `max_order` da técnica de destino. Só é checada quando a aresta já tem um dataset conhecido na ponta de origem (`datasetMeta`); numa aresta entre dois nós de workflow ainda sem execução, essa camada é pulada.
 

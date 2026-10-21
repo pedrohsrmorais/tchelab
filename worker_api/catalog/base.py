@@ -108,3 +108,18 @@ class BaseScript(abc.ABC):
             "familia": self.familia,
             "descricao": self.descricao,
         }
+
+
+def cp_to_tensor(cp_tensor):
+    """Reconstrói o tensor a partir de (weights, factors) de uma decomposição CP/PARAFAC.
+
+    tensorly >= 0.7 expõe `tensorly.cp_tensor.cp_to_tensor`; o antigo `tl.kruskal_to_tensor`
+    foi removido na 0.10 (e requirements.txt só exige tensorly>=0.8). Fallback mantido para
+    instalações antigas.
+    """
+    try:
+        from tensorly.cp_tensor import cp_to_tensor as _f
+    except ImportError:  # pragma: no cover - tensorly muito antigo
+        import tensorly as tl
+        _f = tl.kruskal_to_tensor
+    return _f(cp_tensor)

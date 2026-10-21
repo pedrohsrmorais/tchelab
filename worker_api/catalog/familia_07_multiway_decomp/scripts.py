@@ -1,7 +1,7 @@
 """Decomposição Multiway — Família 07"""
 from __future__ import annotations
 import numpy as np
-from catalog.base import BaseScript
+from catalog.base import BaseScript, cp_to_tensor
 
 
 class PARAFAC(BaseScript):
@@ -43,7 +43,7 @@ class PARAFAC(BaseScript):
                 random_state=random_state, normalize_factors=normalize_factors,
             )
 
-        X_rec = tl.kruskal_to_tensor((weights, factors))
+        X_rec = cp_to_tensor((weights, factors))
         residuals = X - X_rec
         fit = 1.0 - float(np.linalg.norm(residuals) / (np.linalg.norm(X) + 1e-12))
 
@@ -115,7 +115,7 @@ class PARAFACAumentado(BaseScript):
         X_aug = np.concatenate([X, X[..., perm]], axis=-1)
 
         weights, factors = non_negative_parafac(X_aug, rank=rank, n_iter_max=n_iter_max, tol=tol)
-        X_rec = tl.kruskal_to_tensor((weights, factors))
+        X_rec = cp_to_tensor((weights, factors))
         fit = 1.0 - float(np.linalg.norm(X_aug - X_rec) / (np.linalg.norm(X_aug) + 1e-12))
 
         return {

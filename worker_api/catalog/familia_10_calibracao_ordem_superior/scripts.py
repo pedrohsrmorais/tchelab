@@ -1,7 +1,7 @@
 """Calibração de Ordem Superior — Família 10"""
 from __future__ import annotations
 import numpy as np
-from catalog.base import BaseScript
+from catalog.base import BaseScript, cp_to_tensor
 from catalog.familia_04_regressao_1d.scripts import _metrics_cal
 
 
@@ -37,7 +37,7 @@ class SegundaOrdem(BaseScript):
         reg.fit(A, y)
         y_pred = reg.predict(A)
 
-        X_rec = tl.kruskal_to_tensor((weights, factors))
+        X_rec = cp_to_tensor((weights, factors))
         fit = 1.0 - float(np.linalg.norm(X - X_rec) / (np.linalg.norm(X) + 1e-12))
 
         return {
@@ -83,7 +83,7 @@ class TerceiraOrdem(BaseScript):
         reg.fit(A, y)
         y_pred = reg.predict(A)
 
-        X_rec = tl.kruskal_to_tensor((weights, factors))
+        X_rec = cp_to_tensor((weights, factors))
         fit = 1.0 - float(np.linalg.norm(X - X_rec) / (np.linalg.norm(X) + 1e-12))
 
         return {
@@ -128,7 +128,7 @@ class QuartaOrdem(BaseScript):
         reg.fit(A, y)
         y_pred = reg.predict(A)
 
-        X_rec = tl.kruskal_to_tensor((weights, factors))
+        X_rec = cp_to_tensor((weights, factors))
         fit = 1.0 - float(np.linalg.norm(X - X_rec) / (np.linalg.norm(X) + 1e-12))
 
         return {
@@ -179,7 +179,7 @@ class OrdemSuperiorGenerica(BaseScript):
         reg.fit(A, y)
         y_pred = reg.predict(A)
 
-        X_rec = tl.kruskal_to_tensor((weights, factors))
+        X_rec = cp_to_tensor((weights, factors))
         fit = 1.0 - float(np.linalg.norm(X - X_rec) / (np.linalg.norm(X) + 1e-12))
 
         return {

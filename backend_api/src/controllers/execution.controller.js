@@ -3,6 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const jobService = require('../services/job.service');
+const pipeline = require('../services/executionPipeline.service');
 const R = require('../utils/response');
 
 async function resolveWorkflow(uuid) {
@@ -112,6 +113,7 @@ async function dispatchExecutionCore(workflow, user, { parameters_override = {},
   // Cria execution_nodes e enfileira um job por nó na ordem topológica
   const nodeMap = Object.fromEntries(nodes.map((n) => [n.node_key, n]));
   const jobUuids = [];
+  const hasIncoming = new Set(edges.map((e) => e.target_node_key));
   for (const nodeKey of sorted) {
     const node = nodeMap[nodeKey];
     // node.parameters é uma coluna JSON: o mysql2 já entrega um objeto JS
@@ -126,17 +128,7 @@ async function dispatchExecutionCore(workflow, user, { parameters_override = {},
     };
     const inputs = dataset_bindings[nodeKey] || {};
 
-    // input_metadata guarda só a "forma" (dims) de cada porta de entrada, não
-    // o tensor inteiro de novo — o tensor já vai ficar em input_data, então
-    // isto é só para o editor poder mostrar "3 amostras × 5 variáveis" sem
-    // precisar re-percorrer o array toda vez que abre o visualizador de nó.
-    const inputShapes = {};
-    for (const [portName, value] of Object.entries(inputs)) {
-      const dims = [];
-      let cur = value;
-      while (Array.isArray(cur)) { dims.push(cur.length); cur = cur[0]; }
-      inputShapes[portName] = dims;
-    }
+    const inputShapes = pipeline.inputShapesOf(inputs);
 
     // Registra nó de execução com status pending — grava também input_data
     // (os dados que de fato entraram nesta porta, resolvidos a partir de
@@ -145,27 +137,26 @@ async function dispatchExecutionCore(workflow, user, { parameters_override = {},
     // impossível (a coluna existia no schema mas ficava sempre NULL) — era
     // um dos bugs pedidos: "visualizar o input 'os dados que entraram'".
     const [enResult] = await db.query(
-      `INSERT INTO execution_nodes (execution_id, workflow_node_id, status, input_data, input_metadata, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, NOW(), NOW())`,
-      [executionId, node.id, JSON.stringify(inputs), JSON.stringify(inputShapes)],
+      `INSERT INTO execution_nodes (execution_id, workflow_node_id, status, parameters, input_data, input_metadata, created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, NOW(), NOW())`,
+      [executionId, node.id, JSON.stringify(nodeParams), JSON.stringify(inputs), JSON.stringify(inputShapes)],
     );
 
-    const { uuid: jobUuid } = await jobService.createJob({
-      job_type: 'execute_node',
-      user_id: user.id,
-      execution_id: executionId,
-      workflow_id: workflow.id,
-      payload: {
-        // Campos obrigatórios do JobPayload do worker Python
-        execution_id: execUuid,
-        node_id: nodeKey,
-        slug: node.technique_slug,
-        inputs,
-        params: nodeParams,
-        // Metadados extras para rastreabilidade
-        execution_node_id: enResult.insertId,
-        workflow_uuid: workflow.uuid,
-      },
+    // Só os nós raiz (sem aresta de entrada) entram na fila agora. Os demais
+    // ficam 'pending' e são liberados por advanceExecution() quando os nós
+    // anteriores terminam — aí sim com as saídas deles como entrada.
+    if (hasIncoming.has(nodeKey)) continue;
+
+    const { uuid: jobUuid } = await pipeline.enqueueNode({
+      executionUuid: execUuid,
+      workflow,
+      userId: user.id,
+      executionId,
+      executionNodeId: enResult.insertId,
+      nodeKey,
+      slug: node.technique_slug,
+      inputs,
+      params: nodeParams,
     });
     jobUuids.push(jobUuid);
   }

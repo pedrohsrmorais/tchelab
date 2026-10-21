@@ -1445,7 +1445,7 @@ ENTRIES = {
             "metrics_cal": (None, (
                 "Métricas de calibração (ajuste no próprio conjunto de treino): RMSEC, R2C e bias."
             )),
-            "model": ("model", "Metadados do modelo PCR treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo PCR treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "scores": ("matrix", "Scores da PCA de X (posição das amostras nos componentes usados na regressão)."),
         },
         how=(
@@ -1505,7 +1505,7 @@ ENTRIES = {
         },
         outputs={
             "metrics_cal": (None, "Métricas de classificação na calibração: acurácia e acurácia balanceada."),
-            "model": ("model", "Metadados do modelo KNN treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo KNN treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
         },
         how=(
             "Classifica uma amostra nova olhando as K amostras de treino mais próximas dela (por "
@@ -1533,7 +1533,7 @@ ENTRIES = {
         outputs={
             "loadings": ("matrix", "Coeficientes (scalings) de cada variável em cada eixo discriminante."),
             "metrics_cal": (None, "Métricas de classificação na calibração: acurácia e acurácia balanceada."),
-            "model": ("model", "Metadados do modelo LDA treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo LDA treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "scores": ("matrix", (
                 "Scores discriminantes: projeção das amostras nos eixos que melhor separam as classes."
             )),
@@ -1565,7 +1565,7 @@ ENTRIES = {
         outputs={
             "classes": ("vector", "Rótulos das classes, na ordem das colunas da resposta dummy."),
             "metrics_cal": (None, "Métricas de classificação na calibração: acurácia e acurácia balanceada."),
-            "model": ("model", "Metadados do modelo PLS-DA treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo PLS-DA treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "scores": ("matrix", "Scores do PLS-DA (posição das amostras no espaço latente)."),
             "x_loadings": ("matrix", "Loadings de X nos componentes latentes."),
             "x_weights": ("matrix", "Pesos de X nos componentes latentes."),
@@ -1599,7 +1599,7 @@ ENTRIES = {
             "T2_scores": ("vector", "Valor de T² de cada amostra da classe-alvo no espaço dos scores do PLS."),
             "metrics_cal": (None, "Métricas de classificação na calibração: acurácia e acurácia balanceada."),
             "model": ("model", (
-                "Metadados do modelo PLS one-class treinado (tipo e principais hiperparâmetros)."
+                "Modelo PLS one-class treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."
             )),
             "threshold_T2": ("scalar", (
                 "Limiar de T² de Hotelling para aceitar uma amostra como pertencente à classe-alvo."
@@ -1627,7 +1627,7 @@ ENTRIES = {
             "feature_importances": ("vector", "Importância de cada variável na decisão do conjunto de árvores (soma 1)."),
             "metrics_cal": (None, "Métricas de classificação na calibração: acurácia e acurácia balanceada."),
             "model": ("model", (
-                "Metadados do modelo Random Forest treinado (tipo e principais hiperparâmetros)."
+                "Modelo Random Forest treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."
             )),
         },
         how=(
@@ -1653,7 +1653,7 @@ ENTRIES = {
         },
         outputs={
             "metrics_cal": (None, "Métricas de classificação na calibração: acurácia e acurácia balanceada."),
-            "model": ("model", "Metadados do modelo SVM treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo SVM treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "support_vectors": ("matrix", "Amostras de treino que definem a fronteira de decisão (vetores de suporte)."),
         },
         how=(
@@ -1679,7 +1679,7 @@ ENTRIES = {
             "X": ("matrix", "Matriz de dados de treino."),
         },
         outputs={
-            "model": ("model", "Metadados do modelo Autoencoder treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo Autoencoder treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "latent": ("matrix", (
                 "Representação comprimida de cada amostra no espaço latente (amostras × latent_dim)."
             )),
@@ -1722,7 +1722,7 @@ ENTRIES = {
                 "Métricas da última época do treinamento (ex.: loss e, se disponíveis, métricas de "
                 "validação)."
             )),
-            "model": ("model", "Metadados do modelo CNN-1D treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo CNN-1D treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
         },
         how=(
             "Rede neural convolucional adaptada pra sinais 1D (espectros): em vez de olhar o espectro "
@@ -1746,7 +1746,7 @@ ENTRIES = {
             "X": ("matrix", "Matriz de espectros de treino."),
         },
         outputs={
-            "model": ("model", "Metadados do modelo de difusão treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo de difusão treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "X_denoised": ("matrix", "Espectros com ruído removido (só quando task = 'denoise')."),
             "X_augmented": ("matrix", "Espectros sintéticos gerados (só quando task = 'augment')."),
             "training_loss": (None, "Perda final do treinamento (média das últimas épocas)."),
@@ -1783,7 +1783,7 @@ ENTRIES = {
                 "Métricas da última época do treinamento (ex.: loss e, se disponíveis, métricas de "
                 "validação)."
             )),
-            "model": ("model", "Metadados do modelo MLP treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo MLP treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
         },
         how=(
             "Rede neural densa clássica: camadas de neurônios totalmente conectadas, cada uma "
@@ -1815,7 +1815,7 @@ ENTRIES = {
                 "Métricas da última época do treinamento (ex.: loss e, se disponíveis, métricas de "
                 "validação)."
             )),
-            "model": ("model", "Metadados do modelo RNN treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo RNN treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
         },
         how=(
             "Rede neural recorrente (LSTM ou GRU, conforme parâmetro): processa o espectro como uma "
@@ -1840,7 +1840,7 @@ ENTRIES = {
             "y": ("vector", "Valor a prever ou rótulo de classe."),
         },
         outputs={
-            "model": ("model", "Metadados do modelo Transformer treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo Transformer treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "history": (None, (
                 "Métricas da última época do treinamento (ex.: loss e, se disponíveis, métricas de "
                 "validação)."
@@ -1973,7 +1973,7 @@ ENTRIES = {
             "metrics_cal": (None, (
                 "Métricas de calibração (ajuste no próprio conjunto de treino): RMSEC, R2C e bias."
             )),
-            "model": ("model", "Metadados do modelo N-PLS treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo N-PLS treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "scores": ("matrix", "Scores das amostras no espaço latente (amostras × componentes)."),
             "x_loadings": ("matrix", (
                 "Loadings do PLS sobre o tensor desdobrado (variáveis desdobradas × componentes)."
@@ -2008,7 +2008,7 @@ ENTRIES = {
             "metrics_cal": (None, (
                 "Métricas de calibração (ajuste no próprio conjunto de treino): RMSEC, R2C e bias."
             )),
-            "model": ("model", "Metadados do modelo U-PLS treinado (tipo e principais hiperparâmetros)."),
+            "model": ("model", "Modelo U-PLS treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."),
             "scores": ("matrix", "Scores das amostras no espaço latente (amostras × componentes)."),
         },
         how=(
@@ -2034,7 +2034,7 @@ ENTRIES = {
             "classes": ("vector", "Rótulos das classes, na ordem das colunas da resposta dummy."),
             "metrics_cal": (None, "Métricas de classificação na calibração: acurácia e acurácia balanceada."),
             "model": ("model", (
-                "Metadados do modelo PLS-DA multiway treinado (tipo e principais hiperparâmetros)."
+                "Modelo PLS-DA multiway treinado: tipo, hiperparâmetros e, quando o método as guarda, os parâmetros ajustados (coeficientes, pesos, cargas)."
             )),
             "scores": ("matrix", "Scores das amostras no espaço latente do PLS-DA (amostras × componentes)."),
         },

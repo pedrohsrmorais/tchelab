@@ -759,6 +759,14 @@ export default function WorkspacePage() {
   const s = useWsStyles(theme);
   const cl = theme === 'classic';
 
+  // <720px: painéis empilhados (variáveis em cima, operação embaixo) em vez de lado a lado.
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 720);
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 720);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const [variables, setVariables]       = useState([]);
   const [techniques, setTechniques]     = useState([]);
   const [loadingVars, setLoadingVars]   = useState(true);
@@ -982,10 +990,10 @@ export default function WorkspacePage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: cl ? '#d4d0c8' : 'var(--bg-base)', fontFamily: 'var(--font-sans)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'var(--page-h, 100%)', minHeight: 420, overflow: 'hidden', background: cl ? '#d4d0c8' : 'var(--bg-base)', fontFamily: 'var(--font-sans)' }}>
 
       {/* ════════════════ TOOLBAR ════════════════ */}
-      <div style={s.toolbar}>
+      <div style={{ ...s.toolbar, flexWrap: 'wrap', rowGap: 4 }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginRight: 4 }}>
           <Table2 size={14} style={{ color: cl ? '#0a5fa8' : 'var(--accent)' }} />
@@ -1040,12 +1048,14 @@ export default function WorkspacePage() {
       </div>
 
       {/* ════════════════ BODY ════════════════ */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', flex: 1, overflow: narrow ? 'auto' : 'hidden', minHeight: 0 }}>
 
         {/* ──── Painel esquerdo: Workspace Browser ──── */}
         <div style={{
-          width: 300, flexShrink: 0,
-          borderRight: cl ? '1px solid #aca899' : '1px solid var(--border)',
+          width: narrow ? '100%' : 300, flexShrink: 0,
+          ...(narrow ? { maxHeight: 240, overflow: 'auto' } : {}),
+          borderRight: narrow ? 'none' : (cl ? '1px solid #aca899' : '1px solid var(--border)'),
+          borderBottom: narrow ? (cl ? '1px solid #aca899' : '1px solid var(--border)') : 'none',
           display: 'flex', flexDirection: 'column',
           background: cl ? '#f0eeea' : 'var(--bg-surface)',
         }}>
@@ -1143,7 +1153,7 @@ export default function WorkspacePage() {
         </div>
 
         {/* ──── Painel central: Operação / Variable Editor ──── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, background: cl ? '#f5f5f5' : 'var(--bg-base)' }}>
+        <div style={{ flex: narrow ? '0 0 auto' : 1, minHeight: narrow ? 480 : undefined, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, background: cl ? '#f5f5f5' : 'var(--bg-base)' }}>
 
           {/* Sub-tabs (MATLAB-style panel tabs) */}
           <div style={{

@@ -32,7 +32,7 @@ function StatusBadge({ active }) {
 
 function Section({ icon: Icon, title, children, iconColor = '#60a5fa' }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '14px 16px' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
       <h3 style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}>
         <Icon size={14} style={{ color: iconColor, flexShrink: 0 }} /> {title}
       </h3>
@@ -53,12 +53,12 @@ function PortTable({ title, ports, accent }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {ports.map((p) => (
-            <div key={p.name} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px' }}>
+            <div key={p.name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 3 }}>
                 <code style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', padding: '1px 6px', borderRadius: 4, background: `${accent}22`, color: accent, fontWeight: 700 }}>
                   {p.name}
                 </code>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', padding: '0 6px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', padding: '0 6px', borderRadius: 999, border: '1px solid var(--border)' }}>
                   {p.type === ARRAY_TYPES.ANY ? t('catalog.anyType') : p.type}
                 </span>
                 {p.required === false && (
@@ -96,7 +96,7 @@ function ParamList({ schema }) {
         const d = def || {};
         const options = Array.isArray(d.enum) ? d.enum : Array.isArray(d.options) ? d.options : null;
         return (
-          <div key={name} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px' }}>
+          <div key={name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: d.description ? 3 : 0 }}>
               <code style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', padding: '1px 6px', borderRadius: 4, background: '#a78bfa22', color: '#a78bfa', fontWeight: 700 }}>{name}</code>
               {d.type && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{d.type}</span>}
@@ -125,9 +125,13 @@ function ParamList({ schema }) {
  *   onClose   {function} – called when user dismisses the modal
  *   technique {object}   – full technique object from the API (must be provided)
  */
-export default function TechniqueModal({ open, onClose, technique: tech }) {
+/**
+ * TechniqueDetails — corpo da documentação de uma técnica (cabeçalho, descrição,
+ * como funciona, dicas, portas, parâmetros, nota histórica, tags). Usado pelo
+ * TechniqueModal e pela página /catalogo/:uuid, para os dois nunca divergirem.
+ */
+export function TechniqueDetails({ technique: tech, showFullLink = true, onNavigate }) {
   const { t } = useTranslation();
-
   if (!tech) return null;
 
   const fam     = getFamilyConfig(tech.family);
@@ -138,121 +142,130 @@ export default function TechniqueModal({ open, onClose, technique: tech }) {
   const hasDocs = !!(tech.how_it_works || tech.usage_tips);
 
   return (
-    <Modal open={open} onClose={onClose} size="lg">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* ── Header ────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingRight: 32 }}>
-          <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
-              {fam && (
-                <span style={{
-                  fontSize: '0.68rem', fontWeight: 700,
-                  padding: '2px 10px', borderRadius: 999,
-                  background: fam.bg, color: fam.color, border: `1px solid ${fam.border}`,
-                }}>
-                  {fam.labelStr || tech.family}
-                </span>
-              )}
-              <code style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                {tech.slug}
-              </code>
-            </div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px', lineHeight: 1.25, overflowWrap: 'anywhere' }}>
-              {tech.name}
-            </h2>
-            <StatusBadge active={!!tech.active} />
+      {/* ── Header ────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingRight: 32 }}>
+        <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+            {fam && (
+              <span style={{
+                fontSize: '0.68rem', fontWeight: 700,
+                padding: '2px 10px', borderRadius: 999,
+                background: fam.bg, color: fam.color, border: `1px solid ${fam.border}`,
+              }}>
+                {fam.labelStr || tech.family}
+              </span>
+            )}
+            <code style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              {tech.slug}
+            </code>
           </div>
-          {tech.uuid && (
-            <Link
-              to={`/catalogo/${tech.uuid}`}
-              onClick={onClose}
-              title={t('catalog.backToCatalog')}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                fontSize: '0.75rem', color: 'var(--text-muted)',
-                textDecoration: 'none', flexShrink: 0, paddingTop: 2,
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-            >
-              <ExternalLink size={13} />
-              {t('catalog.fullPage', 'Página completa')}
-            </Link>
-          )}
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px', lineHeight: 1.25, overflowWrap: 'anywhere' }}>
+            {tech.name}
+          </h2>
+          <StatusBadge active={!!tech.active} />
         </div>
+        {showFullLink && tech.uuid && (
+          <Link
+            to={`/catalogo/${tech.uuid}`}
+            onClick={onNavigate}
+            title={t('catalog.backToCatalog')}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              fontSize: '0.75rem', color: 'var(--text-muted)',
+              textDecoration: 'none', flexShrink: 0, paddingTop: 2,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+          >
+            <ExternalLink size={13} />
+            {t('catalog.fullPage', 'Página completa')}
+          </Link>
+        )}
+      </div>
 
-        {/* ── Description ───────────────────────────────────────────── */}
-        <Section icon={BookOpen} title={t('catalog.whatIsIt')}>
-          {tech.description || t('catalog.noDescriptionRegistered')}
+      {/* ── Description ───────────────────────────────────────────── */}
+      <Section icon={BookOpen} title={t('catalog.whatIsIt')}>
+        {tech.description || t('catalog.noDescriptionRegistered')}
+      </Section>
+
+      {/* ── How it works ──────────────────────────────────────────── */}
+      {tech.how_it_works && (
+        <Section icon={Cog} title={t('catalog.howItWorks')} iconColor="#a78bfa">
+          {tech.how_it_works}
         </Section>
+      )}
 
-        {/* ── How it works ──────────────────────────────────────────── */}
-        {tech.how_it_works && (
-          <Section icon={Cog} title={t('catalog.howItWorks')} iconColor="#a78bfa">
-            {tech.how_it_works}
-          </Section>
-        )}
+      {/* ── Usage tips ────────────────────────────────────────────── */}
+      {tech.usage_tips && (
+        <Section icon={Lightbulb} title={t('catalog.usageTips')} iconColor="#facc15">
+          {tech.usage_tips}
+        </Section>
+      )}
 
-        {/* ── Usage tips ────────────────────────────────────────────── */}
-        {tech.usage_tips && (
-          <Section icon={Lightbulb} title={t('catalog.usageTips')} iconColor="#facc15">
-            {tech.usage_tips}
-          </Section>
-        )}
+      {!hasDocs && (
+        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{t('catalog.devNoDocs')}</p>
+      )}
 
-        {!hasDocs && (
-          <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{t('catalog.devNoDocs')}</p>
-        )}
-
-        {/* ── Input / Output ────────────────────────────────────────── */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '14px 16px' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
-            <Tag size={14} style={{ color: '#60a5fa' }} /> {t('catalog.inputOutput')}
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <PortTable
-              title={<><LogIn size={11} /> {t('catalog.expectedInput')}</>}
-              ports={inputs}
-              accent="#60a5fa"
-            />
-            <PortTable
-              title={<><LogOutIcon size={11} /> {t('catalog.producedOutput')}</>}
-              ports={outputs}
-              accent="#4ade80"
-            />
-          </div>
+      {/* ── Input / Output ────────────────────────────────────────── */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
+          <Tag size={14} style={{ color: '#60a5fa' }} /> {t('catalog.inputOutput')}
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <PortTable
+            title={<><LogIn size={11} /> {t('catalog.expectedInput')}</>}
+            ports={inputs}
+            accent="#60a5fa"
+          />
+          <PortTable
+            title={<><LogOutIcon size={11} /> {t('catalog.producedOutput')}</>}
+            ports={outputs}
+            accent="#4ade80"
+          />
         </div>
+      </div>
 
-        {/* ── Parameters ────────────────────────────────────────────── */}
+      {/* ── Parameters ────────────────────────────────────────────── */}
+      {(Object.keys(params).length > 0 || !!tech.active) && (
         <Section icon={SlidersHorizontal} title={t('catalog.parameters')} iconColor="#a78bfa">
           <ParamList schema={params} />
         </Section>
+      )}
 
-        {/* ── Historical note ───────────────────────────────────────── */}
-        {tech.historical_note && (
-          <Section icon={Lightbulb} title={t('catalog.historicalNote')} iconColor="#f59e0b">
-            {tech.historical_note}
-          </Section>
-        )}
+      {/* ── Historical note ───────────────────────────────────────── */}
+      {tech.historical_note && (
+        <Section icon={Lightbulb} title={t('catalog.historicalNote')} iconColor="#f59e0b">
+          {tech.historical_note}
+        </Section>
+      )}
 
-        {/* ── Tags ──────────────────────────────────────────────────── */}
-        {tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {tags.map((tag) => (
-              <span key={tag} style={{
-                fontSize: '0.7rem', padding: '2px 8px', borderRadius: 999,
-                background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)',
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}>
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
+      {/* ── Tags ──────────────────────────────────────────────────── */}
+      {tags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {tags.map((tag) => (
+            <span key={tag} style={{
+              fontSize: '0.7rem', padding: '2px 8px', borderRadius: 999,
+              background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
 
-      </div>
+    </div>
+  );
+}
+
+export default function TechniqueModal({ open, onClose, technique: tech }) {
+  if (!tech) return null;
+  return (
+    <Modal open={open} onClose={onClose} size="lg">
+      <TechniqueDetails technique={tech} onNavigate={onClose} />
     </Modal>
   );
 }
