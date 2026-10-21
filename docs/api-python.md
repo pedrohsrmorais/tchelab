@@ -87,7 +87,7 @@ estavam com chaves divergentes do código real até serem corrigidos).
    lista de slugs disponíveis se não encontrar.
 
 Isso é o que a mensagem de log `ScriptFactory: N scripts registrados.` no boot do worker conta —
-hoje **169** (confirmado rodando `autodiscover()` localmente em 2026-10-13; `worker_api/README.md`
+hoje **188** (169 originais + 19 funções MATLAB-like adicionadas em 2026-10-21; `worker_api/README.md`
 já cita esse número certo). O worker nunca executa código arbitrário — só o que está registrado
 aqui, e só o que tem `slug` declarado.
 

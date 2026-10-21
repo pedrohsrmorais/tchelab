@@ -441,6 +441,204 @@ Avalia expressão matemática customizada de forma segura via AST.
 
 ---
 
+## Funções MATLAB-like (`tags: ["matlab","math","basic","workspace"]`)
+
+Scripts que replicam funções comuns do workspace MATLAB/NumPy. Todos operam sobre a porta `X` (array numérico). UUID base: `a1b2c3d4-000N-4000-8000-00000000000N`.
+
+---
+
+## `var`
+
+Calcula a variância dos elementos de X.
+
+**Inputs:** `X` (array numérico, qualquer shape)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (scalar ou array, dependendo do shape de X)
+
+---
+
+## `abs`
+
+Valor absoluto elemento a elemento de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `sort`
+
+Ordena os elementos de X em ordem crescente.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** `axis` (int, default −1 — eixo de ordenação)  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `cumsum`
+
+Soma cumulativa dos elementos de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** `axis` (int, default −1)  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `diff`
+
+Diferenças consecutivas entre elementos de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** `n` (int, default 1 — ordem da diferença), `axis` (int, default −1)  
+**Outputs:** `result` (array com dimensão reduzida em n no eixo escolhido)
+
+---
+
+## `corr`
+
+Matriz de correlação de X.
+
+**Inputs:** `X` (matrix 2D, shape (m, n))  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (matrix quadrada (n, n))
+
+---
+
+## `cov`
+
+Matriz de covariância de X.
+
+**Inputs:** `X` (matrix 2D, shape (m, n))  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (matrix quadrada (n, n))
+
+---
+
+## `fft`
+
+Transformada Rápida de Fourier (FFT) de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** `axis` (int, default −1)  
+**Outputs:** `result` (array complexo com mesmo shape de X)
+
+---
+
+## `log`
+
+Logaritmo natural (base e) elemento a elemento de X.
+
+**Inputs:** `X` (array numérico, todos os valores > 0)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (array com mesmo shape de X)  
+**Restrições:** `validate()` verifica que todos os valores de X são positivos.
+
+---
+
+## `exp`
+
+Exponencial elemento a elemento de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `sqrt`
+
+Raiz quadrada elemento a elemento de X.
+
+**Inputs:** `X` (array numérico, todos os valores ≥ 0)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (array com mesmo shape de X)  
+**Restrições:** `validate()` verifica que todos os valores de X são não-negativos.
+
+---
+
+## `linspace`
+
+Gera vetor com N valores igualmente espaçados entre `start` e `stop`.
+
+**Inputs:** nenhum (gerador puro — não lê `inputs["X"]`)  
+**Parâmetros:** `start` (float), `stop` (float), `num` (int, default 50)  
+**Outputs:** `result` (vetor 1D de shape (num,))
+
+---
+
+## `round`
+
+Arredonda os elementos de X para N casas decimais.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** `decimals` (int, default 0)  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `floor`
+
+Piso (maior inteiro ≤ valor) elemento a elemento de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `ceil`
+
+Teto (menor inteiro ≥ valor) elemento a elemento de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `sign`
+
+Sinal de cada elemento de X (−1, 0 ou 1).
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `mod`
+
+Resto da divisão elemento a elemento de X por `divisor`.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** `divisor` (float, obrigatório ≠ 0)  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `cumprod`
+
+Produto cumulativo dos elementos de X.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** `axis` (int, default −1)  
+**Outputs:** `result` (array com mesmo shape de X)
+
+---
+
+## `unique`
+
+Valores únicos de X, em ordem crescente.
+
+**Inputs:** `X` (array numérico)  
+**Parâmetros:** nenhum  
+**Outputs:** `result` (vetor 1D com os valores únicos)
+
+---
+
 # Família 02 — Pré-processamento (`02_preprocessamento`)
 
 Scripts de transformação espectral. Operações sem modelo — apenas transformam X.

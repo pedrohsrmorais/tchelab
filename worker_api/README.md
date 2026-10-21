@@ -44,7 +44,7 @@ O log de início deve mostrar algo como:
 
 ```
 TcheLab Worker iniciando | concurrency=4 | queue=tchelab_fila
-ScriptFactory: 169 scripts registrados.
+ScriptFactory: 188 scripts registrados.
 Conectado ao Redis: redis://127.0.0.1:6379/1
 ```
 

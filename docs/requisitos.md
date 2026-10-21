@@ -155,7 +155,7 @@
 
 ### Requisitos
 
-- Operações matemáticas pré-existentes: inversão, transposição, multiplicação, soma/subtração, normalizações, funções, operações condicionais, seleção/concatenação/empilhamento de dimensões
+- Operações matemáticas pré-existentes: inversão, transposição, multiplicação, soma/subtração, normalizações, funções, operações condicionais, seleção/concatenação/empilhamento de dimensões; funções MATLAB-like: `var`, `abs`, `sort`, `cumsum`, `diff`, `corr`, `cov`, `fft`, `log`, `exp`, `sqrt`, `linspace`, `round`, `floor`, `ceil`, `sign`, `mod`, `cumprod`, `unique`
 - Combinar operações em sequência
 - Operar sobre dimensões específicas de dados multiway
 - Criar regras matemáticas/condicionais personalizadas

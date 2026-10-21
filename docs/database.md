@@ -614,6 +614,9 @@ Catálogo dos blocos executáveis. Inclui técnicas nativas e modelos customizad
 | `historical_note` | TEXT NULL | Nota histórica/origem da técnica (pode ser NULL — nem toda técnica tem uma origem notável o suficiente pra citar) |
 | `usage_tips` | TEXT NULL | Dicas práticas de uso, também exibidas na página de Catálogo |
 
+**Observação sobre o catálogo:**  
+A tabela contém 188 técnicas nativas ativas (active=1) no estado atual do seed. 19 delas são funções MATLAB-like (`var`, `abs`, `sort`, `cumsum`, `diff`, `corr`, `cov`, `fft`, `log`, `exp`, `sqrt`, `linspace`, `round`, `floor`, `ceil`, `sign`, `mod`, `cumprod`, `unique`), todas na família `01_dados`, com `tags = '["matlab","math","basic","workspace"]'` e UUIDs no padrão `a1b2c3d4-000N-4000-8000-00000000000N`.
+
 **Constraints:**
 ```sql
 CHECK (max_order IS NULL OR max_order BETWEEN 1 AND 20)

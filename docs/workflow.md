@@ -63,6 +63,9 @@ Alteram a organização do array sem contexto quimiométrico:
 Álgebra sobre arrays:
 `soma`, `subtracao`, `multiplicacao_elementwise`, `divisao_elementwise`, `produto_matricial`, `inversa`, `pseudo_inversa`, `determinante`, `autovalores`, `autovetores`, `eig`, `svd`, `norma`, `trace`, `rank`, `mean`, `median`, `std`, `min`, `max`, `sum`, `formula_customizada`
 
+Funções MATLAB-like (workspace matemático):
+`var`, `abs`, `sort`, `cumsum`, `diff`, `corr`, `cov`, `fft`, `log`, `exp`, `sqrt`, `linspace`, `round`, `floor`, `ceil`, `sign`, `mod`, `cumprod`, `unique`
+
 ### Pré-processamento
 Transformações espectrais:
 `snv`, `msc`, `detrend`, `baseline`, `savitzky_golay`, `normalizacao`, `centering`, `autoscaling`, `pareto`

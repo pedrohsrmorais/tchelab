@@ -664,12 +664,15 @@ deleteAnalysis(req, res)
 ```
 listTechniques(req, res)
   - Filtros: category, family, min_order, max_order,
-    requires_sample_axis, tags (array), is_beta, is_custom
-  - Retorna: id, slug, name, category, family, description,
-    min_order, max_order, requires_sample_axis, input_type,
-    output_type, tags, is_beta, is_custom
+    requires_sample_axis, is_beta, is_custom, include_inactive
+  - Retorna: id, uuid, slug, name, category, family, description,
+    min_order, max_order, requires_sample_axis, input_schema,
+    output_schema, parameter_schema, tags, is_beta, is_custom,
+    active, how_it_works, usage_tips, historical_note
+  - Por padrão retorna só técnicas com active=1; passar
+    include_inactive=true retorna todas (usado pela página de Catálogo)
   - Inclui técnicas nativas (is_custom=false) e customizadas
-    do próprio usuário ou de sua comunidade (is_custom=true)
+    do próprio usuário (is_custom=true)
 
 getTechnique(req, res)
   - Retorna todos os campos incluindo:
