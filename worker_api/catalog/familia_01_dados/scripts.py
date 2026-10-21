@@ -809,6 +809,313 @@ class Sum(BaseScript):
         return {"result": np.sum(np.asarray(inputs["X"]), axis=params.get("axis"), keepdims=params.get("keepdims", False))}
 
 
+# ── Funções Matemáticas MATLAB-like ──────────────────────────────────────────
+
+class Var(BaseScript):
+    slug = "var"
+    nome = "Variância"
+    familia = "01_dados"
+    descricao = "Variância ao longo de um eixo. Equivalente ao var() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        return {"result": np.var(X, axis=params.get("axis"), keepdims=params.get("keepdims", False), ddof=params.get("ddof", 0))}
+
+
+class AbsVal(BaseScript):
+    slug = "abs"
+    nome = "Valor Absoluto"
+    familia = "01_dados"
+    descricao = "Valor absoluto elemento a elemento. Equivalente ao abs() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"])
+        return {"result": np.abs(X)}
+
+
+class SortArray(BaseScript):
+    slug = "sort"
+    nome = "Ordenar"
+    familia = "01_dados"
+    descricao = "Ordena os elementos ao longo de um eixo. Equivalente ao sort() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"])
+        axis = params.get("axis", -1)
+        order = params.get("order", "ascending")
+        result = np.sort(X, axis=axis)
+        if order == "descending":
+            result = np.flip(result, axis=axis)
+        idx = np.argsort(X, axis=axis)
+        if order == "descending":
+            idx = np.flip(idx, axis=axis)
+        return {"result": result, "indices": idx}
+
+
+class CumSum(BaseScript):
+    slug = "cumsum"
+    nome = "Soma Cumulativa"
+    familia = "01_dados"
+    descricao = "Soma cumulativa ao longo de um eixo. Equivalente ao cumsum() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        return {"result": np.cumsum(X, axis=params.get("axis"))}
+
+
+class DiffArray(BaseScript):
+    slug = "diff"
+    nome = "Diferença"
+    familia = "01_dados"
+    descricao = "Diferença entre elementos consecutivos ao longo de um eixo. Equivalente ao diff() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        n = params.get("n", 1)
+        axis = params.get("axis", -1)
+        return {"result": np.diff(X, n=n, axis=axis)}
+
+
+class Correlation(BaseScript):
+    slug = "corr"
+    nome = "Matriz de Correlação"
+    familia = "01_dados"
+    descricao = "Coeficientes de Pearson entre colunas de X. Equivalente ao corr() do MATLAB/Python."
+
+    def validate(self, inputs, params):
+        X = np.asarray(self._require_key(inputs, "X"))
+        if X.ndim != 2:
+            raise ValueError("X deve ser matriz 2D.")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        return {"result": np.corrcoef(X, rowvar=params.get("rowvar", False))}
+
+
+class Covariance(BaseScript):
+    slug = "cov"
+    nome = "Matriz de Covariância"
+    familia = "01_dados"
+    descricao = "Matriz de covariância entre colunas de X. Equivalente ao cov() do MATLAB."
+
+    def validate(self, inputs, params):
+        X = np.asarray(self._require_key(inputs, "X"))
+        if X.ndim != 2:
+            raise ValueError("X deve ser matriz 2D.")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        return {"result": np.cov(X, rowvar=params.get("rowvar", False), ddof=params.get("ddof", 1))}
+
+
+class FFT(BaseScript):
+    slug = "fft"
+    nome = "FFT — Transformada de Fourier"
+    familia = "01_dados"
+    descricao = "Transformada Rápida de Fourier 1D ao longo de um eixo. Equivalente ao fft() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        axis = params.get("axis", -1)
+        n = params.get("n", None)
+        spectrum = np.fft.rfft(X, n=n, axis=axis)
+        magnitude = np.abs(spectrum)
+        phase = np.angle(spectrum)
+        freqs = np.fft.rfftfreq(X.shape[axis] if n is None else n,
+                                d=params.get("sample_spacing", 1.0))
+        return {"magnitude": magnitude, "phase": phase, "frequencies": freqs}
+
+
+class LogFunc(BaseScript):
+    slug = "log"
+    nome = "Logaritmo"
+    familia = "01_dados"
+    descricao = "Logaritmo natural, base-2 ou base-10 de cada elemento. Equivalente ao log()/log2()/log10() do MATLAB."
+
+    _BASES = {"natural", "log2", "log10"}
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+        base = params.get("base", "natural")
+        if base not in self._BASES:
+            raise ValueError(f"'base' deve ser um de: {self._BASES}")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        base = params.get("base", "natural")
+        if base == "natural":
+            return {"result": np.log(X)}
+        elif base == "log2":
+            return {"result": np.log2(X)}
+        else:
+            return {"result": np.log10(X)}
+
+
+class ExpFunc(BaseScript):
+    slug = "exp"
+    nome = "Exponencial"
+    familia = "01_dados"
+    descricao = "e^x elemento a elemento. Equivalente ao exp() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        return {"result": np.exp(np.asarray(inputs["X"], dtype=float))}
+
+
+class SqrtFunc(BaseScript):
+    slug = "sqrt"
+    nome = "Raiz Quadrada"
+    familia = "01_dados"
+    descricao = "Raiz quadrada de cada elemento. Equivalente ao sqrt() do MATLAB."
+
+    def validate(self, inputs, params):
+        X = np.asarray(self._require_key(inputs, "X"), dtype=float)
+        if np.any(X < 0):
+            raise ValueError("Todos os valores devem ser ≥ 0 para raiz quadrada real.")
+
+    def execute(self, inputs, params):
+        return {"result": np.sqrt(np.asarray(inputs["X"], dtype=float))}
+
+
+class Linspace(BaseScript):
+    slug = "linspace"
+    nome = "Espaçamento Linear"
+    familia = "01_dados"
+    descricao = "Gera vetor com N valores igualmente espaçados entre start e stop. Equivalente ao linspace() do MATLAB."
+
+    def validate(self, inputs, params):
+        if params.get("start") is None:
+            raise ValueError("'start' é obrigatório.")
+        if params.get("stop") is None:
+            raise ValueError("'stop' é obrigatório.")
+
+    def execute(self, inputs, params):
+        start = float(params["start"])
+        stop = float(params["stop"])
+        n = int(params.get("n", 100))
+        return {"result": np.linspace(start, stop, n)}
+
+
+class RoundFunc(BaseScript):
+    slug = "round"
+    nome = "Arredondamento"
+    familia = "01_dados"
+    descricao = "Arredonda elementos para N casas decimais. Equivalente ao round() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"])
+        decimals = int(params.get("decimals", 0))
+        return {"result": np.round(X, decimals=decimals)}
+
+
+class FloorFunc(BaseScript):
+    slug = "floor"
+    nome = "Piso (floor)"
+    familia = "01_dados"
+    descricao = "Maior inteiro menor ou igual a cada elemento. Equivalente ao floor() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        return {"result": np.floor(np.asarray(inputs["X"], dtype=float))}
+
+
+class CeilFunc(BaseScript):
+    slug = "ceil"
+    nome = "Teto (ceil)"
+    familia = "01_dados"
+    descricao = "Menor inteiro maior ou igual a cada elemento. Equivalente ao ceil() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        return {"result": np.ceil(np.asarray(inputs["X"], dtype=float))}
+
+
+class SignFunc(BaseScript):
+    slug = "sign"
+    nome = "Sinal"
+    familia = "01_dados"
+    descricao = "Sinal de cada elemento: -1, 0 ou +1. Equivalente ao sign() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        return {"result": np.sign(np.asarray(inputs["X"], dtype=float))}
+
+
+class ModFunc(BaseScript):
+    slug = "mod"
+    nome = "Módulo / Resto"
+    familia = "01_dados"
+    descricao = "Resto da divisão de X por divisor. Equivalente ao mod() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+        if params.get("divisor") is None:
+            raise ValueError("'divisor' é obrigatório.")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"])
+        divisor = float(params["divisor"])
+        return {"result": np.mod(X, divisor)}
+
+
+class CumProd(BaseScript):
+    slug = "cumprod"
+    nome = "Produto Cumulativo"
+    familia = "01_dados"
+    descricao = "Produto cumulativo ao longo de um eixo. Equivalente ao cumprod() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"], dtype=float)
+        return {"result": np.cumprod(X, axis=params.get("axis"))}
+
+
+class UniqueArray(BaseScript):
+    slug = "unique"
+    nome = "Valores Únicos"
+    familia = "01_dados"
+    descricao = "Retorna os valores únicos e ordenados de X. Equivalente ao unique() do MATLAB."
+
+    def validate(self, inputs, params):
+        self._require_key(inputs, "X")
+
+    def execute(self, inputs, params):
+        X = np.asarray(inputs["X"]).ravel()
+        unique_vals, counts = np.unique(X, return_counts=True)
+        return {"result": unique_vals, "counts": counts}
+
+
 # ── Fórmula Customizada ───────────────────────────────────────────────────────
 
 _ALLOWED_NODES = {

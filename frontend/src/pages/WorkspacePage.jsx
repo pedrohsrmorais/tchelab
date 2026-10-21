@@ -26,6 +26,7 @@ import {
   X, ChevronDown, Search, Upload, FileText,
   Braces, AlertCircle, Table2, Layers, TriangleAlert,
   FolderOpen, Save, Copy, ChevronRight, ArrowRight,
+  Info, BookOpen, Zap, ChevronUp,
 } from 'lucide-react';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -580,6 +581,153 @@ function ImportModal({ onClose, onImported, s, theme }) {
   );
 }
 
+// ─── Painel de info de técnica ────────────────────────────────────────────────
+
+/** Renderiza a descrição completa de uma técnica: how_it_works, inputs, outputs, tips */
+function TechInfoPanel({ tech, s, theme }) {
+  const cl = theme === 'classic';
+  const [collapsed, setCollapsed] = useState(false);
+
+  if (!tech) return null;
+
+  const iSchema = pj(tech.input_schema, {});
+  const oSchema = pj(tech.output_schema, {});
+  const isMatlabFn = (pj(tech.tags, []) || []).includes('matlab');
+
+  const headerBg = cl
+    ? 'linear-gradient(180deg,#e8f0fb 0%,#d8e4f4 100%)'
+    : 'var(--bg-elevated)';
+  const borderColor = cl ? '#c0d0e8' : 'var(--border)';
+  const codeBg = cl ? '#f8f8f8' : 'rgba(255,255,255,0.04)';
+  const codeColor = cl ? '#003880' : 'var(--text-accent)';
+
+  return (
+    <div style={{
+      border: `1px solid ${borderColor}`,
+      borderRadius: cl ? 2 : 'var(--radius-sm)',
+      overflow: 'hidden',
+      background: cl ? '#fff' : 'var(--bg-card)',
+      fontSize: '0.75rem',
+    }}>
+      {/* Header */}
+      <div
+        onClick={() => setCollapsed(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: cl ? '5px 8px' : '6px 10px',
+          background: headerBg,
+          borderBottom: collapsed ? 'none' : `1px solid ${borderColor}`,
+          cursor: 'pointer', userSelect: 'none',
+        }}
+      >
+        <BookOpen size={11} style={{ color: cl ? '#4a7fbf' : 'var(--text-accent)', flexShrink: 0 }} />
+        <span style={{ fontWeight: 700, fontSize: '0.72rem', color: cl ? '#1a1a1a' : 'var(--text-primary)', flex: 1, fontFamily: cl ? 'var(--font-sans)' : 'inherit', letterSpacing: '0.04em' }}>
+          {isMatlabFn ? '⚡ ' : ''}{tech.name}
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 400, opacity: 0.6, marginLeft: 6, fontSize: '0.68rem' }}>
+            {tech.slug}
+          </span>
+        </span>
+        {collapsed
+          ? <ChevronDown size={11} style={{ color: 'var(--text-muted)' }} />
+          : <ChevronUp size={11} style={{ color: 'var(--text-muted)' }} />}
+      </div>
+
+      {!collapsed && (
+        <div style={{ padding: cl ? '10px 10px' : '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* Description / how it works */}
+          {(tech.how_it_works || tech.description) && (
+            <div>
+              <p style={{ margin: 0, lineHeight: 1.55, color: cl ? '#2a2a2a' : 'var(--text-secondary)', fontSize: '0.73rem' }}>
+                {tech.how_it_works || tech.description}
+              </p>
+            </div>
+          )}
+
+          {/* Inputs */}
+          {Object.keys(iSchema).length > 0 && (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.65rem', letterSpacing: '0.06em', color: cl ? '#4a7fbf' : 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>
+                Entradas (inputs)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {Object.entries(iSchema).map(([port, def]) => (
+                  <div key={port} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                    <code style={{ background: codeBg, color: codeColor, padding: '1px 5px', borderRadius: cl ? 1 : 3, fontFamily: 'var(--font-mono)', fontSize: '0.72rem', flexShrink: 0, fontWeight: 700 }}>
+                      {port}
+                    </code>
+                    {def.type && (
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0, marginTop: 1, fontStyle: 'italic' }}>
+                        {def.type}
+                      </span>
+                    )}
+                    {def.description && (
+                      <span style={{ color: cl ? '#555' : 'var(--text-secondary)', lineHeight: 1.45, fontSize: '0.72rem' }}>
+                        — {def.description}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Outputs */}
+          {Object.keys(oSchema).length > 0 && (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.65rem', letterSpacing: '0.06em', color: cl ? '#2a7a40' : '#3fb950', marginBottom: 4, textTransform: 'uppercase' }}>
+                Saídas (outputs)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {Object.entries(oSchema).map(([port, def]) => (
+                  <div key={port} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                    <code style={{ background: codeBg, color: cl ? '#2a7a40' : '#3fb950', padding: '1px 5px', borderRadius: cl ? 1 : 3, fontFamily: 'var(--font-mono)', fontSize: '0.72rem', flexShrink: 0, fontWeight: 700 }}>
+                      {port}
+                    </code>
+                    {def.type && (
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0, marginTop: 1, fontStyle: 'italic' }}>
+                        {def.type}
+                      </span>
+                    )}
+                    {def.description && (
+                      <span style={{ color: cl ? '#555' : 'var(--text-secondary)', lineHeight: 1.45, fontSize: '0.72rem' }}>
+                        — {def.description}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tips */}
+          {tech.usage_tips && (
+            <div style={{
+              background: cl ? '#fffbe6' : 'rgba(245,158,11,0.08)',
+              border: cl ? '1px solid #e8d48a' : '1px solid rgba(245,158,11,0.25)',
+              borderRadius: cl ? 2 : 'var(--radius-sm)',
+              padding: '5px 8px',
+              display: 'flex', gap: 6, alignItems: 'flex-start',
+            }}>
+              <Info size={11} style={{ color: cl ? '#c08000' : '#f59e0b', flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: '0.71rem', color: cl ? '#7a5a00' : '#d97706', lineHeight: 1.5 }}>
+                {tech.usage_tips}
+              </p>
+            </div>
+          )}
+
+          {/* Historical note */}
+          {tech.historical_note && (
+            <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-muted)', borderTop: `1px solid ${borderColor}`, paddingTop: 6, lineHeight: 1.5, fontStyle: 'italic' }}>
+              📖 {tech.historical_note}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function WorkspacePage() {
@@ -785,6 +933,23 @@ export default function WorkspacePage() {
     });
     return g;
   }, [filteredTechs]);
+
+  // Separate MATLAB-like functions for their dedicated section in the dropdown
+  const matlabFuncs = useMemo(() =>
+    filteredTechs.filter(t => (pj(t.tags, []) || []).includes('matlab')),
+    [filteredTechs]
+  );
+
+  const nonMatlabByFamily = useMemo(() => {
+    const matlabSlugs = new Set(matlabFuncs.map(t => t.slug));
+    const g = {};
+    filteredTechs.filter(t => !matlabSlugs.has(t.slug)).forEach(t => {
+      const f = t.family || 'outros';
+      if (!g[f]) g[f] = [];
+      g[f].push(t);
+    });
+    return g;
+  }, [filteredTechs, matlabFuncs]);
 
   const iSchema = selectedTech ? pj(selectedTech.input_schema, {}) : {};
   const oSchema = selectedTech ? pj(selectedTech.output_schema, {}) : {};
@@ -1055,7 +1220,31 @@ export default function WorkspacePage() {
                           onChange={e => setTechFilter(e.target.value)} />
                       </div>
                       <div style={{ overflowY: 'auto' }}>
-                        {Object.entries(techsByFamily).map(([fam, techs]) => (
+                        {/* MATLAB Functions section — shown first */}
+                        {matlabFuncs.length > 0 && (
+                          <div>
+                            <div style={{ padding: '3px 8px', fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.07em', position: 'sticky', top: 0, background: cl ? '#1a4a80' : '#1a2a4a', color: '#fff', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Zap size={9} /> MATLAB FUNCTIONS
+                            </div>
+                            {matlabFuncs.map(t => (
+                              <button key={t.uuid}
+                                onClick={() => { setSelectedTech(t); setTechDropOpen(false); setTechFilter(''); setActivePanel('operation'); }}
+                                style={{
+                                  width: '100%', textAlign: 'left',
+                                  padding: cl ? '3px 12px' : '4px 10px',
+                                  background: selectedTech?.uuid === t.uuid ? (cl ? '#c2d8f0' : 'var(--bg-hover)') : 'none',
+                                  border: 'none', cursor: 'pointer',
+                                  display: 'flex', alignItems: 'baseline', gap: 8,
+                                }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: cl ? '#003880' : 'var(--text-accent)', flexShrink: 0, fontWeight: 700 }}>{t.slug}</span>
+                                <span style={{ fontSize: '0.71rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* All other techniques by family */}
+                        {Object.entries(nonMatlabByFamily).map(([fam, techs]) => (
                           <div key={fam}>
                             <div style={{ padding: '3px 8px', fontSize: '0.62rem', fontWeight: 700, color: cl ? '#fff' : 'var(--text-muted)', letterSpacing: '0.07em', background: cl ? '#4a7fbf' : 'var(--bg-base)', position: 'sticky', top: 0 }}>
                               {fam.replace(/^\d+_/, '').toUpperCase()}
@@ -1083,6 +1272,11 @@ export default function WorkspacePage() {
                     </div>
                   )}
                 </div>
+
+                {/* Painel de documentação da técnica */}
+                {selectedTech && (
+                  <TechInfoPanel tech={selectedTech} s={s} theme={theme} />
+                )}
 
                 {/* Entradas */}
                 {selectedTech && Object.keys(iSchema).length > 0 && (
