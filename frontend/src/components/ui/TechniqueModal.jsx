@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import {
   BookOpen, Cog, Lightbulb, Tag,
   LogIn, LogOut as LogOutIcon,
-  CheckCircle2, Hammer, ExternalLink,
+  CheckCircle2, Hammer, ExternalLink, SlidersHorizontal,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
-import { getFamilyConfig, getPorts } from '../../config/techniqueRegistry';
+import { getFamilyConfig, getPorts, ARRAY_TYPES } from '../../config/techniqueRegistry';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -54,11 +54,16 @@ function PortTable({ title, ports, accent }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {ports.map((p) => (
             <div key={p.name} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 3 }}>
                 <code style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', padding: '1px 6px', borderRadius: 4, background: `${accent}22`, color: accent, fontWeight: 700 }}>
                   {p.name}
                 </code>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{p.type}</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', padding: '0 6px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  {p.type === ARRAY_TYPES.ANY ? t('catalog.anyType') : p.type}
+                </span>
+                {p.required === false && (
+                  <span style={{ fontSize: '0.65rem', color: '#fbbf24', fontStyle: 'italic' }}>{t('catalog.optional')}</span>
+                )}
                 {p.shape && <span style={{ fontSize: '0.65rem', color: 'rgba(148,163,184,0.5)' }}>shape {p.shape}</span>}
               </div>
               {p.description
@@ -69,6 +74,43 @@ function PortTable({ title, ports, accent }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function fmtDefault(v) {
+  if (v === null || v === undefined) return 'null';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+function ParamList({ schema }) {
+  const { t } = useTranslation();
+  const entries = Object.entries(schema || {});
+  if (!entries.length) {
+    return <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>{t('catalog.noParameters')}</p>;
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {entries.map(([name, def]) => {
+        const d = def || {};
+        const options = Array.isArray(d.enum) ? d.enum : Array.isArray(d.options) ? d.options : null;
+        return (
+          <div key={name} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: d.description ? 3 : 0 }}>
+              <code style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', padding: '1px 6px', borderRadius: 4, background: '#a78bfa22', color: '#a78bfa', fontWeight: 700 }}>{name}</code>
+              {d.type && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{d.type}</span>}
+              {'default' in d && (
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                  {t('catalog.defaultValue')}: <code style={{ fontFamily: 'var(--font-mono)' }}>{fmtDefault(d.default)}</code>
+                </span>
+              )}
+              {options && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>[{options.join(' | ')}]</span>}
+            </div>
+            {d.description && <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{d.description}</p>}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -92,15 +134,17 @@ export default function TechniqueModal({ open, onClose, technique: tech }) {
   const inputs  = getPorts(tech.input_schema);
   const outputs = getPorts(tech.output_schema);
   const tags    = safeJson(tech.tags, []);
+  const params  = safeJson(tech.parameter_schema, {}) || {};
+  const hasDocs = !!(tech.how_it_works || tech.usage_tips);
 
   return (
     <Modal open={open} onClose={onClose} size="lg">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── Header ────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingRight: 32 }}>
+          <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
               {fam && (
                 <span style={{
                   fontSize: '0.68rem', fontWeight: 700,
@@ -114,7 +158,7 @@ export default function TechniqueModal({ open, onClose, technique: tech }) {
                 {tech.slug}
               </code>
             </div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px', lineHeight: 1.25 }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px', lineHeight: 1.25, overflowWrap: 'anywhere' }}>
               {tech.name}
             </h2>
             <StatusBadge active={!!tech.active} />
@@ -158,6 +202,10 @@ export default function TechniqueModal({ open, onClose, technique: tech }) {
           </Section>
         )}
 
+        {!hasDocs && (
+          <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{t('catalog.devNoDocs')}</p>
+        )}
+
         {/* ── Input / Output ────────────────────────────────────────── */}
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '14px 16px' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
@@ -176,6 +224,11 @@ export default function TechniqueModal({ open, onClose, technique: tech }) {
             />
           </div>
         </div>
+
+        {/* ── Parameters ────────────────────────────────────────────── */}
+        <Section icon={SlidersHorizontal} title={t('catalog.parameters')} iconColor="#a78bfa">
+          <ParamList schema={params} />
+        </Section>
 
         {/* ── Historical note ───────────────────────────────────────── */}
         {tech.historical_note && (

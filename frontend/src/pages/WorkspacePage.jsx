@@ -20,6 +20,7 @@ import React, {
   useState, useEffect, useRef, useCallback, useMemo,
 } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import client from '../api/client';
 import TechniqueModal from '../components/ui/TechniqueModal';
 import {
@@ -586,6 +587,7 @@ function ImportModal({ onClose, onImported, s, theme }) {
 
 /** Renderiza a descrição completa de uma técnica: how_it_works, inputs, outputs, tips */
 function TechInfoPanel({ tech, s, theme, onOpenModal }) {
+  const { t } = useTranslation();
   const cl = theme === 'classic';
   const [collapsed, setCollapsed] = useState(false);
 
@@ -741,7 +743,7 @@ function TechInfoPanel({ tech, s, theme, onOpenModal }) {
               onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
               onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
             >
-              <Info size={11} /> Ver detalhes completos
+              <Info size={11} /> {t('catalog.viewFullDetails')}
             </button>
           )}
         </div>

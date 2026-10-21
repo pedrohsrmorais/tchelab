@@ -343,6 +343,7 @@ export function getPorts(schema) {
       description: p.description || '',
       shape: p.shape || null,
       dtype: p.dtype || null,
+      required: p.required !== false,
     };
   });
 }

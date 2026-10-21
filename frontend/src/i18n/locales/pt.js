@@ -617,6 +617,13 @@ export default {
     producedOutput:     'Saída produzida',
     fullPage:           'Página completa',
     viewDetails:        'Ver detalhes',
+    viewFullDetails:    'Ver detalhes completos',
+    parameters:         'Parâmetros',
+    noParameters:       'Esta técnica não tem parâmetros configuráveis.',
+    optional:           'opcional',
+    anyType:            'qualquer tipo',
+    defaultValue:       'padrão',
+    devNoDocs:          'Técnica em desenvolvimento: a documentação detalhada ainda não foi escrita.',
   },
 
   // ── Artigos ───────────────────────────────────────────────────────────────

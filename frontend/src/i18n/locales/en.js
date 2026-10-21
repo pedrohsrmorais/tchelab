@@ -607,6 +607,13 @@ export default {
     producedOutput:     'Produced output',
     fullPage:           'Full page',
     viewDetails:        'View details',
+    viewFullDetails:    'View full details',
+    parameters:         'Parameters',
+    noParameters:       'This technique has no configurable parameters.',
+    optional:           'optional',
+    anyType:            'any type',
+    defaultValue:       'default',
+    devNoDocs:          'Technique under development: detailed documentation has not been written yet.',
   },
 
   articles: {

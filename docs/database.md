@@ -401,6 +401,9 @@ Estrutura principal para dados científicos multidimensionais. Suporta arrays N-
 | `updated_at` | DATETIME | |
 | `deleted_at` | DATETIME | |
 
+**Fonte da verdade das portas e textos (técnicas ativas):**  
+`backend_api/sql/catalog_ports_source.py` define, para cada uma das 94 técnicas ativas, as portas (tipo + descrição + opcional) e os textos `how_it_works`, `usage_tips` e `historical_note`. `python3 backend_api/sql/gen_catalog_ports_sql.py --check` confere tudo contra o código do worker (via AST); sem `--check` gera `backend_api/sql/catalog_ports.sql` (deploy: `mysql ... < backend_api/sql/catalog_ports.sql`, idempotente) e `--init-mysql` reinjeta o bloco no `init.mysql`. Não edite o bloco `catalog_ports` do `init.mysql` à mão.
+
 **Constraints:**
 ```sql
 CHECK (data_order BETWEEN 1 AND 20)
@@ -593,8 +596,8 @@ Catálogo dos blocos executáveis. Inclui técnicas nativas e modelos customizad
 | `description` | TEXT | O que o script faz |
 | `input_type` | VARCHAR(100) | Tipo genérico de entrada (Matrix, Tensor, Model…) — para filtragem rápida |
 | `output_type` | VARCHAR(100) | Tipo genérico de saída |
-| `input_schema` | JSON | Schema detalhado das portas de entrada: `{port: {tipo, min_order, max_order, requires_sample_axis, dtype}}` |
-| `output_schema` | JSON | Schema detalhado das portas de saída: `{port: {tipo, shape_formula, dtype}}` |
+| `input_schema` | JSON | Portas de entrada: `{port: {type, description, required?}}`. `type` ∈ {matrix, tensor, vector, scalar, model, figures, labels}; porta **sem** `type` aceita qualquer tipo (curinga). `required: false` marca entrada opcional. Os nomes das portas devem ser idênticos às chaves lidas em `inputs[...]` no worker. Gerado por `backend_api/sql/gen_catalog_ports_sql.py` |
+| `output_schema` | JSON | Portas de saída: `{port: {type, description}}`, mesmas regras de tipo; os nomes devem ser idênticos às chaves retornadas por `execute()` |
 | `parameter_schema` | JSON | Schema dos parâmetros: `{param: {tipo, default, range, opcoes}}` |
 | `min_order` | TINYINT UNSIGNED NULL | Ordem analítica mínima suportada (excluindo eixo de amostras). NULL = sem mínimo |
 | `max_order` | TINYINT UNSIGNED NULL | Ordem analítica máxima suportada. NULL = sem teto (ex: PARAFAC aceita N-way arbitrário) |
@@ -615,7 +618,7 @@ Catálogo dos blocos executáveis. Inclui técnicas nativas e modelos customizad
 | `usage_tips` | TEXT NULL | Dicas práticas de uso, também exibidas na página de Catálogo |
 
 **Observação sobre o catálogo:**  
-A tabela contém 188 técnicas nativas ativas (active=1) no estado atual do seed. 19 delas são funções MATLAB-like (`var`, `abs`, `sort`, `cumsum`, `diff`, `corr`, `cov`, `fft`, `log`, `exp`, `sqrt`, `linspace`, `round`, `floor`, `ceil`, `sign`, `mod`, `cumprod`, `unique`), todas na família `01_dados`, com `tags = '["matlab","math","basic","workspace"]'` e UUIDs no padrão `a1b2c3d4-000N-4000-8000-00000000000N`.
+A tabela contém 217 técnicas nativas no seed, das quais 94 estão ativas (active=1) — as demais aparecem no Catálogo como "em desenvolvimento" e ainda não têm `how_it_works`/`usage_tips`. 19 delas são funções MATLAB-like (`var`, `abs`, `sort`, `cumsum`, `diff`, `corr`, `cov`, `fft`, `log`, `exp`, `sqrt`, `linspace`, `round`, `floor`, `ceil`, `sign`, `mod`, `cumprod`, `unique`), todas na família `01_dados`, com `tags = '["matlab","math","basic","workspace"]'` e UUIDs no padrão `a1b2c3d4-000N-4000-8000-00000000000N`.
 
 **Constraints:**
 ```sql

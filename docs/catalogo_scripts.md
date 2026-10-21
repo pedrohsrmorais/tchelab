@@ -4,6 +4,8 @@
 > Cada entrada descreve um script do catálogo: o que faz, o que recebe, o que retorna e quais restrições matemáticas aplica.  
 > O worker nunca executa código arbitrário. Apenas scripts declarados aqui podem ser instanciados em um nó de workflow.
 
+> As linhas **Inputs / Parâmetros / Outputs** de cada script são geradas a partir do banco e do código do worker por `backend_api/sql/sync_docs_ports.py`. Porta sem tipo entre parênteses aceita qualquer tipo.  
+
 ---
 
 ## Contrato geral
@@ -62,9 +64,9 @@ Scripts de manipulação estrutural e matemática sobre arrays. Não assumem con
 
 Lê um arquivo externo e registra o dataset no sistema.
 
-**Inputs:** arquivo (XLSX, CSV, NumPy, HDF5, Zarr)  
-**Parâmetros:** `file_path`, `format`, `sample_axis`, `mode_labels`, `dtype`  
-**Outputs:** `dataset` (tensor ou matrix)  
+**Inputs:** —  
+**Parâmetros:** `file_path` (string), `format` (auto | xlsx | csv | npy | npz | hdf5 | h5 | zarr), `sample_axis` (integer), `dtype` (string)  
+**Outputs:** `dataset`, `dtype`, `sample_axis` (scalar), `shape` (vector)  
 **Restrições:** formato deve ser suportado; shape detectado automaticamente se não declarado
 
 ---
@@ -73,9 +75,9 @@ Lê um arquivo externo e registra o dataset no sistema.
 
 Remove amostras ou variáveis com critérios definidos pelo usuário.
 
-**Inputs:** `X` (matrix ou tensor)  
-**Parâmetros:** `remove_nan`, `remove_inf`, `threshold_zero_variance` (float), `axis`  
-**Outputs:** `X_clean` (matrix ou tensor), `removed_indices` (vector)  
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer), `remove_nan` (boolean), `remove_inf` (boolean), `threshold_zero_variance` (number)  
+**Outputs:** `X_clean`, `removed_indices` (vector)  
 **Restrições:** axis deve ser válido para o shape de X
 
 ---
@@ -84,9 +86,9 @@ Remove amostras ou variáveis com critérios definidos pelo usuário.
 
 Preenche ou remove valores ausentes.
 
-**Inputs:** `X` (matrix ou tensor)  
-**Parâmetros:** `strategy` (mean | median | zero | interpolate | drop), `axis`  
-**Outputs:** `X_filled` (matrix ou tensor)  
+**Inputs:** `X`  
+**Parâmetros:** `strategy` (mean | median | zero | interpolate | drop)  
+**Outputs:** `X_filled`  
 **Restrições:** strategy `interpolate` disponível apenas para axis com significado espectral
 
 ---
@@ -95,9 +97,9 @@ Preenche ou remove valores ausentes.
 
 Seleciona subconjunto de amostras por índice ou máscara booleana.
 
-**Inputs:** `X` (matrix ou tensor com sample_axis definido)  
-**Parâmetros:** `indices` (lista de inteiros) ou `mask` (vetor booleano)  
-**Outputs:** `X_sel` (matrix ou tensor)  
+**Inputs:** `X`  
+**Parâmetros:** `sample_axis` (integer), `indices` (array), `mask` (array)  
+**Outputs:** `X_sel`  
 **Restrições:** exige sample_axis declarado
 
 ---
@@ -106,9 +108,9 @@ Seleciona subconjunto de amostras por índice ou máscara booleana.
 
 Seleciona subconjunto de variáveis por índice, range ou máscara.
 
-**Inputs:** `X` (matrix ou tensor)  
-**Parâmetros:** `indices` ou `range` [start, stop, step], `mode` (eixo a selecionar)  
-**Outputs:** `X_sel` (matrix ou tensor)
+**Inputs:** `X`  
+**Parâmetros:** `mode` (integer), `indices` (array), `range` (array), `mask` (array)  
+**Outputs:** `X_sel`, `selected_indices` (vector)  
 
 ---
 
@@ -116,7 +118,7 @@ Seleciona subconjunto de variáveis por índice, range ou máscara.
 
 Divide as amostras em calibração (treino), teste e, opcionalmente, validação, via algoritmo de Kennard-Stone (RW Kennard & LA Stone, 1969): seleciona iterativamente a amostra mais distante (distância Euclidiana) das já escolhidas, maximizando a cobertura da variabilidade multivariada do conjunto de calibração em vez de uma divisão aleatória. Determinístico — a mesma entrada sempre produz a mesma divisão (sem `random_state`).
 
-**Inputs:** `X` (matrix ou tensor com sample_axis definido)  
+**Inputs:** `X`  
 **Parâmetros:**
 - `sample_axis` (int, default `0`) — eixo de amostras
 - `n_train` (int) ou `train_size` (float em (0,1), default `0.7`) — tamanho do conjunto de treino/calibração. `n_train` tem prioridade sobre `train_size` quando ambos são informados
@@ -147,9 +149,9 @@ Divide as amostras em calibração (treino), teste e, opcionalmente, validação
 
 Permuta os eixos do array.
 
-**Inputs:** `X` (array N-dimensional)  
-**Parâmetros:** `axes` (permutação dos índices dos eixos)  
-**Outputs:** `X_T` com shape reordenado  
+**Inputs:** `X`  
+**Parâmetros:** `axes` (array)  
+**Outputs:** `X_T`  
 **Restrições:** `len(axes) == ndim(X)`; axes deve ser permutação válida  
 **Transformação de shape:** `shape_out = tuple(shape_in[a] for a in axes)`
 
@@ -159,9 +161,9 @@ Permuta os eixos do array.
 
 Altera a forma do array sem alterar a ordem dos elementos.
 
-**Inputs:** `X` (array N-dimensional)  
-**Parâmetros:** `new_shape` (tupla)  
-**Outputs:** `X_r` com shape novo  
+**Inputs:** `X`  
+**Parâmetros:** `new_shape` (array)  
+**Outputs:** `X_r`  
 **Restrições:** `prod(shape_in) == prod(new_shape)`
 
 ---
@@ -170,9 +172,9 @@ Altera a forma do array sem alterar a ordem dos elementos.
 
 Seleciona parte de um ou mais eixos por range.
 
-**Inputs:** `X` (array N-dimensional)  
-**Parâmetros:** `ranges` — dict `{eixo: [start, stop, step]}`  
-**Outputs:** `X_sl` (array N-dimensional, mesma ordem)
+**Inputs:** `X`  
+**Parâmetros:** `ranges` (object)  
+**Outputs:** `X_sl`  
 
 ---
 
@@ -180,8 +182,8 @@ Seleciona parte de um ou mais eixos por range.
 
 Remove eixos de tamanho 1.
 
-**Inputs:** `X` (array N-dimensional)  
-**Parâmetros:** `axis` (opcional)  
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer)  
 **Outputs:** `X_sq`  
 **Restrições:** eixo especificado deve ter tamanho 1
 
@@ -191,9 +193,9 @@ Remove eixos de tamanho 1.
 
 Insere um eixo de tamanho 1.
 
-**Inputs:** `X` (array N-dimensional)  
-**Parâmetros:** `axis` (posição do novo eixo)  
-**Outputs:** `X_exp`
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer)  
+**Outputs:** `X_exp`  
 
 ---
 
@@ -201,9 +203,9 @@ Insere um eixo de tamanho 1.
 
 Transforma tensor N-way em matriz 2D ao longo de um modo.
 
-**Inputs:** `X` (tensor, ndim ≥ 2)  
-**Parâmetros:** `mode` (índice do eixo a desdobrar), `ordering` (C ou F)  
-**Outputs:** `X_unf` (matrix)  
+**Inputs:** `X`  
+**Parâmetros:** `mode` (integer), `ordering` (C | F)  
+**Outputs:** `X_unf` (matrix), `mode` (scalar), `original_shape` (vector)  
 **Restrições:** mode deve ser índice válido  
 **Transformação de shape:** eixo `mode` vira linhas; produto dos demais vira colunas
 
@@ -214,7 +216,7 @@ Transforma tensor N-way em matriz 2D ao longo de um modo.
 Operação inversa do unfolding. Reconstrói tensor a partir de matriz.
 
 **Inputs:** `X_unf` (matrix)  
-**Parâmetros:** `original_shape` (tupla), `mode`, `ordering`  
+**Parâmetros:** `original_shape` (array), `mode` (integer), `ordering` (C | F)  
 **Outputs:** `X` (tensor)  
 **Restrições:** `prod(original_shape) == prod(X_unf.shape)`
 
@@ -224,8 +226,8 @@ Operação inversa do unfolding. Reconstrói tensor a partir de matriz.
 
 Concatena dois ou mais arrays ao longo de um eixo existente.
 
-**Inputs:** `A`, `B` (arrays — pode receber lista)  
-**Parâmetros:** `axis`  
+**Inputs:** `A`, `B`  
+**Parâmetros:** `axis` (integer)  
 **Outputs:** `result`  
 **Restrições:** mesmo ndim; eixos exceto `axis` com mesmo tamanho  
 **Transformação de shape:** tamanho do eixo `axis` é somado
@@ -236,8 +238,8 @@ Concatena dois ou mais arrays ao longo de um eixo existente.
 
 Empilha arrays adicionando um novo eixo.
 
-**Inputs:** `A`, `B` (arrays com shapes idênticos)  
-**Parâmetros:** `axis`  
+**Inputs:** `A`, `B`  
+**Parâmetros:** `axis` (integer)  
 **Outputs:** `result`  
 **Restrições:** shapes de A e B idênticos
 
@@ -248,8 +250,8 @@ Empilha arrays adicionando um novo eixo.
 Divide array em partes ao longo de um eixo.
 
 **Inputs:** `X`  
-**Parâmetros:** `indices_or_sections` (int ou lista), `axis`  
-**Outputs:** `part_1`, `part_2`, …
+**Parâmetros:** `axis` (integer), `indices_or_sections` (integer)  
+**Outputs:** `part_1`, `part_2`, `part_3`, `part_4` (+ chaves dinâmicas)  
 
 ---
 
@@ -266,7 +268,7 @@ Adição elemento a elemento.
 ## `subtracao`
 
 **Inputs:** `A`, `B`  
-**Outputs:** `result` = A − B  
+**Outputs:** `result`  
 **Restrições:** shapes compatíveis
 
 ---
@@ -274,15 +276,15 @@ Adição elemento a elemento.
 ## `multiplicacao_elementwise`
 
 **Inputs:** `A`, `B`  
-**Outputs:** `result` = A × B  
+**Outputs:** `result`  
 **Restrições:** shapes compatíveis
 
 ---
 
 ## `divisao_elementwise`
 
-**Inputs:** `A` (numerador), `B` (denominador)  
-**Outputs:** `result` = A / B  
+**Inputs:** `A`, `B`  
+**Outputs:** `result`  
 **Restrições:** shapes compatíveis; avisa se B contiver zeros
 
 ---
@@ -302,7 +304,7 @@ Multiplicação matricial A @ B.
 
 Calcula A⁻¹.
 
-**Inputs:** `A` (matrix quadrada)  
+**Inputs:** `A` (matrix)  
 **Outputs:** `A_inv` (matrix)  
 **Restrições:** A deve ser quadrada (n × n)
 
@@ -313,13 +315,13 @@ Calcula A⁻¹.
 Calcula a pseudoinversa de Moore-Penrose A⁺.
 
 **Inputs:** `A` (matrix)  
-**Outputs:** `A_pinv` (matrix)
+**Outputs:** `A_pinv` (matrix)  
 
 ---
 
 ## `determinante`
 
-**Inputs:** `A` (matrix quadrada)  
+**Inputs:** `A` (matrix)  
 **Outputs:** `det` (scalar)  
 **Restrições:** A deve ser quadrada
 
@@ -327,15 +329,15 @@ Calcula a pseudoinversa de Moore-Penrose A⁺.
 
 ## `autovalores`
 
-**Inputs:** `A` (matrix quadrada)  
-**Outputs:** `eigenvalues` (vector)
+**Inputs:** `A` (matrix)  
+**Outputs:** `eigenvalues` (vector)  
 
 ---
 
 ## `autovetores`
 
-**Inputs:** `A` (matrix quadrada)  
-**Outputs:** `eigenvalues` (vector), `eigenvectors` (matrix)
+**Inputs:** `A` (matrix)  
+**Outputs:** `eigenvectors` (matrix)  
 
 ---
 
@@ -343,8 +345,8 @@ Calcula a pseudoinversa de Moore-Penrose A⁺.
 
 Decomposição espectral completa.
 
-**Inputs:** `A` (matrix quadrada)  
-**Outputs:** `eigenvalues`, `eigenvectors`
+**Inputs:** `A` (matrix)  
+**Outputs:** `eigenvalues` (vector), `eigenvectors` (matrix)  
 
 ---
 
@@ -353,23 +355,23 @@ Decomposição espectral completa.
 Decomposição em valores singulares.
 
 **Inputs:** `A` (matrix)  
-**Parâmetros:** `full_matrices` (bool), `n_components`  
-**Outputs:** `U`, `s`, `Vt`
+**Parâmetros:** `full_matrices` (boolean)  
+**Outputs:** `S` (vector), `U` (matrix), `Vt` (matrix)  
 
 ---
 
 ## `norma`
 
 **Inputs:** `X`  
-**Parâmetros:** `ord` (tipo de norma), `axis`  
-**Outputs:** `norm` (scalar ou vector)
+**Parâmetros:** `ord` (string), `axis` (integer)  
+**Outputs:** `result`  
 
 ---
 
 ## `trace`
 
-**Inputs:** `A` (matrix quadrada)  
-**Outputs:** `trace` (scalar)
+**Inputs:** `A` (matrix)  
+**Outputs:** `result` (scalar)  
 
 ---
 
@@ -378,55 +380,55 @@ Decomposição em valores singulares.
 Posto da matriz.
 
 **Inputs:** `A` (matrix)  
-**Outputs:** `rank` (scalar inteiro)
+**Outputs:** `result` (scalar)  
 
 ---
 
 ## `mean`
 
 **Inputs:** `X`  
-**Parâmetros:** `axis`, `keepdims`  
-**Outputs:** `result`
+**Parâmetros:** `axis` (integer), `keepdims` (boolean)  
+**Outputs:** `result`  
 
 ---
 
 ## `median`
 
 **Inputs:** `X`  
-**Parâmetros:** `axis`, `keepdims`  
-**Outputs:** `result`
+**Parâmetros:** `axis` (integer), `keepdims` (boolean)  
+**Outputs:** `result`  
 
 ---
 
 ## `std`
 
 **Inputs:** `X`  
-**Parâmetros:** `axis`, `ddof`, `keepdims`  
-**Outputs:** `result`
+**Parâmetros:** `axis` (integer), `keepdims` (boolean), `ddof` (integer)  
+**Outputs:** `result`  
 
 ---
 
 ## `min`
 
 **Inputs:** `X`  
-**Parâmetros:** `axis`, `keepdims`  
-**Outputs:** `result`
+**Parâmetros:** `axis` (integer), `keepdims` (boolean)  
+**Outputs:** `result`  
 
 ---
 
 ## `max`
 
 **Inputs:** `X`  
-**Parâmetros:** `axis`, `keepdims`  
-**Outputs:** `result`
+**Parâmetros:** `axis` (integer), `keepdims` (boolean)  
+**Outputs:** `result`  
 
 ---
 
 ## `sum`
 
 **Inputs:** `X`  
-**Parâmetros:** `axis`, `keepdims`  
-**Outputs:** `result`
+**Parâmetros:** `axis` (integer), `keepdims` (boolean)  
+**Outputs:** `result`  
 
 ---
 
@@ -434,8 +436,8 @@ Posto da matriz.
 
 Avalia expressão matemática customizada de forma segura via AST.
 
-**Inputs:** quaisquer arrays (referenciados pelo nome na expressão)  
-**Parâmetros:** `formula` (string, ex: `"2 * A + B"`)  
+**Inputs:** `X`  
+**Parâmetros:** `expression` (string)  
 **Outputs:** `result`  
 **Restrições de segurança:** parser AST com whitelist de nós permitidos (`Num`, `BinOp`, `Call`, etc.); whitelist de funções permitidas (`np.mean`, `np.std`, `np.sum`, `np.sqrt`, etc.); lista negra de nomes proibidos (`__builtins__`, `exec`, `eval`, `import`, etc.). Nunca usa `eval()` direto.
 
@@ -451,9 +453,9 @@ Scripts que replicam funções comuns do workspace MATLAB/NumPy. Todos operam so
 
 Calcula a variância dos elementos de X.
 
-**Inputs:** `X` (array numérico, qualquer shape)  
-**Parâmetros:** nenhum  
-**Outputs:** `result` (scalar ou array, dependendo do shape de X)
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer), `ddof` (integer), `keepdims` (boolean)  
+**Outputs:** `result`  
 
 ---
 
@@ -461,9 +463,9 @@ Calcula a variância dos elementos de X.
 
 Valor absoluto elemento a elemento de X.
 
-**Inputs:** `X` (array numérico)  
+**Inputs:** `X`  
 **Parâmetros:** nenhum  
-**Outputs:** `result` (array com mesmo shape de X)
+**Outputs:** `result`  
 
 ---
 
@@ -471,9 +473,9 @@ Valor absoluto elemento a elemento de X.
 
 Ordena os elementos de X em ordem crescente.
 
-**Inputs:** `X` (array numérico)  
-**Parâmetros:** `axis` (int, default −1 — eixo de ordenação)  
-**Outputs:** `result` (array com mesmo shape de X)
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer), `order` (ascending | descending)  
+**Outputs:** `indices`, `result`  
 
 ---
 
@@ -481,9 +483,9 @@ Ordena os elementos de X em ordem crescente.
 
 Soma cumulativa dos elementos de X.
 
-**Inputs:** `X` (array numérico)  
-**Parâmetros:** `axis` (int, default −1)  
-**Outputs:** `result` (array com mesmo shape de X)
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer)  
+**Outputs:** `result`  
 
 ---
 
@@ -491,9 +493,9 @@ Soma cumulativa dos elementos de X.
 
 Diferenças consecutivas entre elementos de X.
 
-**Inputs:** `X` (array numérico)  
-**Parâmetros:** `n` (int, default 1 — ordem da diferença), `axis` (int, default −1)  
-**Outputs:** `result` (array com dimensão reduzida em n no eixo escolhido)
+**Inputs:** `X`  
+**Parâmetros:** `n` (integer), `axis` (integer)  
+**Outputs:** `result`  
 
 ---
 
@@ -501,9 +503,9 @@ Diferenças consecutivas entre elementos de X.
 
 Matriz de correlação de X.
 
-**Inputs:** `X` (matrix 2D, shape (m, n))  
-**Parâmetros:** nenhum  
-**Outputs:** `result` (matrix quadrada (n, n))
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `rowvar` (boolean)  
+**Outputs:** `result` (matrix)  
 
 ---
 
@@ -511,9 +513,9 @@ Matriz de correlação de X.
 
 Matriz de covariância de X.
 
-**Inputs:** `X` (matrix 2D, shape (m, n))  
-**Parâmetros:** nenhum  
-**Outputs:** `result` (matrix quadrada (n, n))
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `rowvar` (boolean), `ddof` (integer)  
+**Outputs:** `result` (matrix)  
 
 ---
 
@@ -521,9 +523,9 @@ Matriz de covariância de X.
 
 Transformada Rápida de Fourier (FFT) de X.
 
-**Inputs:** `X` (array numérico)  
-**Parâmetros:** `axis` (int, default −1)  
-**Outputs:** `result` (array complexo com mesmo shape de X)
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer), `n` (integer), `sample_spacing` (number)  
+**Outputs:** `frequencies` (vector), `magnitude`, `phase`  
 
 ---
 
@@ -531,9 +533,9 @@ Transformada Rápida de Fourier (FFT) de X.
 
 Logaritmo natural (base e) elemento a elemento de X.
 
-**Inputs:** `X` (array numérico, todos os valores > 0)  
-**Parâmetros:** nenhum  
-**Outputs:** `result` (array com mesmo shape de X)  
+**Inputs:** `X`  
+**Parâmetros:** `base` (natural | log2 | log10)  
+**Outputs:** `result`  
 **Restrições:** `validate()` verifica que todos os valores de X são positivos.
 
 ---
@@ -542,9 +544,9 @@ Logaritmo natural (base e) elemento a elemento de X.
 
 Exponencial elemento a elemento de X.
 
-**Inputs:** `X` (array numérico)  
+**Inputs:** `X`  
 **Parâmetros:** nenhum  
-**Outputs:** `result` (array com mesmo shape de X)
+**Outputs:** `result`  
 
 ---
 
@@ -552,9 +554,9 @@ Exponencial elemento a elemento de X.
 
 Raiz quadrada elemento a elemento de X.
 
-**Inputs:** `X` (array numérico, todos os valores ≥ 0)  
+**Inputs:** `X`  
 **Parâmetros:** nenhum  
-**Outputs:** `result` (array com mesmo shape de X)  
+**Outputs:** `result`  
 **Restrições:** `validate()` verifica que todos os valores de X são não-negativos.
 
 ---
@@ -563,9 +565,9 @@ Raiz quadrada elemento a elemento de X.
 
 Gera vetor com N valores igualmente espaçados entre `start` e `stop`.
 
-**Inputs:** nenhum (gerador puro — não lê `inputs["X"]`)  
-**Parâmetros:** `start` (float), `stop` (float), `num` (int, default 50)  
-**Outputs:** `result` (vetor 1D de shape (num,))
+**Inputs:** —  
+**Parâmetros:** `start` (number), `stop` (number), `n` (integer)  
+**Outputs:** `result` (vector)  
 
 ---
 
@@ -573,9 +575,9 @@ Gera vetor com N valores igualmente espaçados entre `start` e `stop`.
 
 Arredonda os elementos de X para N casas decimais.
 
-**Inputs:** `X` (array numérico)  
-**Parâmetros:** `decimals` (int, default 0)  
-**Outputs:** `result` (array com mesmo shape de X)
+**Inputs:** `X`  
+**Parâmetros:** `decimals` (integer)  
+**Outputs:** `result`  
 
 ---
 
@@ -583,9 +585,9 @@ Arredonda os elementos de X para N casas decimais.
 
 Piso (maior inteiro ≤ valor) elemento a elemento de X.
 
-**Inputs:** `X` (array numérico)  
+**Inputs:** `X`  
 **Parâmetros:** nenhum  
-**Outputs:** `result` (array com mesmo shape de X)
+**Outputs:** `result`  
 
 ---
 
@@ -593,9 +595,9 @@ Piso (maior inteiro ≤ valor) elemento a elemento de X.
 
 Teto (menor inteiro ≥ valor) elemento a elemento de X.
 
-**Inputs:** `X` (array numérico)  
+**Inputs:** `X`  
 **Parâmetros:** nenhum  
-**Outputs:** `result` (array com mesmo shape de X)
+**Outputs:** `result`  
 
 ---
 
@@ -603,9 +605,9 @@ Teto (menor inteiro ≥ valor) elemento a elemento de X.
 
 Sinal de cada elemento de X (−1, 0 ou 1).
 
-**Inputs:** `X` (array numérico)  
+**Inputs:** `X`  
 **Parâmetros:** nenhum  
-**Outputs:** `result` (array com mesmo shape de X)
+**Outputs:** `result`  
 
 ---
 
@@ -613,9 +615,9 @@ Sinal de cada elemento de X (−1, 0 ou 1).
 
 Resto da divisão elemento a elemento de X por `divisor`.
 
-**Inputs:** `X` (array numérico)  
-**Parâmetros:** `divisor` (float, obrigatório ≠ 0)  
-**Outputs:** `result` (array com mesmo shape de X)
+**Inputs:** `X`  
+**Parâmetros:** `divisor` (number)  
+**Outputs:** `result`  
 
 ---
 
@@ -623,9 +625,9 @@ Resto da divisão elemento a elemento de X por `divisor`.
 
 Produto cumulativo dos elementos de X.
 
-**Inputs:** `X` (array numérico)  
-**Parâmetros:** `axis` (int, default −1)  
-**Outputs:** `result` (array com mesmo shape de X)
+**Inputs:** `X`  
+**Parâmetros:** `axis` (integer)  
+**Outputs:** `result`  
 
 ---
 
@@ -633,9 +635,9 @@ Produto cumulativo dos elementos de X.
 
 Valores únicos de X, em ordem crescente.
 
-**Inputs:** `X` (array numérico)  
+**Inputs:** `X`  
 **Parâmetros:** nenhum  
-**Outputs:** `result` (vetor 1D com os valores únicos)
+**Outputs:** `counts` (vector), `result`  
 
 ---
 
@@ -649,8 +651,8 @@ Scripts de transformação espectral. Operações sem modelo — apenas transfor
 
 Standard Normal Variate. Normaliza cada espectro individualmente pela média e desvio padrão.
 
-**Inputs:** `X` (matrix: n_samples × n_vars)  
-**Outputs:** `X_snv`
+**Inputs:** `X` (matrix)  
+**Outputs:** `X_snv` (matrix)  
 
 ---
 
@@ -659,8 +661,8 @@ Standard Normal Variate. Normaliza cada espectro individualmente pela média e d
 Multiplicative Scatter Correction. Corrige efeitos de espalhamento usando espectro de referência.
 
 **Inputs:** `X` (matrix)  
-**Parâmetros:** `reference` ("mean" ou vetor explícito)  
-**Outputs:** `X_msc`, `reference_spectrum`
+**Parâmetros:** `reference` (string)  
+**Outputs:** `X_msc` (matrix), `reference_used` (vector)  
 
 ---
 
@@ -668,9 +670,9 @@ Multiplicative Scatter Correction. Corrige efeitos de espalhamento usando espect
 
 Suavização e derivadas via filtro Savitzky-Golay.
 
-**Inputs:** `X` (matrix ou vector)  
-**Parâmetros:** `window_length`, `polyorder`, `deriv` (0=suavização, 1=1ª derivada, 2=2ª derivada)  
-**Outputs:** `X_sg`  
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `window_length` (integer), `polyorder` (integer), `deriv` (integer), `spectral_axis` (integer)  
+**Outputs:** `X_sg` (matrix)  
 **Restrições:** `window_length` deve ser ímpar e maior que `polyorder`
 
 ---
@@ -680,8 +682,8 @@ Suavização e derivadas via filtro Savitzky-Golay.
 Mean Centering. Subtrai a média de cada variável (ou amostra, conforme `axis`).
 
 **Inputs:** `X` (matrix)  
-**Parâmetros:** `axis` (0=centraliza colunas/variáveis, 1=centraliza linhas; default 0)  
-**Outputs:** `X_c`, `mean_`  
+**Parâmetros:** `axis` (integer)  
+**Outputs:** `X_c` (matrix), `mean_` (vector)  
 **Restrições:** X deve ser matriz 2D
 
 ---
@@ -690,8 +692,8 @@ Mean Centering. Subtrai a média de cada variável (ou amostra, conforme `axis`)
 
 Centraliza na média e escala pelo desvio padrão (z-score).
 
-**Inputs:** `X`  
-**Outputs:** `X_as`, `mean`, `std`
+**Inputs:** `X` (matrix)  
+**Outputs:** `X_as` (matrix), `mean_` (vector), `std_` (vector)  
 
 ---
 
@@ -710,8 +712,8 @@ Normalização por norma L1, L2 ou máximo.
 Correção de Linha de Base. Remove a linha de base por método linear, polinomial, rubberband (envoltória convexa inferior) ou ALS (Asymmetric Least Squares).
 
 **Inputs:** `X` (matrix)  
-**Parâmetros:** `method` (linear | polynomial | rubberband | als; default `linear`), `degree` (usado em `polynomial`, default 2), `lambda_` (peso de suavização, usado em `als`, default 1e4), `spectral_axis` (default 1)  
-**Outputs:** `X_bl`  
+**Parâmetros:** `method` (linear | polynomial | rubberband | als), `degree` (integer), `lambda_` (number), `spectral_axis` (integer)  
+**Outputs:** `X_bl` (matrix)  
 **Restrições:** `method` deve ser um dos 4 válidos; X deve ser matriz 2D
 
 ---
@@ -841,9 +843,9 @@ Orthogonal Signal Correction. Remove variação ortogonal à variável resposta.
 
 Principal Component Analysis.
 
-**Inputs:** `X` (matrix: n_samples × n_vars)  
-**Parâmetros:** `n_components`, `scale` (bool)  
-**Outputs:** `scores` (T), `loadings` (P), `explained_variance`, `eigenvalues`
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `n_components` (integer), `center` (boolean), `scale` (boolean)  
+**Outputs:** `explained_variance` (vector), `explained_variance_ratio` (vector), `loadings` (matrix), `scores` (matrix)  
 
 ---
 
@@ -851,9 +853,9 @@ Principal Component Analysis.
 
 Hierarchical Cluster Analysis.
 
-**Inputs:** `X`  
-**Parâmetros:** `linkage` (ward | complete | average | single), `metric`, `n_clusters`  
-**Outputs:** `dendrogram`, `labels`, `linkage_matrix`
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `method` (ward | complete | average | single), `metric` (euclidean | cityblock | cosine | correlation)  
+**Outputs:** `dendrogram_data`, `linkage_matrix` (matrix)  
 
 ---
 
@@ -871,9 +873,9 @@ K-Means Clustering.
 
 Detecção de outliers por Hotelling T² e SPE.
 
-**Inputs:** `X`  
-**Parâmetros:** `method` (pca_t2 | pca_spe | isolation_forest), `n_components`, `alpha`  
-**Outputs:** `outlier_flags`, `scores`, `threshold`
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `method` (hotelling | mahalanobis | isolation_forest), `alpha` (number)  
+**Outputs:** `outlier_mask` (vector), `scores_` (vector), `threshold` (scalar)  
 
 ---
 
@@ -926,9 +928,9 @@ Elastic Net (L1 + L2).
 
 Principal Component Regression.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_components`  
-**Outputs:** `model`, `scores`, `loadings`, `metrics`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `n_components` (integer)  
+**Outputs:** `coefficients` (vector), `loadings` (matrix), `metrics_cal`, `model` (model), `scores` (matrix)  
 
 ---
 
@@ -936,9 +938,9 @@ Principal Component Regression.
 
 Partial Least Squares Regression (PLS1/PLS2).
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_components`  
-**Outputs:** `model`, `x_scores`, `x_loadings`, `y_loadings`, `vip`, `metrics`
+**Inputs:** `X` (matrix), `Y`  
+**Parâmetros:** `n_components` (integer), `scale` (boolean)  
+**Outputs:** `metrics_cal`, `model` (model), `regression_vector` (vector), `x_loadings` (matrix), `x_scores` (matrix), `x_weights` (matrix), `y_loadings` (matrix)  
 
 ---
 
@@ -982,8 +984,8 @@ ILS — Inverse Least Squares. Modela `y = X × b` diretamente, com regularizaç
 
 Linear Discriminant Analysis.
 
-**Inputs:** `X`, `y` (labels)  
-**Outputs:** `model`, `scores`, `metrics` (accuracy, balanced_accuracy)
+**Inputs:** `X` (matrix), `y` (vector)  
+**Outputs:** `loadings` (matrix), `metrics_cal`, `model` (model), `scores` (matrix)  
 
 ---
 
@@ -1000,9 +1002,9 @@ Quadratic Discriminant Analysis.
 
 K-Nearest Neighbors Classifier.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_neighbors`, `metric`, `weights`  
-**Outputs:** `model`, `metrics`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `n_neighbors` (integer), `metric` (euclidean | manhattan | chebyshev | minkowski | cosine), `weights` (uniform | distance)  
+**Outputs:** `metrics_cal`, `model` (model)  
 
 ---
 
@@ -1010,9 +1012,9 @@ K-Nearest Neighbors Classifier.
 
 Support Vector Machine Classifier.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `kernel`, `C`, `gamma`  
-**Outputs:** `model`, `support_vectors`, `metrics`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `kernel` (linear | poly | rbf | sigmoid), `C` (number), `gamma` (string)  
+**Outputs:** `metrics_cal`, `model` (model), `support_vectors` (matrix)  
 
 ---
 
@@ -1020,9 +1022,9 @@ Support Vector Machine Classifier.
 
 PLS Discriminant Analysis.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_components`, `threshold`  
-**Outputs:** `model`, `scores`, `vip`, `metrics`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `n_components` (integer), `threshold` (number)  
+**Outputs:** `classes` (vector), `metrics_cal`, `model` (model), `scores` (matrix), `x_loadings` (matrix), `x_weights` (matrix)  
 
 ---
 
@@ -1030,9 +1032,9 @@ PLS Discriminant Analysis.
 
 Random Forest Classifier.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_estimators`, `max_depth`, `random_state`  
-**Outputs:** `model`, `feature_importances`, `metrics`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `n_estimators` (integer), `max_depth` (integer), `min_samples_split` (integer), `random_state` (integer)  
+**Outputs:** `feature_importances` (vector), `metrics_cal`, `model` (model)  
 
 ---
 
@@ -1040,9 +1042,9 @@ Random Forest Classifier.
 
 Soft Independent Modelling of Class Analogy.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_components`, `alpha`  
-**Outputs:** `model`, `class_models`, `metrics`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `n_components` (integer), `alpha` (number)  
+**Outputs:** `classes` (vector), `distances`, `metrics_cal`, `model` (model), `thresholds`  
 
 ---
 
@@ -1083,9 +1085,9 @@ One-Class SVM. Detecção de novidades treinando um SVM de uma classe apenas com
 
 PLS One-Class. Ajusta um PLS contra pseudo-negativos sintéticos (permutações/ruído da classe alvo) e usa Hotelling T² nos scores como limiar de pertencimento.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `target_class` (default = primeira classe de y), `n_components` (default 3), `alpha` (default 0.05), `random_state` (default 42)  
-**Outputs:** `model`, `threshold_T2`, `T2_scores`, `metrics_cal`  
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `target_class` (string), `n_components` (integer), `alpha` (number), `random_state` (integer)  
+**Outputs:** `T2_scores` (vector), `metrics_cal`, `model` (model), `threshold_T2` (scalar)  
 **Restrições:** X e y devem ter o mesmo número de amostras
 
 ---
@@ -1109,9 +1111,9 @@ OC-RF — One-Class Random Forest. Treina uma Random Forest contra pseudo-negati
 
 Multi-Layer Perceptron (regressão ou classificação).
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `hidden_layers` (lista de inteiros), `activation`, `epochs`, `learning_rate`, `task` (regression | classification)  
-**Outputs:** `model`, `history`, `metrics`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `task` (regression | classification), `hidden_layers` (array), `activation` (relu | tanh | sigmoid), `dropout` (number), `epochs` (integer), `batch_size` (integer), `learning_rate` (number)  
+**Outputs:** `history`, `model` (model)  
 
 ---
 
@@ -1119,9 +1121,9 @@ Multi-Layer Perceptron (regressão ou classificação).
 
 Convolutional Neural Network 1D para espectros/séries temporais (regressão ou classificação).
 
-**Inputs:** `X` (n_samples × n_vars), `y`  
-**Parâmetros:** `filters` (lista, default `[32, 64]`), `kernel_size` (default 5), `pool_size` (default 2), `dense_units` (default `[64]`), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3), `task` (regression | classification)  
-**Outputs:** `model`, `history`  
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `task` (regression | classification), `filters` (array), `kernel_size` (integer), `pool_size` (integer), `dense_units` (array), `epochs` (integer), `batch_size` (integer), `learning_rate` (number)  
+**Outputs:** `history`, `model` (model)  
 **Restrições:** X deve ser 2D (n_samples, n_features); X e y devem ter o mesmo número de amostras
 
 ---
@@ -1141,9 +1143,9 @@ Convolutional Neural Network 2D para imagens hiperespectrais ou mapas 2D.
 
 Recurrent Neural Network (LSTM/GRU).
 
-**Inputs:** `X` (n_samples × n_timesteps × n_features), `y`  
-**Parâmetros:** `units`, `cell_type` (lstm | gru), `epochs`, `task`  
-**Outputs:** `model`, `history`, `metrics`  
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `task` (regression | classification), `cell` (lstm | gru), `units` (array), `dense_units` (array), `dropout` (number), `epochs` (integer), `batch_size` (integer), `learning_rate` (number)  
+**Outputs:** `history`, `model` (model)  
 **Restrições:** X deve ser 3D
 
 ---
@@ -1152,9 +1154,9 @@ Recurrent Neural Network (LSTM/GRU).
 
 Autoencoder denso (variante padrão ou variacional) para redução de dimensão / detecção de anomalias.
 
-**Inputs:** `X` (matrix: n_samples × n_features)  
-**Parâmetros:** `variant` (standard | variational; default "standard"), `latent_dim` (default 8), `encoder_layers` (lista, default `[64, 32]`), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3)  
-**Outputs:** `model`, `latent`, `reconstruction_error`, `history`  
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `variant` (standard | variational), `latent_dim` (integer), `encoder_layers` (array), `epochs` (integer), `batch_size` (integer), `learning_rate` (number)  
+**Outputs:** `model` (model), `latent` (matrix), `reconstruction_error` (scalar), `history` (+ chaves dinâmicas)  
 **Restrições:** X deve ser 2D; `variant` deve ser "standard" ou "variational"
 
 ---
@@ -1163,9 +1165,9 @@ Autoencoder denso (variante padrão ou variacional) para redução de dimensão 
 
 Transformer com multi-head self-attention 1D para espectros/séries.
 
-**Inputs:** `X` (matrix: n_samples × sequence_length), `y`  
-**Parâmetros:** `n_heads` (default 4), `d_model` (default 32), `ff_dim` (default 64), `n_blocks` (default 2), `dense_units` (default `[64]`), `dropout` (default 0.1), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3), `task` (regression | classification)  
-**Outputs:** `model`, `history`  
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `task` (regression | classification), `n_heads` (integer), `d_model` (integer), `ff_dim` (integer), `n_blocks` (integer), `dense_units` (array), `dropout` (number), `epochs` (integer), `batch_size` (integer), `learning_rate` (number)  
+**Outputs:** `model` (model), `history` (+ chaves dinâmicas)  
 **Restrições:** X deve ser 2D (n_samples, sequence_length); X e y devem ter o mesmo número de amostras
 
 ---
@@ -1174,9 +1176,9 @@ Transformer com multi-head self-attention 1D para espectros/séries.
 
 Diffusion Model — rede de denoising por difusão para denoising ou augmentação de espectros.
 
-**Inputs:** `X` (matrix: n_samples × n_features)  
-**Parâmetros:** `task` (denoise | augment; default "denoise"), `T` (número de passos de difusão, default 100), `hidden_units` (default `[128, 128]`), `epochs` (default 50), `batch_size` (default 32), `learning_rate` (default 1e-3), `n_augment` (nº de amostras a gerar quando task=augment, default = n_samples de X)  
-**Outputs:** `model`, `X_denoised` (task=denoise) ou `X_augmented` (task=augment), `training_loss`  
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `task` (denoise | augment), `T` (integer), `hidden_units` (array), `epochs` (integer), `batch_size` (integer), `learning_rate` (number), `n_augment` (integer)  
+**Outputs:** `model` (model), `X_denoised` (matrix), `X_augmented` (matrix), `training_loss` (+ chaves dinâmicas)  
 **Restrições:** X deve ser 2D; `task` deve ser "denoise" ou "augment"
 
 ---
@@ -1189,9 +1191,9 @@ Diffusion Model — rede de denoising por difusão para denoising ou augmentaç�
 
 PARAFAC / CP Decomposition.
 
-**Inputs:** `X` (tensor, ndim ≥ 3)  
-**Parâmetros:** `rank`, `n_iter_max`, `tol`, `init`  
-**Outputs:** `factors` (lista de matrizes por modo), `reconstruction_error`  
+**Inputs:** `X` (tensor)  
+**Parâmetros:** `rank` (integer), `n_iter_max` (integer), `tol` (number), `random_state` (integer), `non_negative` (boolean), `normalize_factors` (boolean)  
+**Outputs:** `core_consistency`, `factors`, `fit` (scalar), `model` (model), `weights` (vector)  
 **Restrições:** ndim ≥ 3
 
 ---
@@ -1222,9 +1224,9 @@ PARAFAC Aumentado. Concatena o tensor com uma versão de colunas permutadas ao l
 
 Tucker3 Decomposition.
 
-**Inputs:** `X` (tensor, ndim ≥ 3)  
-**Parâmetros:** `ranks` (lista de ranks por modo)  
-**Outputs:** `core`, `factors`, `reconstruction_error`
+**Inputs:** `X` (tensor)  
+**Parâmetros:** `ranks` (array), `n_iter_max` (integer), `tol` (number)  
+**Outputs:** `core` (tensor), `factors`, `fit` (scalar), `model` (model)  
 
 ---
 
@@ -1232,9 +1234,9 @@ Tucker3 Decomposition.
 
 Multivariate Curve Resolution — Alternating Least Squares.
 
-**Inputs:** `X` (matrix ou tensor desdobrado)  
-**Parâmetros:** `n_components`, `constraints` (non_negativity, closure, unimodality)  
-**Outputs:** `C` (concentrações), `St` (espectros puros), `residuals`
+**Inputs:** `X` (matrix)  
+**Parâmetros:** `n_components` (integer), `n_iter` (integer), `tol` (number), `non_neg_C` (boolean), `non_neg_S` (boolean)  
+**Outputs:** `C` (matrix), `S` (matrix), `X_reconstructed` (matrix), `fit` (scalar), `model` (model)  
 
 ---
 
@@ -1279,9 +1281,9 @@ Tensor NMF. NMF não-negativa aplicada ao desdobramento de um modo escolhido do 
 
 N-PLS — N-way Partial Least Squares. Desdobra o tensor no modo amostras e ajusta um PLS padrão sobre a matriz resultante.
 
-**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
-**Parâmetros:** `n_components` (default 3)  
-**Outputs:** `model`, `scores`, `x_loadings`, `metrics_cal`  
+**Inputs:** `X` (tensor), `y` (vector)  
+**Parâmetros:** `n_components` (integer)  
+**Outputs:** `metrics_cal`, `model` (model), `scores` (matrix), `x_loadings` (matrix)  
 **Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
 
 ---
@@ -1290,9 +1292,9 @@ N-PLS — N-way Partial Least Squares. Desdobra o tensor no modo amostras e ajus
 
 U-PLS — Unfolded PLS. Desdobra o tensor no modo amostras, normaliza (`StandardScaler`) e ajusta PLS sobre a matriz resultante.
 
-**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
-**Parâmetros:** `n_components` (default 3)  
-**Outputs:** `model`, `scores`, `metrics_cal`  
+**Inputs:** `X` (tensor), `y` (vector)  
+**Parâmetros:** `n_components` (integer)  
+**Outputs:** `metrics_cal`, `model` (model), `scores` (matrix)  
 **Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
 
 ---
@@ -1413,9 +1415,9 @@ Tensor Random Forest. Desdobra o tensor, reduz via PCA e classifica com Random F
 
 Multiway PLS-DA. Desdobra o tensor e ajusta PLS-DA com variável resposta dummy (one-hot).
 
-**Inputs:** `X` (tensor, ndim ≥ 3), `y`  
-**Parâmetros:** `n_components` (default 3)  
-**Outputs:** `model`, `scores`, `classes`, `metrics_cal`  
+**Inputs:** `X` (tensor), `y` (vector)  
+**Parâmetros:** `n_components` (integer)  
+**Outputs:** `classes` (vector), `metrics_cal`, `model` (model), `scores` (matrix)  
 **Restrições:** X deve ser tensor de ordem ≥ 3; X e y devem ter o mesmo número de amostras
 
 ---
@@ -1506,9 +1508,9 @@ Uninformative Variable Elimination.
 
 Interval PLS.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_intervals`, `n_components`  
-**Outputs:** `best_interval`, `selected_indices`, `rmsecv_per_interval`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `n_intervals` (integer), `n_components` (integer), `n_folds` (integer)  
+**Outputs:** `all_intervals`, `best_interval`, `model` (model), `selected_indices` (vector)  
 
 ---
 
@@ -1536,9 +1538,9 @@ Competitive Adaptive Reweighted Sampling.
 
 Variable Importance in Projection (VIP do PLS).
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `n_components`, `threshold` (padrão 1.0)  
-**Outputs:** `vip_scores`, `selected_indices`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `n_components` (integer), `threshold` (number)  
+**Outputs:** `model` (model), `n_selected` (scalar), `selected_indices` (vector), `threshold` (scalar), `vip_scores` (vector)  
 
 ---
 
@@ -1602,9 +1604,9 @@ Métodos de validação cruzada, bootstrap e diagnóstico estatístico de modelo
 
 Cross-Validation K-Fold, LOO ou Monte Carlo.
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `method` (pls | ridge | lda | rf_reg | rf_cls), `cv_type` (kfold | loo | montecarlo), `n_folds`, `n_iter`, `test_size`, parâmetros do modelo  
-**Outputs:** `model`, `metrics_cv` (RMSECV + R² para regressão; accuracy + balanced_accuracy para classificação), `n_splits`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `method` (pls | ridge | lda | rf_reg | rf_cls), `cv_type` (kfold | loo | montecarlo), `n_folds` (integer), `n_iter` (integer), `test_size` (number)  
+**Outputs:** `model` (model), `metrics_cv`, `n_splits` (scalar) (+ chaves dinâmicas)  
 
 ---
 
@@ -1632,9 +1634,9 @@ Teste de permutação (y-scrambling).
 
 Leverage e Influência (Hat Matrix + Distância de Cook).
 
-**Inputs:** `X`, `y`  
-**Parâmetros:** `threshold_leverage`  
-**Outputs:** `model`, `leverage`, `cooks_distance`, `threshold_leverage`, `high_leverage_samples`, `n_high_leverage`
+**Inputs:** `X` (matrix), `y` (vector)  
+**Parâmetros:** `threshold_leverage` (number)  
+**Outputs:** `cooks_distance` (vector), `high_leverage_samples` (vector), `leverage` (vector), `model` (model), `n_high_leverage` (scalar), `threshold_leverage` (scalar)  
 
 ---
 
@@ -1648,9 +1650,9 @@ Padronização de instrumentos, domain adaptation e fine-tuning de modelos espec
 
 Piecewise Direct Standardization.
 
-**Inputs:** `X_secondary`, `X_primary`, `X_new` (opcional)  
-**Parâmetros:** `window`, `n_components`  
-**Outputs:** `model`, `X_corrected`  
+**Inputs:** `X_new` (matrix, opcional), `X_primary` (matrix), `X_secondary` (matrix)  
+**Parâmetros:** `window` (integer), `n_components` (integer)  
+**Outputs:** `X_corrected` (matrix), `model` (model)  
 **Restrições:** `X_primary` e `X_secondary` devem ter o mesmo shape
 
 ---
@@ -1659,8 +1661,8 @@ Piecewise Direct Standardization.
 
 Direct Standardization.
 
-**Inputs:** `X_secondary`, `X_primary`, `X_new` (opcional)  
-**Outputs:** `model`, `F` (matriz de transformação), `X_corrected`  
+**Inputs:** `X_new` (matrix, opcional), `X_primary` (matrix), `X_secondary` (matrix)  
+**Outputs:** `F` (matrix), `X_corrected` (matrix), `model` (model)  
 **Restrições:** mesmas amostras em primário e secundário
 
 ---
@@ -2038,9 +2040,9 @@ Scripts utilitários de suporte a análises quimiométricas.
 
 Consolidação e comparação de métricas de múltiplos experimentos.
 
-**Inputs:** `results` (lista de dicts com métricas)  
-**Parâmetros:** `metrics` (lista de chaves a comparar), `sort_by`  
-**Outputs:** `model`, `summary` (mean, std, min, max por métrica), `n_experiments`, `sorted_results`, `best_experiment`
+**Inputs:** `results`  
+**Parâmetros:** `metrics` (array), `sort_by` (string)  
+**Outputs:** `best_experiment`, `model` (model), `n_experiments` (scalar), `sorted_results`, `summary`  
 
 ---
 

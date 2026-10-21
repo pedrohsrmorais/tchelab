@@ -106,6 +106,8 @@ model  → tensor     ✗ (geralmente)
 scalar → matrix     ✗
 ```
 
+Vocabulário de tipos: `matrix`, `tensor`, `vector`, `scalar`, `model`, `figures`, `labels`. A comparação é por igualdade estrita; uma porta **sem** `type` (operações que aceitam qualquer ordem, ou saídas em dicionário/lista) funciona como curinga e conecta com qualquer porta. Convenção do catálogo: operações só-2D → `matrix`; multiway (≥3 modos) → `tensor`; `y` → `vector`; modelos → `model`.
+
 ### 5. Ordem analítica
 O `data_order` do array de entrada satisfaz `min_order` e `max_order` da técnica de destino. Só é checada quando a aresta já tem um dataset conhecido na ponta de origem (`datasetMeta`); numa aresta entre dois nós de workflow ainda sem execução, essa camada é pulada.
 

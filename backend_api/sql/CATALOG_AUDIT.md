@@ -300,3 +300,14 @@ usuário era a completude do `parameter_schema` no banco (resolvido aqui) e
 a riqueza da UI do `NodeConfigPanel`, que hoje só renderiza
 `<input type="number">`/`<input type="text">` — isso é Fase 4, fora do
 escopo desta rodada.
+
+
+## Auditoria de portas, tipos e textos (2026-10-21)
+
+Revisão completa das 94 técnicas ativas contra o código do worker. A rodada anterior havia corrigido só 24; esta encontrou mais 33 divergências de nome de porta, além de tipos fora do vocabulário documentado (`ndarray`, `array`, `string`…) e da técnica `linspace`, que o seed descartava silenciosamente (CHECK `min_order/max_order BETWEEN 1 AND 20` — agora NULL).
+
+- **Fonte da verdade:** `catalog_ports_source.py` (portas + `how_it_works`, `usage_tips`, `historical_note`).
+- **Validação:** `python3 gen_catalog_ports_sql.py --check` (AST do worker; nomes, opcionais, tipos, textos não vazios). Saída esperada: `OK — 94 técnicas conferidas`.
+- **Geração:** `python3 gen_catalog_ports_sql.py` → `catalog_ports.sql` (deploy idempotente); `--init-mysql` reinjeta o bloco no `init.mysql`.
+- **Doc:** `python3 sync_docs_ports.py --params <dump parameter_schema>` atualiza as linhas Inputs/Parâmetros/Outputs de `docs/catalogo_scripts.md`.
+- **Pendente:** 123 técnicas inativas ainda usam tipos legados e não têm textos explicativos; as linhas `Restrições`/descrições de `catalogo_scripts.md` são manuais e não foram auditadas.
