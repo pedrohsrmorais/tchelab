@@ -71,6 +71,43 @@ sessão de teste.
 - Artefatos do sandbox, não bugs do app: fuso do MariaDB (-03) vs backend (`+00:00`) desloca timestamps;
   fontes externas bloqueadas (`ERR_TUNNEL`); rate limiter de login (20/15 min) esgota em testes repetidos.
 
+## Atualização — persistência das conexões e tema Classic (2026-10-21, tarde)
+
+### Bug: conexões/dataset perdidos ao sair do workflow (corrigido)
+
+Reproduzido: com Dataset→SNV→PCA conectados, ao sair e reabrir sobravam 1 aresta e o dataset
+selecionado sumia ("Nenhum dataset selecionado").
+
+- **Causa raiz (backend):** `updateWorkflowDefinition()` em `workflowNode.controller.js` e
+  `workflowEdge.controller.js` sobrescrevia `workflows.definition` inteiro com `{nodes, edges}`, apagando o
+  `canvas` (dataset escolhido + ligações dataset→porta) que o autosave do editor grava. Qualquer
+  criação/movimento de nó ou criação de aresta *depois* de ligar o dataset apagava a ligação.
+- **Correção:** novo `services/workflowDefinition.service.js::patchDefinition` (merge raso por chave de 1º
+  nível), usado pelos controllers de nó/aresta; `PUT /workflows/:id` também faz merge de `definition`.
+- **Segunda brecha (frontend):** o autosave debounced (800 ms) era cancelado ao desmontar o editor, então
+  conectar e sair rápido perdia o salvamento. Agora há *flush* no unmount.
+- **Nós novos nasciam colados/sobrepostos** (grade de 240 px ≈ largura do nó, impossibilitando conectar):
+  agora são posicionados à direita do último, com folga.
+- **Verificado** (nova criação de workflow pela UI, SPA → Voltar → reabrir): esperar autosave, sair após
+  100 ms, sair imediatamente e sair ~600 ms após ligar o dataset → em todos, 2 arestas, dataset mantido e
+  "Pipeline válido".
+- **Limitação:** workflows que já tiveram o canvas apagado pelo bug não são recuperáveis — é preciso
+  religar o dataset uma vez.
+
+### Tema Classic
+
+Ver [`tema_classic.md`](tema_classic.md). Antes: editor com nós navy ilegíveis, famílias em cores neon,
+botões/abas com cores claras de tema escuro, login escuro, Workspace em bege estilo Windows XP com Command
+Window preta. Agora: paleta cinza/branco/azul MATLAB em todas as telas, Command Window branca, heatmap em
+parula, cores MATLAB nos gráficos e nas famílias. Capturas: `classic_workspace.png`, `classic_editor.png`,
+`classic_dataset.png`, `classic_viz_heat.png`, `classic_login.png`.
+
+### Pendências adicionais
+- Restaurar versão de workflow (`restoreVersion`) só regrava `definition`; não recria `workflow_nodes`/
+  `workflow_edges` (e apaga o `canvas`). Recurso incompleto, não corrigido.
+- Excluir nó no canvas (ícone de lixeira) não pede confirmação e remove arestas/ligações em cascata.
+- Tema Claro: textos cinza claros (`#94a3b8`) ficam abaixo de 3:1 em várias telas (auditoria Claro: 48 casos).
+
 ## Capturas incluídas
 
 | Arquivo | Fluxo |

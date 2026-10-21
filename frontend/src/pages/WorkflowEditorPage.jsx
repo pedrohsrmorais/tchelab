@@ -203,7 +203,7 @@ function DatasetNode({ id, data, selected }) {
   return (
     <div style={{
       minWidth: 210,
-      background: selected ? 'rgba(37,99,235,0.18)' : 'rgba(10,15,30,0.95)',
+      background: selected ? 'rgba(37,99,235,0.18)' : 'var(--node-bg)',
       border: `2px solid ${selected ? 'var(--accent)' : 'rgba(37,99,235,0.5)'}`,
       borderRadius: 12,
       padding: '10px 14px',
@@ -288,7 +288,7 @@ function TechniqueNode({ id, data, selected }) {
   return (
     <div style={{
       minWidth: 220,
-      background: selected ? `rgba(${hexToRgb(color)},0.18)` : 'rgba(10,15,30,0.96)',
+      background: selected ? `rgba(${hexToRgb(color)},0.18)` : 'var(--node-bg)',
       border: `2px solid ${statusMeta ? statusMeta.color : (selected ? color : border)}`,
       borderRadius: 12,
       padding: '10px 14px',
@@ -1183,24 +1183,34 @@ export default function WorkflowEditorPage() {
   );
   const datasetBindingsKey = JSON.stringify(datasetBindings);
   const saveCanvasTimerRef = useRef(null);
+  // Salvamento pendente (ainda dentro do debounce). Guardado em ref para o
+  // flush ao sair da página: sem isso, o cleanup do efeito cancelava o timer e
+  // quem conectava e saía em menos de 800ms perdia dataset/ligações.
+  const pendingCanvasRef = useRef(null);
+  const saveCanvasNow = useCallback((wfId, payload) => {
+    pendingCanvasRef.current = null;
+    return api.workflows.update(wfId, { definition: { canvas: payload } }).catch(() => {
+      // Autosave silencioso — uma falha aqui não deve interromper o
+      // usuário; a próxima mudança de canvas tenta salvar de novo.
+    });
+  }, []);
   useEffect(() => {
     if (!canvasHydratedRef.current) return;
     if (saveCanvasTimerRef.current) clearTimeout(saveCanvasTimerRef.current);
-    saveCanvasTimerRef.current = setTimeout(() => {
-      api.workflows.update(id, {
-        definition: {
-          canvas: {
-            datasetNodes: JSON.parse(datasetNodesKey),
-            datasetBindings: JSON.parse(datasetBindingsKey),
-          },
-        },
-      }).catch(() => {
-        // Autosave silencioso — uma falha aqui não deve interromper o
-        // usuário; a próxima mudança de canvas tenta salvar de novo.
-      });
-    }, 800);
+    const payload = {
+      datasetNodes: JSON.parse(datasetNodesKey),
+      datasetBindings: JSON.parse(datasetBindingsKey),
+    };
+    pendingCanvasRef.current = { id, payload };
+    saveCanvasTimerRef.current = setTimeout(() => saveCanvasNow(id, payload), 800);
     return () => { if (saveCanvasTimerRef.current) clearTimeout(saveCanvasTimerRef.current); };
-  }, [datasetNodesKey, datasetBindingsKey, id]);
+  }, [datasetNodesKey, datasetBindingsKey, id, saveCanvasNow]);
+  // Ao desmontar (sair do workflow / trocar de workflow), grava na hora o que
+  // ainda estava pendente.
+  useEffect(() => () => {
+    const pending = pendingCanvasRef.current;
+    if (pending) saveCanvasNow(pending.id, pending.payload);
+  }, [saveCanvasNow]);
 
   // ── Deriva as arestas visuais de ligação Dataset→Técnica a partir do
   //    estado datasetBindings + da lista atual de nós (para refletir trocas
@@ -1398,9 +1408,23 @@ export default function WorkflowEditorPage() {
   const handleAddTechnique = useCallback((tech, dropPosition) => {
     nodeCount.current += 1;
     const nodeKey = `${tech.slug}_${Date.now().toString(36)}${nodeCount.current}`;
-    const position = dropPosition
-      ? { x: Math.round(dropPosition.x), y: Math.round(dropPosition.y) }
-      : { x: 300 + (nodeCount.current % 4) * 240, y: 140 + Math.floor(nodeCount.current / 4) * 160 };
+    // Sem posição de drop: coloca o nó à direita do último nó do canvas, com
+    // folga entre eles (a grade fixa de 240px era quase a largura do próprio
+    // nó, então nós sucessivos nasciam colados/sobrepostos e as portas não
+    // podiam ser conectadas).
+    let position;
+    if (dropPosition) {
+      position = { x: Math.round(dropPosition.x), y: Math.round(dropPosition.y) };
+    } else {
+      const existing = (rfInstanceRef.current?.getNodes?.() || []).filter(n => n.type === 'technique');
+      if (existing.length === 0) {
+        position = { x: 340, y: 180 };
+      } else {
+        const last = existing.reduce((a, b) => (b.position.x > a.position.x ? b : a));
+        const w = last.measured?.width ?? last.width ?? 260;
+        position = { x: Math.round(last.position.x + w + 90), y: Math.round(last.position.y) };
+      }
+    }
 
     api.workflows.addNode(id, {
       technique_id: tech.uuid,

@@ -121,11 +121,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden"
+    <div className="login-root min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #172554 100%)' }}>
 
       {/* Ambient blobs */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="login-deco absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-10"
           style={{ background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)', filter: 'blur(60px)' }} />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full opacity-8"
@@ -135,10 +135,10 @@ export default function LoginPage() {
       </div>
 
       {/* Floating particles */}
-      {PARTICLES.map(p => <Particle key={p.id} {...p} />)}
+      <div className="login-deco">{PARTICLES.map(p => <Particle key={p.id} {...p} />)}</div>
 
       {/* Orbit rings (desktop accent) */}
-      <div className="absolute left-1/2 top-1/2 pointer-events-none hidden lg:block">
+      <div className="login-deco absolute left-1/2 top-1/2 pointer-events-none hidden lg:block">
         <OrbitRing radius={320} duration={30} delay={0} dotCount={4} />
         <OrbitRing radius={420} duration={45} delay={5} dotCount={3} />
         <OrbitRing radius={520} duration={60} delay={10} dotCount={5} />
@@ -151,7 +151,7 @@ export default function LoginPage() {
         {/* Logo area */}
         <div className="text-center mb-8">
           <div
-            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4"
+            className="login-logo inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4"
             style={{ background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', boxShadow: '0 0 40px rgba(59,130,246,0.5)' }}
           >
             <FlaskConical className="w-10 h-10 text-white" />
@@ -170,7 +170,7 @@ export default function LoginPage() {
 
         {/* Card body */}
         <div
-          className="rounded-2xl p-8"
+          className="login-card rounded-2xl p-8"
           style={{
             background: 'rgba(15, 23, 42, 0.8)',
             backdropFilter: 'blur(24px)',

@@ -144,7 +144,9 @@ export default function AppLayout() {
             }}
           >
             <Suspense fallback={<ContentLoader />}>
-              {displayOutlet}
+              {/* key={theme}: remonta a página ao trocar de tema, para que cores calculadas
+                  em JS (ex.: paleta MATLAB das famílias no Classic) sejam recalculadas */}
+              <React.Fragment key={theme}>{displayOutlet}</React.Fragment>
             </Suspense>
           </div>
         )}

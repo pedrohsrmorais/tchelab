@@ -3,6 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
+const { parseDefinition } = require('../services/workflowDefinition.service');
 
 async function resolveWorkflow(uuid) {
   const [rows] = await db.query('SELECT * FROM workflows WHERE uuid = ? AND deleted_at IS NULL', [uuid]);
@@ -152,7 +153,16 @@ async function updateWorkflow(req, res) {
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         fields.push(`${key} = ?`);
-        values.push(key === 'tags' || key === 'definition' ? JSON.stringify(req.body[key]) : req.body[key]);
+        if (key === 'definition') {
+          // Merge raso por chave de 1º nível (não substitui a coluna inteira):
+          // o autosave do editor manda só { canvas } e não pode apagar o
+          // snapshot { nodes, edges } — e vice-versa (ver workflowDefinition.service.js).
+          const incoming = (req.body.definition && typeof req.body.definition === 'object' && !Array.isArray(req.body.definition))
+            ? req.body.definition : {};
+          values.push(JSON.stringify({ ...parseDefinition(workflow.definition), ...incoming }));
+        } else {
+          values.push(key === 'tags' ? JSON.stringify(req.body[key]) : req.body[key]);
+        }
       }
     }
     if (!fields.length) return R.badRequest(res, 'Nenhum campo para atualizar.');

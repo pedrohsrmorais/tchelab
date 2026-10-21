@@ -122,7 +122,7 @@ function useWsStyles(theme) {
       display: 'flex', alignItems: 'center', gap: '0.25rem',
       padding: cl ? '3px 6px' : '0.4rem 0.75rem',
       background: cl
-        ? 'linear-gradient(180deg, #f0eeea 0%, #dcd8d0 100%)'
+        ? '#f5f5f5'
         : 'var(--bg-surface)',
       borderBottom: cl ? '1px solid #aca899' : '1px solid var(--border)',
       flexShrink: 0,
@@ -132,7 +132,7 @@ function useWsStyles(theme) {
     // Separador vertical na toolbar
     sep: {
       width: 1, height: 22,
-      background: cl ? '#aca899' : 'var(--border)',
+      background: cl ? '#c8c8c8' : 'var(--border)',
       margin: '0 4px', flexShrink: 0,
     },
 
@@ -144,10 +144,10 @@ function useWsStyles(theme) {
       fontFamily: cl ? 'var(--font-sans)' : 'inherit',
       fontWeight: 500,
       border: cl
-        ? (active ? '1px solid #7a9ac8' : '1px solid transparent')
+        ? (active ? '1px solid #0a5fa8' : '1px solid transparent')
         : '1px solid var(--border)',
       background: cl
-        ? (active ? 'linear-gradient(180deg,#c2d8f0,#a8c4e8)' : 'transparent')
+        ? (active ? '#d6e6f5' : 'transparent')
         : (active ? 'var(--bg-hover)' : 'var(--bg-elevated)'),
       borderRadius: cl ? 2 : 'var(--radius-sm)',
       color: cl ? '#1a1a1a' : 'var(--text-secondary)',
@@ -161,16 +161,16 @@ function useWsStyles(theme) {
       display: 'flex', alignItems: 'center', gap: '0.35rem',
       padding: cl ? '2px 8px' : '0.35rem 0.75rem',
       background: cl
-        ? 'linear-gradient(180deg,#6fa3d4 0%,#4a7fbf 100%)'
+        ? '#e6e6e6'
         : 'var(--bg-surface)',
-      color: cl ? '#fff' : 'var(--text-muted)',
+      color: cl ? '#333' : 'var(--text-muted)',
       fontSize: cl ? '0.72rem' : '0.67rem',
       fontWeight: cl ? 700 : 700,
       letterSpacing: '0.06em',
-      borderBottom: cl ? '1px solid #3a6fa0' : '1px solid var(--border)',
+      borderBottom: cl ? '1px solid #c8c8c8' : '1px solid var(--border)',
       flexShrink: 0,
       userSelect: 'none',
-      textShadow: cl ? '0 1px 1px rgba(0,0,0,0.3)' : 'none',
+      textShadow: 'none',
     },
 
     // Tabela workspace
@@ -262,16 +262,16 @@ function useWsStyles(theme) {
       padding: cl ? '4px 14px' : '0.38rem 1rem',
       fontSize: cl ? '0.8rem' : '0.8rem',
       fontWeight: 600,
-      border: cl ? '1px solid #5a8fc8' : 'none',
+      border: cl ? '1px solid #084d8a' : 'none',
       background: cl
-        ? 'linear-gradient(180deg,#5a9fe0,#3d7ec8)'
+        ? 'var(--accent)'
         : 'var(--accent)',
       borderRadius: cl ? 2 : 'var(--radius-sm)',
       color: '#fff',
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.55 : 1,
       boxShadow: cl ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
-      textShadow: cl ? '0 1px 1px rgba(0,0,0,0.3)' : 'none',
+      textShadow: 'none',
     }),
 
     btnSecondary: {
@@ -281,7 +281,7 @@ function useWsStyles(theme) {
       fontWeight: 500,
       border: cl ? '1px solid #aaa' : '1px solid var(--border)',
       background: cl
-        ? 'linear-gradient(180deg,#f5f5f5,#e5e5e5)'
+        ? '#f5f5f5'
         : 'var(--bg-elevated)',
       borderRadius: cl ? 2 : 'var(--radius-sm)',
       color: cl ? '#333' : 'var(--text-secondary)',
@@ -298,20 +298,20 @@ function useWsStyles(theme) {
 
     // Console
     console: {
-      background: cl ? '#1a1a1a' : '#0d1117',
-      color: cl ? '#d4d0c8' : '#c9d1d9',
+      background: cl ? '#ffffff' : '#0d1117',
+      color: cl ? '#1a1a1a' : '#c9d1d9',
     },
     consoleHdr: {
-      background: cl ? '#2d2d2d' : '#161b22',
-      borderBottom: cl ? '1px solid #444' : '1px solid #21262d',
+      background: cl ? '#f0f0f0' : '#161b22',
+      borderBottom: cl ? '1px solid #c8c8c8' : '1px solid #21262d',
       padding: cl ? '3px 8px' : '0.3rem 0.75rem',
       display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
     },
-    consolePrompt: { color: cl ? '#e8a020' : '#7ee787' },  // laranja (MATLAB) ou verde
-    consoleText: { color: cl ? '#d4d0c8' : '#c9d1d9' },
-    consoleOk: { color: cl ? '#a8d080' : '#3fb950' },
-    consoleErr: { color: cl ? '#f08080' : '#f85149' },
-    consolePending: { color: cl ? '#888' : '#8b949e' },
+    consolePrompt: { color: cl ? '#1a1a1a' : '#7ee787' },  // laranja (MATLAB) ou verde
+    consoleText: { color: cl ? '#1a1a1a' : '#c9d1d9' },
+    consoleOk: { color: cl ? '#1f7a3d' : '#3fb950' },
+    consoleErr: { color: cl ? '#d32f2f' : '#f85149' },
+    consolePending: { color: cl ? '#777' : '#8b949e' },
   };
 }
 
@@ -394,9 +394,9 @@ function VarEditor({ variable, s, theme }) {
       <div style={{
         ...s.panelHdr,
         background: cl
-          ? 'linear-gradient(180deg,#6fa3d4 0%,#4a7fbf 100%)'
+          ? '#e6e6e6'
           : 'var(--bg-surface)',
-        color: cl ? '#fff' : 'var(--text-muted)',
+        color: cl ? '#333' : 'var(--text-muted)',
       }}>
         <Table2 size={11} />
         {variable.name}
@@ -490,10 +490,10 @@ function ImportModal({ onClose, onImported, s, theme }) {
   }
 
   const overlayBg = cl ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.6)';
-  const dlgBg = cl ? '#f0eeea' : 'var(--bg-elevated)';
+  const dlgBg = cl ? '#f5f5f5' : 'var(--bg-elevated)';
   const dlgBorder = cl ? '2px solid #aca899' : '1px solid var(--border)';
-  const hdrBg = cl ? 'linear-gradient(180deg,#6fa3d4,#4a7fbf)' : 'var(--bg-surface)';
-  const hdrColor = cl ? '#fff' : 'var(--text-primary)';
+  const hdrBg = cl ? '#e6e6e6' : 'var(--bg-surface)';
+  const hdrColor = cl ? '#333' : 'var(--text-primary)';
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: overlayBg, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: cl ? 'none' : 'blur(3px)' }}
@@ -501,7 +501,7 @@ function ImportModal({ onClose, onImported, s, theme }) {
       <div style={{ background: dlgBg, border: dlgBorder, borderRadius: cl ? 2 : 'var(--radius)', boxShadow: 'var(--shadow-lg)', width: 440, maxWidth: '95vw', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Title bar */}
         <div style={{ background: hdrBg, padding: cl ? '4px 10px' : '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ color: hdrColor, fontSize: cl ? '0.82rem' : '0.875rem', fontWeight: 700, textShadow: cl ? '0 1px 1px rgba(0,0,0,0.3)' : 'none', fontFamily: cl ? 'var(--font-sans)' : 'inherit' }}>
+          <span style={{ color: hdrColor, fontSize: cl ? '0.82rem' : '0.875rem', fontWeight: 700, textShadow: 'none', fontFamily: cl ? 'var(--font-sans)' : 'inherit' }}>
             Importar Variável — Workspace
           </span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: hdrColor, cursor: 'pointer', opacity: 0.8, lineHeight: 1 }}>✕</button>
@@ -598,9 +598,9 @@ function TechInfoPanel({ tech, s, theme, onOpenModal }) {
   const isMatlabFn = (pj(tech.tags, []) || []).includes('matlab');
 
   const headerBg = cl
-    ? 'linear-gradient(180deg,#e8f0fb 0%,#d8e4f4 100%)'
+    ? '#f0f0f0'
     : 'var(--bg-elevated)';
-  const borderColor = cl ? '#c0d0e8' : 'var(--border)';
+  const borderColor = cl ? '#c8c8c8' : 'var(--border)';
   const codeBg = cl ? '#f8f8f8' : 'rgba(255,255,255,0.04)';
   const codeColor = cl ? '#003880' : 'var(--text-accent)';
 
@@ -990,7 +990,7 @@ export default function WorkspacePage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'var(--page-h, 100%)', minHeight: 420, overflow: 'hidden', background: cl ? '#d4d0c8' : 'var(--bg-base)', fontFamily: 'var(--font-sans)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'var(--page-h, 100%)', minHeight: 420, overflow: 'hidden', background: cl ? '#f0f0f0' : 'var(--bg-base)', fontFamily: 'var(--font-sans)' }}>
 
       {/* ════════════════ TOOLBAR ════════════════ */}
       <div style={{ ...s.toolbar, flexWrap: 'wrap', rowGap: 4 }}>
@@ -1057,7 +1057,7 @@ export default function WorkspacePage() {
           borderRight: narrow ? 'none' : (cl ? '1px solid #aca899' : '1px solid var(--border)'),
           borderBottom: narrow ? (cl ? '1px solid #aca899' : '1px solid var(--border)') : 'none',
           display: 'flex', flexDirection: 'column',
-          background: cl ? '#f0eeea' : 'var(--bg-surface)',
+          background: cl ? '#f5f5f5' : 'var(--bg-surface)',
         }}>
           {/* Header */}
           <div style={s.panelHdr}>
@@ -1158,7 +1158,7 @@ export default function WorkspacePage() {
           {/* Sub-tabs (MATLAB-style panel tabs) */}
           <div style={{
             display: 'flex', alignItems: 'center',
-            background: cl ? '#d4d0c8' : 'var(--bg-surface)',
+            background: cl ? '#f0f0f0' : 'var(--bg-surface)',
             borderBottom: cl ? '1px solid #aca899' : '1px solid var(--border)',
             flexShrink: 0,
             paddingLeft: 4,
@@ -1177,7 +1177,7 @@ export default function WorkspacePage() {
                   background: active
                     ? (cl ? '#f5f5f5' : 'var(--bg-base)')
                     : 'transparent',
-                  border: cl ? `1px solid ${active ? '#aca899' : 'transparent'}` : 'none',
+                  border: cl ? `1px solid ${active ? '#c8c8c8' : 'transparent'}` : 'none',
                   borderBottom: cl
                     ? (active ? '1px solid #f5f5f5' : '1px solid #aca899')
                     : `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
@@ -1281,7 +1281,7 @@ export default function WorkspacePage() {
                         {/* All other techniques by family */}
                         {Object.entries(nonMatlabByFamily).map(([fam, techs]) => (
                           <div key={fam}>
-                            <div style={{ padding: '3px 8px', fontSize: '0.62rem', fontWeight: 700, color: cl ? '#fff' : 'var(--text-muted)', letterSpacing: '0.07em', background: cl ? '#4a7fbf' : 'var(--bg-base)', position: 'sticky', top: 0 }}>
+                            <div style={{ padding: '3px 8px', fontSize: '0.62rem', fontWeight: 700, color: cl ? '#333' : 'var(--text-muted)', letterSpacing: '0.07em', background: cl ? '#4a7fbf' : 'var(--bg-base)', position: 'sticky', top: 0 }}>
                               {fam.replace(/^\d+_/, '').toUpperCase()}
                             </div>
                             {techs.map(t => (
@@ -1393,16 +1393,16 @@ export default function WorkspacePage() {
           </div>
 
           {/* ──── Command Window ──── */}
-          <div style={{ height: 155, flexShrink: 0, ...s.console, display: 'flex', flexDirection: 'column', borderTop: cl ? '1px solid #555' : '1px solid var(--border)' }}>
+          <div style={{ height: 155, flexShrink: 0, ...s.console, display: 'flex', flexDirection: 'column', borderTop: cl ? '1px solid #c8c8c8' : '1px solid var(--border)' }}>
             <div style={s.consoleHdr}>
-              <Terminal size={11} style={{ color: cl ? '#a8a8a8' : '#8b949e' }} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: cl ? '#a8a8a8' : '#8b949e', letterSpacing: '0.08em' }}>COMMAND WINDOW</span>
+              <Terminal size={11} style={{ color: cl ? '#555' : '#8b949e' }} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: cl ? '#555' : '#8b949e', letterSpacing: '0.08em' }}>COMMAND WINDOW</span>
               <div style={{ flex: 1 }} />
               <button onClick={() => setHistory([])} style={{ fontSize: '0.62rem', color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>limpar</button>
             </div>
             <div ref={consoleRef} style={{ flex: 1, overflowY: 'auto', padding: '3px 10px 4px' }}>
               {history.length === 0 && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: '#555', padding: '2px 0', lineHeight: 1.5 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: cl ? '#777' : '#555', padding: '2px 0', lineHeight: 1.5 }}>
                   % TcheLab Workspace {new Date().getFullYear()} — {theme} theme
                 </div>
               )}
@@ -1410,7 +1410,7 @@ export default function WorkspacePage() {
               {/* Blinking cursor */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0' }}>
                 <span style={{ ...s.consolePrompt, fontFamily: 'var(--font-mono)', fontSize: '0.73rem' }}>&gt;&gt;</span>
-                <span style={{ display: 'inline-block', width: 7, height: 13, background: cl ? '#e8a020' : '#7ee787', animation: 'blink 1.1s step-end infinite' }} />
+                <span style={{ display: 'inline-block', width: 7, height: 13, background: cl ? '#1a1a1a' : '#7ee787', animation: 'blink 1.1s step-end infinite' }} />
               </div>
             </div>
           </div>
@@ -1421,7 +1421,7 @@ export default function WorkspacePage() {
       <div style={{
         display: 'flex', alignItems: 'center',
         padding: cl ? '1px 8px' : '2px 10px',
-        background: cl ? '#d4d0c8' : 'var(--bg-surface)',
+        background: cl ? '#f0f0f0' : 'var(--bg-surface)',
         borderTop: cl ? '1px solid #aca899' : '1px solid var(--border)',
         flexShrink: 0,
         fontSize: '0.68rem',

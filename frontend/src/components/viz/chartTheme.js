@@ -26,6 +26,21 @@ export const ACADEMIC_COLORWAY = [
   '#515a5a', // cinza chumbo
 ];
 
+// ── Variante "MATLAB" (só no tema Classic) ───────────────────────────────────
+// O gráfico continua com fundo branco (pensado pra figura de artigo), mas no
+// tema Classic usa a ordem de cores padrão das linhas do MATLAB, o colormap
+// `parula` (default do MATLAB desde a R2014b) e eixos em caixa (`box on`).
+export const MATLAB_COLORWAY = ['#0072BD', '#D95319', '#EDB120', '#7E2F8E', '#77AC30', '#4DBEEE', '#A2142F'];
+export const PARULA_COLORSCALE = [
+  [0, '#352A87'], [0.125, '#0363E1'], [0.25, '#1485D4'], [0.375, '#06A7C6'],
+  [0.5, '#38B99E'], [0.625, '#92BF73'], [0.75, '#D9BA56'], [0.875, '#FCCE2E'], [1, '#F9FB0E'],
+];
+export function isClassicTheme() {
+  try { return document.documentElement.getAttribute('data-theme') === 'classic'; } catch { return false; }
+}
+export const activeColorway = () => (isClassicTheme() ? MATLAB_COLORWAY : ACADEMIC_COLORWAY);
+export const activeHeatmapScale = () => (isClassicTheme() ? PARULA_COLORSCALE : 'Viridis');
+
 // Padrões de traço e marcador — atribuídos ciclicamente por série, pra que
 // um gráfico com várias curvas continue legível impresso em P&B (requisito
 // comum de revista) sem depender só da cor.
@@ -66,10 +81,10 @@ export function academicLayout({ title, xTitle, yTitle, showLegend = true, extra
     font: { family: ACADEMIC_FONT, size: 13, color: '#111827' },
     paper_bgcolor: '#ffffff',
     plot_bgcolor: '#ffffff',
-    colorway: ACADEMIC_COLORWAY,
+    colorway: activeColorway(),
     margin: { l: 72, r: 28, t: title ? 56 : 24, b: 64 },
-    xaxis: { ...AXIS_BASE, title: xTitle ? { text: xTitle, font: { size: 14 }, standoff: 10 } : undefined, ...extraXAxis },
-    yaxis: { ...AXIS_BASE, title: yTitle ? { text: yTitle, font: { size: 14 }, standoff: 10 } : undefined, ...extraYAxis },
+    xaxis: { ...AXIS_BASE, ...(isClassicTheme() ? { mirror: 'ticks' } : {}), title: xTitle ? { text: xTitle, font: { size: 14 }, standoff: 10 } : undefined, ...extraXAxis },
+    yaxis: { ...AXIS_BASE, ...(isClassicTheme() ? { mirror: 'ticks' } : {}), title: yTitle ? { text: yTitle, font: { size: 14 }, standoff: 10 } : undefined, ...extraYAxis },
     showlegend: showLegend,
     legend: {
       font: { size: 12 },

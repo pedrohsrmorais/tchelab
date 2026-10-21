@@ -220,16 +220,33 @@ export const FAMILIES = {
  * Aceita tanto o slug exato (ex: "02_pre_processamento") quanto
  * o campo `family` do banco (ex: "pre_processamento").
  */
+// Paleta baseada nas linhas do MATLAB — usada no tema Classic no lugar das cores
+// vivas das famílias (que foram pensadas para o tema escuro).
+// Tons levemente escurecidos em relação aos originais (D95319→C24A12, EDB120→A67700,
+// 77AC30→4F8A1C, 4DBEEE→1B86B3) porque aqui a cor também vira TEXTO sobre cinza
+// claro; os originais não passam de contraste 3:1.
+const MATLAB_COLORS = ['#0072BD', '#C24A12', '#A67700', '#7E2F8E', '#4F8A1C', '#1B86B3', '#A2142F'];
+function isClassicTheme() {
+  try { return document.documentElement.getAttribute('data-theme') === 'classic'; } catch { return false; }
+}
+function matlabize(cfg) {
+  if (!isClassicTheme() || !cfg || cfg.order == null) return cfg;
+  const c = MATLAB_COLORS[(cfg.order - 1) % MATLAB_COLORS.length];
+  const h = c.replace('#', '');
+  const rgb = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
+  return { ...cfg, color: c, bg: `rgba(${rgb},0.10)`, border: `rgba(${rgb},0.45)` };
+}
+
 export function getFamilyConfig(familySlug, lang = 'pt') {
   if (!familySlug) return null;
   // Tenta match direto
   if (FAMILIES[familySlug]) {
-    return { ...FAMILIES[familySlug], slug: familySlug, labelStr: FAMILIES[familySlug].label[lang] || FAMILIES[familySlug].label.pt };
+    return matlabize({ ...FAMILIES[familySlug], slug: familySlug, labelStr: FAMILIES[familySlug].label[lang] || FAMILIES[familySlug].label.pt });
   }
   // Tenta match com prefixo numérico
   const found = Object.entries(FAMILIES).find(([k]) => k.endsWith(`_${familySlug}`) || k === familySlug);
   if (found) {
-    return { ...found[1], slug: found[0], labelStr: found[1].label[lang] || found[1].label.pt };
+    return matlabize({ ...found[1], slug: found[0], labelStr: found[1].label[lang] || found[1].label.pt });
   }
   return { label: { pt: familySlug, en: familySlug }, color: '#64748b', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.3)', labelStr: familySlug, slug: familySlug };
 }
@@ -240,7 +257,7 @@ export function getFamilyConfig(familySlug, lang = 'pt') {
 export function getFamiliesList(lang = 'pt') {
   return Object.entries(FAMILIES)
     .sort(([, a], [, b]) => a.order - b.order)
-    .map(([slug, cfg]) => ({ slug, ...cfg, labelStr: cfg.label[lang] || cfg.label.pt }));
+    .map(([slug, cfg]) => matlabize({ slug, ...cfg, labelStr: cfg.label[lang] || cfg.label.pt }));
 }
 
 // ── Matriz de compatibilidade de tipos ───────────────────────────────────────

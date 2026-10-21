@@ -1,6 +1,6 @@
 import { useRef, useImperativeHandle, forwardRef } from 'react';
 import { Plot, downloadPlot } from './plotly';
-import { academicLayout, ACADEMIC_CONFIG, ACADEMIC_COLORWAY, LINE_DASHES, MARKER_SYMBOLS } from './chartTheme';
+import { academicLayout, ACADEMIC_CONFIG, activeColorway, LINE_DASHES, MARKER_SYMBOLS } from './chartTheme';
 
 /**
  * Gráfico de linha/espectro no padrão de publicação científica.
@@ -21,6 +21,7 @@ export const LineChartAcademic = forwardRef(function LineChartAcademic(
   ref
 ) {
   const gdRef = useRef(null);
+  const COLORWAY = activeColorway();
 
   useImperativeHandle(ref, () => ({
     exportImage: (opts) => downloadPlot(gdRef.current, { filename: 'chart', ...opts }),
@@ -34,7 +35,7 @@ export const LineChartAcademic = forwardRef(function LineChartAcademic(
       x: s.x ?? s.values?.map((_, idx) => idx) ?? [],
       y: s.y ?? s.values ?? [],
       line: {
-        color: s.color || ACADEMIC_COLORWAY[i % ACADEMIC_COLORWAY.length],
+        color: s.color || COLORWAY[i % COLORWAY.length],
         width: 2,
         dash: LINE_DASHES[i % LINE_DASHES.length],
       },
@@ -49,7 +50,7 @@ export const LineChartAcademic = forwardRef(function LineChartAcademic(
     // `marker: undefined`, e sim omitir a chave.
     if (markers) {
       trace.marker = {
-        color: s.color || ACADEMIC_COLORWAY[i % ACADEMIC_COLORWAY.length],
+        color: s.color || COLORWAY[i % COLORWAY.length],
         symbol: MARKER_SYMBOLS[i % MARKER_SYMBOLS.length],
         size: 6,
       };

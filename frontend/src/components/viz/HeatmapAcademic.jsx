@@ -1,6 +1,6 @@
 import { useRef, useImperativeHandle, forwardRef } from 'react';
 import { Plot, downloadPlot } from './plotly';
-import { academicLayout, ACADEMIC_CONFIG } from './chartTheme';
+import { academicLayout, ACADEMIC_CONFIG, activeHeatmapScale } from './chartTheme';
 
 /**
  * Heatmap 2D no padrão de publicação científica — fundo branco, Viridis
@@ -25,7 +25,7 @@ export const HeatmapAcademic = forwardRef(function HeatmapAcademic(
   const data = [{
     type: 'heatmap',
     z, x, y,
-    colorscale: 'Viridis',
+    colorscale: activeHeatmapScale(),
     colorbar: {
       title: colorbarTitle ? { text: colorbarTitle, side: 'right', font: { size: 13 } } : undefined,
       outlinecolor: '#374151',

@@ -3,6 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
+const { patchDefinition } = require('../services/workflowDefinition.service');
 
 async function resolveWorkflow(uuid) {
   const [rows] = await db.query('SELECT * FROM workflows WHERE uuid = ? AND deleted_at IS NULL', [uuid]);
@@ -12,10 +13,8 @@ async function resolveWorkflow(uuid) {
 async function updateWorkflowDefinition(workflowId) {
   const [nodes] = await db.query('SELECT * FROM workflow_nodes WHERE workflow_id = ?', [workflowId]);
   const [edges] = await db.query('SELECT * FROM workflow_edges WHERE workflow_id = ?', [workflowId]);
-  await db.query(
-    'UPDATE workflows SET definition = ?, updated_at = NOW() WHERE id = ?',
-    [JSON.stringify({ nodes, edges }), workflowId],
-  );
+  // Merge: preserva `definition.canvas` (estado do editor) — ver workflowDefinition.service.js
+  await patchDefinition(workflowId, { nodes, edges });
 }
 
 // GET /workflows/:wid/nodes

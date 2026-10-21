@@ -38,6 +38,8 @@
   --shadow:         0 4px 16px rgba(0,0,0,0.4);
   --shadow-lg:      0 8px 32px rgba(0,0,0,0.5);
 
+  --node-bg:        rgba(10,15,30,0.96);
+
   --sidebar-w:      240px;
   --sidebar-collapsed: 68px;
 
@@ -72,6 +74,8 @@
   --danger:         #dc2626;
   --info:           #0284c7;
 
+  --node-bg:        #ffffff;
+
   --shadow-sm:      0 2px 8px rgba(0,0,0,0.08);
   --shadow:         0 4px 16px rgba(0,0,0,0.1);
   --shadow-lg:      0 8px 32px rgba(0,0,0,0.14);
@@ -98,7 +102,7 @@
 
   --text-primary:   #1a1a1a;
   --text-secondary: #4d4d4d;
-  --text-muted:     #8a8a8a;
+  --text-muted:     #6b6b6b;
   --text-accent:    #0a5fa8;
 
   --accent:         #0a5fa8;
@@ -114,6 +118,8 @@
   --radius:         3px;
   --radius-lg:      4px;
   --radius-xl:      4px;
+
+  --node-bg:        #ffffff;
 
   --shadow-sm:      0 1px 2px rgba(0,0,0,0.18);
   --shadow:         0 1px 3px rgba(0,0,0,0.22);
@@ -151,6 +157,98 @@
   animation-duration: 0.001s !important;
   animation-delay: 0s !important;
 }
+
+
+/* ─── Classic: ajustes para parecer com o MATLAB (R2023, tema claro) ─────────
+   Referência: janela cinza #f0f0f0/#e4e4e4, painéis brancos, bordas finas,
+   cantos quase retos, texto compacto, azul de seleção e a paleta padrão de
+   linhas do MATLAB (0072BD, D95319, EDB120, 7E2F8E, 77AC30, 4DBEEE, A2142F). */
+html[data-theme="classic"] { font-size: 14px; }
+
+/* Cantos retos — utilitários Tailwind, `.rounded-full` de pílulas (círculos com
+   w-/h- explícito e `50%` inline, como avatares e bolinhas, ficam redondos) e
+   `border-radius` inline em px. */
+[data-theme="classic"] [class*="rounded-"]:not(.rounded-full):not(.rounded-none) { border-radius: 2px !important; }
+[data-theme="classic"] .rounded-full:not([class*=" w-"]):not([class^="w-"]) { border-radius: 2px !important; }
+[data-theme="classic"] [style*="border-radius"]:not([style*="50%"]):not([style*="9999"]) { border-radius: 2px !important; }
+
+/* Cores inline pensadas para fundo escuro (tons claros de Tailwind) → equivalentes
+   legíveis em fundo claro, da paleta do MATLAB. */
+[data-theme="classic"] [style^="color: rgb(147, 197, 253)"], [data-theme="classic"] [style*="; color: rgb(147, 197, 253)"] { color: #0a5fa8 !important; }
+[data-theme="light"] [style^="color: rgb(147, 197, 253)"], [data-theme="light"] [style*="; color: rgb(147, 197, 253)"] { color: #0a5fa8 !important; }
+[data-theme="classic"] [style^="color: rgb(96, 165, 250)"], [data-theme="classic"] [style*="; color: rgb(96, 165, 250)"] { color: #0a5fa8 !important; }
+[data-theme="light"] [style^="color: rgb(96, 165, 250)"], [data-theme="light"] [style*="; color: rgb(96, 165, 250)"] { color: #0a5fa8 !important; }
+[data-theme="classic"] [style^="color: rgb(59, 130, 246)"], [data-theme="classic"] [style*="; color: rgb(59, 130, 246)"] { color: #0a5fa8 !important; }
+[data-theme="light"] [style^="color: rgb(59, 130, 246)"], [data-theme="light"] [style*="; color: rgb(59, 130, 246)"] { color: #0a5fa8 !important; }
+[data-theme="classic"] [style^="color: rgb(56, 189, 248)"], [data-theme="classic"] [style*="; color: rgb(56, 189, 248)"] { color: #1a7fa8 !important; }
+[data-theme="light"] [style^="color: rgb(56, 189, 248)"], [data-theme="light"] [style*="; color: rgb(56, 189, 248)"] { color: #1a7fa8 !important; }
+[data-theme="classic"] [style^="color: rgb(34, 211, 238)"], [data-theme="classic"] [style*="; color: rgb(34, 211, 238)"] { color: #1a7fa8 !important; }
+[data-theme="light"] [style^="color: rgb(34, 211, 238)"], [data-theme="light"] [style*="; color: rgb(34, 211, 238)"] { color: #1a7fa8 !important; }
+[data-theme="classic"] [style^="color: rgb(52, 211, 153)"], [data-theme="classic"] [style*="; color: rgb(52, 211, 153)"] { color: #2f6f1f !important; }
+[data-theme="light"] [style^="color: rgb(52, 211, 153)"], [data-theme="light"] [style*="; color: rgb(52, 211, 153)"] { color: #2f6f1f !important; }
+[data-theme="classic"] [style^="color: rgb(110, 231, 183)"], [data-theme="classic"] [style*="; color: rgb(110, 231, 183)"] { color: #2f6f1f !important; }
+[data-theme="light"] [style^="color: rgb(110, 231, 183)"], [data-theme="light"] [style*="; color: rgb(110, 231, 183)"] { color: #2f6f1f !important; }
+[data-theme="classic"] [style^="color: rgb(251, 191, 36)"], [data-theme="classic"] [style*="; color: rgb(251, 191, 36)"] { color: #b04210 !important; }
+[data-theme="light"] [style^="color: rgb(251, 191, 36)"], [data-theme="light"] [style*="; color: rgb(251, 191, 36)"] { color: #b04210 !important; }
+[data-theme="classic"] [style^="color: rgb(252, 211, 77)"], [data-theme="classic"] [style*="; color: rgb(252, 211, 77)"] { color: #b04210 !important; }
+[data-theme="light"] [style^="color: rgb(252, 211, 77)"], [data-theme="light"] [style*="; color: rgb(252, 211, 77)"] { color: #b04210 !important; }
+[data-theme="classic"] [style^="color: rgb(248, 113, 113)"], [data-theme="classic"] [style*="; color: rgb(248, 113, 113)"] { color: #a2142f !important; }
+[data-theme="light"] [style^="color: rgb(248, 113, 113)"], [data-theme="light"] [style*="; color: rgb(248, 113, 113)"] { color: #a2142f !important; }
+[data-theme="classic"] [style^="color: rgb(252, 165, 165)"], [data-theme="classic"] [style*="; color: rgb(252, 165, 165)"] { color: #a2142f !important; }
+[data-theme="light"] [style^="color: rgb(252, 165, 165)"], [data-theme="light"] [style*="; color: rgb(252, 165, 165)"] { color: #a2142f !important; }
+[data-theme="classic"] [style^="color: rgb(167, 139, 250)"], [data-theme="classic"] [style*="; color: rgb(167, 139, 250)"] { color: #7e2f8e !important; }
+[data-theme="light"] [style^="color: rgb(167, 139, 250)"], [data-theme="light"] [style*="; color: rgb(167, 139, 250)"] { color: #7e2f8e !important; }
+[data-theme="classic"] [style^="color: rgb(192, 132, 252)"], [data-theme="classic"] [style*="; color: rgb(192, 132, 252)"] { color: #7e2f8e !important; }
+[data-theme="light"] [style^="color: rgb(192, 132, 252)"], [data-theme="light"] [style*="; color: rgb(192, 132, 252)"] { color: #7e2f8e !important; }
+[data-theme="classic"] [style^="color: rgb(244, 114, 182)"], [data-theme="classic"] [style*="; color: rgb(244, 114, 182)"] { color: #7e2f8e !important; }
+[data-theme="light"] [style^="color: rgb(244, 114, 182)"], [data-theme="light"] [style*="; color: rgb(244, 114, 182)"] { color: #7e2f8e !important; }
+[data-theme="classic"] [style^="color: rgb(226, 232, 240)"], [data-theme="classic"] [style*="; color: rgb(226, 232, 240)"] { color: #333333 !important; }
+[data-theme="classic"] [style^="color: rgb(203, 213, 225)"], [data-theme="classic"] [style*="; color: rgb(203, 213, 225)"] { color: #4d4d4d !important; }
+[data-theme="classic"] [style^="color: rgb(148, 163, 184)"], [data-theme="classic"] [style*="; color: rgb(148, 163, 184)"] { color: #5a5a5a !important; }
+
+/* Azul vivo de Tailwind (botões/abas ativos) → azul de seleção do MATLAB */
+[data-theme="classic"] .bg-blue-600, [data-theme="classic"] .bg-blue-500, [data-theme="classic"] .bg-blue-700 { background-color: var(--accent) !important; }
+[data-theme="classic"] .text-blue-500, [data-theme="classic"] .text-blue-600 { color: var(--accent) !important; }
+[data-theme="classic"] [style*="background: rgb(37, 99, 235)"], [data-theme="classic"] [style*="background-color: rgb(37, 99, 235)"] { background: var(--accent) !important; }
+
+/* Cabeçalhos de tabela: cinza claro com texto preto, como o Variable Editor do MATLAB */
+[data-theme="classic"] thead tr { background: #f0f0f0 !important; }
+[data-theme="classic"] thead th { color: #1a1a1a !important; border-bottom: 1px solid var(--border-strong) !important; }
+
+/* Botões/abas com fundo azul mantêm texto branco (o override de .text-white do
+   tema transforma o texto em escuro, o que quebra o contraste sobre o azul) */
+[data-theme="classic"] [class*="bg-blue-"][class*="text-white"],
+[data-theme="classic"] [class*="bg-blue-"] .text-white { color: #ffffff !important; }
+
+/* Verde claro de chip de saída e fundo slate translúcido de abas (inline) */
+[data-theme="classic"] [style^="color: rgb(74, 222, 128)"], [data-theme="classic"] [style*="; color: rgb(74, 222, 128)"],
+[data-theme="light"] [style^="color: rgb(74, 222, 128)"], [data-theme="light"] [style*="; color: rgb(74, 222, 128)"] { color: #2f6f1f !important; }
+[data-theme="classic"] [style*="background: rgba(30, 41, 59"], [data-theme="light"] [style*="background: rgba(30, 41, 59"] { background: var(--bg-hover) !important; }
+
+/* Degradês azul/roxo decorativos (botões, abas ativas, logos) → azul chapado do
+   MATLAB; degradê navy de fundo (login) → cinza de janela. */
+[data-theme="classic"] [style*="linear-gradient(135deg, rgb(29, 78, 216)"],
+[data-theme="classic"] [style*="linear-gradient(135deg, rgb(124, 58, 237), rgb(37, 99, 235)"],
+[data-theme="classic"] [style*="linear-gradient(135deg, rgb(37, 99, 235)"] { background: var(--accent) !important; }
+[data-theme="classic"] [style*="linear-gradient(135deg, rgb(15, 23, 42)"] { background: var(--bg-base) !important; }
+
+/* Tela de login: no Classic vira uma janela cinza com painel branco, sem os
+   enfeites (blobs, órbitas, partículas) nem o cartão navy do tema escuro. */
+[data-theme="classic"] .login-root { background: var(--bg-base) !important; }
+[data-theme="classic"] .login-deco { display: none !important; }
+[data-theme="classic"] .login-card { background: #ffffff !important; border: 1px solid var(--border-strong) !important; box-shadow: var(--shadow-lg) !important; }
+[data-theme="classic"] .login-root [class*="text-blue-400/"] { color: var(--text-secondary) !important; }
+[data-theme="classic"] .login-logo { box-shadow: none !important; }
+[data-theme="classic"] .login-logo .text-white { color: #ffffff !important; }
+
+/* Minimapa e controles do React Flow */
+[data-theme="classic"] .react-flow__minimap, [data-theme="light"] .react-flow__minimap { background: #ffffff !important; border: 1px solid var(--border-strong); }
+[data-theme="classic"] .react-flow__minimap-mask, [data-theme="light"] .react-flow__minimap-mask { fill: rgba(0,0,0,0.12) !important; }
+[data-theme="classic"] .react-flow__minimap-node, [data-theme="light"] .react-flow__minimap-node { fill: #8fb4d8; stroke: none; }
+[data-theme="classic"] .react-flow__controls-button { background: #fff; color: #333; border-bottom: 1px solid var(--border); }
+[data-theme="classic"] .react-flow__controls-button:hover { background: var(--bg-hover); }
+[data-theme="classic"] .react-flow__controls-button svg { fill: #333; }
+[data-theme="classic"] .react-flow__edge-path { stroke: #0072BD; }
 
 /* ─── Base reset ───────────────────────────────────────────────────────────── */
 @layer base {
