@@ -3,6 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
+const { LEVEL, guardWorkflow } = require('../services/access.service');
 const { parseDefinition } = require('../services/workflowDefinition.service');
 
 async function resolveWorkflow(uuid) {
@@ -87,6 +88,7 @@ async function forkWorkflow(req, res) {
   try {
     const original = await resolveWorkflow(req.params.id);
     if (!original) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, original, LEVEL.READ))) return;
 
     const uuid = uuidv4();
     const [forkResult] = await db.query(
@@ -125,6 +127,7 @@ async function getWorkflow(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
     const { nodes, edges } = await buildDefinition(workflow.id);
     return R.ok(res, { ...workflow, nodes, edges });
   } catch (err) { return R.serverError(res, err); }
@@ -135,7 +138,7 @@ async function updateWorkflow(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     // 'definition' não guarda o grafo real (workflow_nodes/workflow_edges são
     // a fonte de verdade disso, montada em buildDefinition) — guarda o estado
@@ -178,7 +181,7 @@ async function deleteWorkflow(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.OWNER))) return;
     await db.query('UPDATE workflows SET deleted_at = NOW() WHERE id = ?', [workflow.id]);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
@@ -189,6 +192,7 @@ async function saveSnapshot(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const { label, description } = req.body;
     const { nodes, edges } = await buildDefinition(workflow.id);
@@ -209,6 +213,7 @@ async function listVersions(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
     const [rows] = await db.query(
       'SELECT id, label, description, created_by, created_at FROM workflow_versions WHERE workflow_id = ? ORDER BY created_at DESC',
       [workflow.id],
@@ -222,6 +227,7 @@ async function getVersion(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
     const [rows] = await db.query(
       'SELECT * FROM workflow_versions WHERE id = ? AND workflow_id = ?',
       [req.params.vid, workflow.id],
@@ -236,6 +242,7 @@ async function restoreVersion(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const [versions] = await db.query(
       'SELECT * FROM workflow_versions WHERE id = ? AND workflow_id = ?',
@@ -266,7 +273,7 @@ async function setTemplate(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.id);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.OWNER))) return;
 
     const { is_template, domain, data_type, analytical_order } = req.body;
     await db.query(

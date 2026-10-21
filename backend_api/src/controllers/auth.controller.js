@@ -7,6 +7,7 @@ const db = require('../config/db.config');
 const redis = require('../config/redis.config');
 const jobService = require('../services/job.service');
 const R = require('../utils/response');
+const profile = require('../utils/userProfile');
 
 const ACCESS_EXPIRES = process.env.JWT_EXPIRES_IN || '24h';
 const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
@@ -27,15 +28,12 @@ function signRefresh(user) {
   );
 }
 
-function safeUser(u) {
-  const { password_hash, deleted_at, ...safe } = u;
-  return safe;
-}
+const safeUser = profile.selfUser;
 
 // POST /auth/register
 async function register(req, res) {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, preferences } = req.body;
     if (!name || !email || !password) {
       return R.unprocessable(res, [
         { field: 'name', message: 'Obrigatório.' },
@@ -52,12 +50,21 @@ async function register(req, res) {
       return R.unprocessable(res, [{ field: 'email', message: 'E-mail já cadastrado.' }]);
     }
 
+    // Tema/idioma escolhidos antes do cadastro já nascem salvos na conta.
+    let prefsJson = null;
+    if (preferences && typeof preferences === 'object') {
+      const merged = profile.mergePreferences({}, {
+        theme: preferences.theme, language: preferences.language,
+      });
+      if (!merged.errors.length) prefsJson = JSON.stringify(merged.value);
+    }
+
     const password_hash = await bcrypt.hash(password, 12);
     const uuid = uuidv4();
     const [result] = await db.query(
-      `INSERT INTO users (uuid, name, email, password_hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NOW(), NOW())`,
-      [uuid, name.trim(), email.toLowerCase().trim(), password_hash],
+      `INSERT INTO users (uuid, name, email, password_hash, preferences, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+      [uuid, name.trim(), email.toLowerCase().trim(), password_hash, prefsJson],
     );
 
     const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
@@ -196,6 +203,33 @@ async function resetPassword(req, res) {
   }
 }
 
+// POST /auth/change-password  { current_password, new_password }
+async function changePassword(req, res) {
+  try {
+    const { current_password, new_password } = req.body || {};
+    const errors = [];
+    if (!current_password) errors.push({ field: 'current_password', message: 'Obrigatório.' });
+    if (!new_password) errors.push({ field: 'new_password', message: 'Obrigatório.' });
+    else if (String(new_password).length < 8) errors.push({ field: 'new_password', message: 'Mínimo 8 caracteres.' });
+    else if (String(new_password).length > 128) errors.push({ field: 'new_password', message: 'Máximo 128 caracteres.' });
+    if (errors.length) return R.unprocessable(res, errors);
+
+    const [rows] = await db.query('SELECT id, password_hash FROM users WHERE id = ? AND deleted_at IS NULL', [req.user.id]);
+    if (!rows.length) return R.notFound(res, 'Usuário');
+    if (!(await bcrypt.compare(String(current_password), rows[0].password_hash))) {
+      return R.error(res, 400, 'INVALID_PASSWORD', 'Senha atual incorreta.');
+    }
+    if (String(current_password) === String(new_password)) {
+      return R.unprocessable(res, [{ field: 'new_password', message: 'A nova senha deve ser diferente da atual.' }]);
+    }
+    const hash = await bcrypt.hash(String(new_password), 12);
+    await db.query('UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?', [hash, req.user.id]);
+    return R.ok(res, { message: 'Senha alterada com sucesso.' });
+  } catch (err) {
+    return R.serverError(res, err);
+  }
+}
+
 // GET /auth/me
 async function me(req, res) {
   try {
@@ -210,4 +244,4 @@ async function me(req, res) {
   }
 }
 
-module.exports = { register, login, logout, refresh, forgotPassword, resetPassword, me };
+module.exports = { register, login, logout, refresh, forgotPassword, resetPassword, changePassword, me };

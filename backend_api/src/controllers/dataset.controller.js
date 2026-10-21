@@ -7,6 +7,7 @@ const db = require('../config/db.config');
 const jobService = require('../services/job.service');
 const lineageService = require('../services/lineage.service');
 const R = require('../utils/response');
+const { LEVEL, guardDataset } = require('../services/access.service');
 
 /**
  * Parses a CSV/TSV text string into { headers, rows, separator }.
@@ -390,6 +391,7 @@ async function getDataset(req, res) {
   try {
     const ds = await resolveDataset(req.params.id);
     if (!ds) return R.notFound(res, 'Dataset');
+    if (!(await guardDataset(req, res, ds, LEVEL.READ))) return;
     return R.ok(res, ds);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -434,6 +436,7 @@ async function getLineage(req, res) {
   try {
     const ds = await resolveDataset(req.params.id);
     if (!ds) return R.notFound(res, 'Dataset');
+    if (!(await guardDataset(req, res, ds, LEVEL.READ))) return;
     const lineage = await lineageService.getLineage(ds.id);
     return R.ok(res, lineage);
   } catch (err) { return R.serverError(res, err); }
@@ -444,6 +447,7 @@ async function getSlice(req, res) {
   try {
     const ds = await resolveDataset(req.params.id);
     if (!ds) return R.notFound(res, 'Dataset');
+    if (!(await guardDataset(req, res, ds, LEVEL.READ))) return;
 
     // Monta ranges a partir de query params: ?axis0=0:10&axis1=5:20
     const ranges = {};
@@ -471,6 +475,7 @@ async function getPreview(req, res) {
   try {
     const ds = await resolveDataset(req.params.id);
     if (!ds) return R.notFound(res, 'Dataset');
+    if (!(await guardDataset(req, res, ds, LEVEL.READ))) return;
     const n_samples = parseInt(req.query.n_samples || '5', 10);
     const n_vars = parseInt(req.query.n_vars || '20', 10);
 
@@ -513,6 +518,7 @@ async function listDatasetSpectra(req, res) {
   try {
     const ds = await resolveDataset(req.params.id);
     if (!ds) return R.notFound(res, 'Dataset');
+    if (!(await guardDataset(req, res, ds, LEVEL.READ))) return;
     const [rows] = await db.query(
       `SELECT s.uuid, s.name, s.technique, s.sample_class, ds_s.position
        FROM spectra s

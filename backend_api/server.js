@@ -81,6 +81,18 @@ app.use('/api/', globalLimiter);
 app.use('/api/v1/auth/login',           authLimiter);
 app.use('/api/v1/auth/register',        authLimiter);
 app.use('/api/v1/auth/forgot-password', authLimiter);
+app.use('/api/v1/auth/change-password', authLimiter);
+
+// Códigos de convite: limite próprio contra tentativa de adivinhação.
+const inviteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { data: null, meta: null, error: { code: 'RATE_LIMIT', message: 'Muitas tentativas. Aguarde alguns minutos.' } },
+});
+app.use('/api/v1/communities/join', inviteLimiter);
+app.use('/api/v1/communities/invite', inviteLimiter);
 
 // ─── API routes ──────────────────────────────────────────────────────────────
 app.use('/api/v1', apiRouter);
@@ -100,6 +112,10 @@ app.get('/health', async (req, res) => {
 const distPath = process.env.FRONTEND_DIST
   ? path.resolve(process.env.FRONTEND_DIST)
   : path.resolve(__dirname, '..', 'frontend', 'dist');
+
+// Avatares são públicos (aparecem em perfis/listas); demais arquivos do
+// storage (datasets, PDFs de comunidades…) passam por rotas autenticadas.
+app.use('/storage/avatars', express.static(storageConfig.avatars, { index: false, maxAge: '1h' }));
 
 app.use(express.static(distPath, { index: false }));
 
@@ -132,10 +148,16 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Startup ─────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`[TcheLab API] Listening on port ${PORT} (${ENV})`);
-  console.log(`[TcheLab API] Serving frontend from: ${distPath}`);
-});
+// Migrações idempotentes antes de aceitar tráfego (ver src/config/migrate.js).
+// Uma falha aqui é logada mas não impede a API de subir.
+require('./src/config/migrate').migrate()
+  .catch((err) => console.error('[migrate] falhou:', err.message))
+  .finally(() => {
+    app.listen(PORT, () => {
+      console.log(`[TcheLab API] Listening on port ${PORT} (${ENV})`);
+      console.log(`[TcheLab API] Serving frontend from: ${distPath}`);
+    });
+  });
 
 // Assina os resultados que o worker Python publica no Redis (jobs, execuções
 // de workflow e as operações rápidas de dataset só saem de "queued"/"pending"

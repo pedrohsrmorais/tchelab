@@ -3,6 +3,7 @@
 const db = require('../config/db.config');
 const shapeValidator = require('../services/shapeValidator.service');
 const R = require('../utils/response');
+const { LEVEL, guardWorkflow } = require('../services/access.service');
 const { patchDefinition } = require('../services/workflowDefinition.service');
 
 async function resolveWorkflow(uuid) {
@@ -22,6 +23,7 @@ async function listEdges(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
     const [rows] = await db.query(
       'SELECT * FROM workflow_edges WHERE workflow_id = ? ORDER BY created_at ASC',
       [workflow.id],
@@ -35,7 +37,7 @@ async function createEdge(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const { source_node_key, source_port, target_node_key, target_port } = req.body;
 
@@ -90,7 +92,7 @@ async function deleteEdge(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const [edges] = await db.query(
       'SELECT id FROM workflow_edges WHERE id = ? AND workflow_id = ?',
@@ -109,6 +111,7 @@ async function validateWorkflow(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
 
     const [edges] = await db.query(
       'SELECT * FROM workflow_edges WHERE workflow_id = ?',

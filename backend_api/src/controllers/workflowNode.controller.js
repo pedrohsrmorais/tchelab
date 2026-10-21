@@ -3,6 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
+const { LEVEL, guardWorkflow } = require('../services/access.service');
 const { patchDefinition } = require('../services/workflowDefinition.service');
 
 async function resolveWorkflow(uuid) {
@@ -22,6 +23,7 @@ async function listNodes(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
     const [rows] = await db.query(
       `SELECT wn.*, t.slug AS technique_slug, t.name AS technique_name,
               t.input_schema, t.output_schema, t.parameter_schema
@@ -40,7 +42,7 @@ async function addNode(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const { technique_id, node_key, name, parameters, position_x, position_y } = req.body;
     if (!technique_id || !node_key) {
@@ -92,6 +94,7 @@ async function getNode(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
     const [rows] = await db.query(
       `SELECT wn.*, t.slug, t.name AS technique_name, t.input_schema, t.output_schema, t.parameter_schema
        FROM workflow_nodes wn
@@ -109,7 +112,7 @@ async function updateNode(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const [nodes] = await db.query(
       'SELECT * FROM workflow_nodes WHERE workflow_id = ? AND node_key = ?',
@@ -147,7 +150,7 @@ async function deleteNode(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const [nodes] = await db.query(
       'SELECT id FROM workflow_nodes WHERE workflow_id = ? AND node_key = ?',

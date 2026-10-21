@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
-const { datasetUpload, pdfUpload, avatarUpload } = require('../utils/multer');
+const { datasetUpload, pdfUpload } = require('../utils/multer');
 
 // Controllers
 const authCtrl            = require('../controllers/auth.controller');
@@ -38,43 +38,70 @@ router.post('/auth/logout',             authenticate, authCtrl.logout);
 router.post('/auth/refresh',            authCtrl.refresh);
 router.post('/auth/forgot-password',    authCtrl.forgotPassword);
 router.post('/auth/reset-password',     authCtrl.resetPassword);
+router.post('/auth/change-password',    authenticate, authCtrl.changePassword);
 router.get ('/auth/me',                 authenticate, authCtrl.me);
 
 // ─── USERS ─────────────────────────────────────────────────────────────────────
 router.get   ('/users/:id',             authenticate, userCtrl.getUser);
 router.put   ('/users/:id',             authenticate, userCtrl.updateUser);
-router.post  ('/users/:id/avatar',      authenticate, avatarUpload.single('avatar'), userCtrl.uploadAvatar);
+router.post  ('/users/:id/avatar',      authenticate, userCtrl.assertSelfOrAdmin, userCtrl.avatarMiddleware, userCtrl.uploadAvatar);
+router.delete('/users/:id/avatar',      authenticate, userCtrl.assertSelfOrAdmin, userCtrl.deleteAvatar);
+router.get   ('/users/:id/projects',    authenticate, userCtrl.listUserProjects);
+router.get   ('/users/:id/communities', authenticate, userCtrl.listUserCommunities);
 router.get   ('/users/:id/stats',       authenticate, userCtrl.getStats);
 router.delete('/users/:id',             authenticate, userCtrl.deleteUser);
 
 // ─── COMMUNITIES ───────────────────────────────────────────────────────────────
+// Papéis: owner > admin > moderator > member (ver community.controller.js)
+const cg = communityCtrl.guard;
 router.get   ('/communities',                                   authenticate, communityCtrl.listMyCommunities);
 router.get   ('/communities/public',                            authenticate, communityCtrl.listPublicCommunities);
 router.post  ('/communities',                                   authenticate, communityCtrl.createCommunity);
-router.get   ('/communities/:id',                               authenticate, communityCtrl.getCommunity);
-router.put   ('/communities/:id',                               authenticate, communityCtrl.updateCommunity);
-router.delete('/communities/:id',                               authenticate, communityCtrl.deleteCommunity);
+router.post  ('/communities/join',                              authenticate, communityCtrl.joinWithCode);
+router.get   ('/communities/invite/:code',                      authenticate, communityCtrl.previewInvite);
+router.get   ('/communities/:id',                               authenticate, cg('visible'),   communityCtrl.getCommunity);
+router.put   ('/communities/:id',                               authenticate, cg('admin'),     communityCtrl.updateCommunity);
+router.delete('/communities/:id',                               authenticate, cg('owner'),     communityCtrl.deleteCommunity);
+router.post  ('/communities/:id/join',                          authenticate, communityCtrl.joinPublic);
+router.post  ('/communities/:id/leave',                         authenticate, cg('member'),    communityCtrl.leaveCommunity);
+router.post  ('/communities/:id/transfer',                      authenticate, cg('owner'),     communityCtrl.transferOwnership);
+// Invites
+router.get   ('/communities/:id/invites',                       authenticate, cg('moderator'), communityCtrl.listInvites);
+router.post  ('/communities/:id/invites',                       authenticate, cg('moderator'), communityCtrl.createInvite);
+router.delete('/communities/:id/invites/:iid',                  authenticate, cg('moderator'), communityCtrl.revokeInvite);
 // Members
-router.get   ('/communities/:id/members',                       authenticate, communityCtrl.listMembers);
-router.post  ('/communities/:id/members',                       authenticate, communityCtrl.addMember);
-router.put   ('/communities/:id/members/:uid',                  authenticate, communityCtrl.updateMemberRole);
-router.delete('/communities/:id/members/:uid',                  authenticate, communityCtrl.removeMember);
-// Projects
-router.get   ('/communities/:id/projects',                      authenticate, communityCtrl.listCommunityProjects);
-router.post  ('/communities/:id/projects',                      authenticate, communityCtrl.linkProject);
-router.delete('/communities/:id/projects/:pid',                 authenticate, communityCtrl.unlinkProject);
+router.get   ('/communities/:id/members',                       authenticate, cg('member'),    communityCtrl.listMembers);
+router.put   ('/communities/:id/members/:uid',                  authenticate, cg('admin'),     communityCtrl.updateMember);
+router.delete('/communities/:id/members/:uid',                  authenticate, cg('moderator'), communityCtrl.removeMember);
+router.get   ('/communities/:id/bans',                          authenticate, cg('admin'),     communityCtrl.listBans);
+router.delete('/communities/:id/bans/:uid',                     authenticate, cg('admin'),     communityCtrl.removeBan);
+// Projects (vínculo com nível de acesso leitura/edição)
+router.get   ('/communities/:id/projects',                      authenticate, cg('visible'),   communityCtrl.listCommunityProjects);
+router.post  ('/communities/:id/projects',                      authenticate, cg('member'),    communityCtrl.linkProject);
+router.put   ('/communities/:id/projects/:pid',                 authenticate, cg('member'),    communityCtrl.updateProjectLink);
+router.delete('/communities/:id/projects/:pid',                 authenticate, cg('member'),    communityCtrl.unlinkProject);
 // Datasets
-router.get   ('/communities/:id/datasets',                      authenticate, communityCtrl.listCommunityDatasets);
-router.post  ('/communities/:id/datasets',                      authenticate, communityCtrl.shareDataset);
-router.delete('/communities/:id/datasets/:did',                 authenticate, communityCtrl.removeDatasetShare);
+router.get   ('/communities/:id/datasets',                      authenticate, cg('member'),    communityCtrl.listCommunityDatasets);
+router.post  ('/communities/:id/datasets',                      authenticate, cg('member'),    communityCtrl.shareDataset);
+router.delete('/communities/:id/datasets/:did',                 authenticate, cg('member'),    communityCtrl.removeDatasetShare);
 // Workflows
-router.get   ('/communities/:id/workflows',                     authenticate, communityCtrl.listCommunityWorkflows);
-router.post  ('/communities/:id/workflows',                     authenticate, communityCtrl.shareWorkflow);
-router.delete('/communities/:id/workflows/:wid',                authenticate, communityCtrl.removeWorkflowShare);
+router.get   ('/communities/:id/workflows',                     authenticate, cg('member'),    communityCtrl.listCommunityWorkflows);
+router.post  ('/communities/:id/workflows',                     authenticate, cg('member'),    communityCtrl.shareWorkflow);
+router.delete('/communities/:id/workflows/:wid',                authenticate, cg('member'),    communityCtrl.removeWorkflowShare);
+// Conteúdo (tópicos + materiais: PDF, links, textos)
+router.get   ('/communities/:id/content',                       authenticate, cg('member'),    communityCtrl.getContent);
+router.post  ('/communities/:id/sections',                      authenticate, cg('moderator'), communityCtrl.createSection);
+router.put   ('/communities/:id/sections-order',                authenticate, cg('moderator'), communityCtrl.reorderSections);
+router.put   ('/communities/:id/sections/:sid',                 authenticate, cg('moderator'), communityCtrl.updateSection);
+router.delete('/communities/:id/sections/:sid',                 authenticate, cg('moderator'), communityCtrl.deleteSection);
+router.post  ('/communities/:id/items',                         authenticate, cg('moderator'), communityCtrl.itemUpload, communityCtrl.createItem);
+router.put   ('/communities/:id/items/:iid',                    authenticate, cg('moderator'), communityCtrl.updateItem);
+router.delete('/communities/:id/items/:iid',                    authenticate, cg('moderator'), communityCtrl.deleteItem);
+router.get   ('/communities/:id/items/:iid/file',               authenticate, cg('member'),    communityCtrl.downloadItemFile);
 // Messages
-router.get   ('/communities/:id/messages',                      authenticate, communityCtrl.listMessages);
-router.post  ('/communities/:id/messages',                      authenticate, communityCtrl.sendMessage);
-router.delete('/communities/:id/messages/:mid',                 authenticate, communityCtrl.deleteMessage);
+router.get   ('/communities/:id/messages',                      authenticate, cg('member'),    communityCtrl.listMessages);
+router.post  ('/communities/:id/messages',                      authenticate, cg('member'),    communityCtrl.sendMessage);
+router.delete('/communities/:id/messages/:mid',                 authenticate, cg('member'),    communityCtrl.deleteMessage);
 
 // ─── PROJECTS ──────────────────────────────────────────────────────────────────
 router.get   ('/projects',                                      authenticate, projectCtrl.listProjects);
@@ -100,6 +127,12 @@ router.delete('/projects/:id/workflows/:wid',                   authenticate, pr
 router.get   ('/projects/:id/articles',                         authenticate, projectCtrl.listProjectArticles);
 router.post  ('/projects/:id/articles',                         authenticate, projectCtrl.addArticleToProject);
 router.delete('/projects/:id/articles/:aid',                    authenticate, projectCtrl.removeArticleFromProject);
+// Techniques (favoritas / próprias)
+router.get   ('/projects/:id/techniques',                       authenticate, projectCtrl.listProjectTechniques);
+router.post  ('/projects/:id/techniques',                       authenticate, projectCtrl.addProjectTechnique);
+router.delete('/projects/:id/techniques/:tid',                  authenticate, projectCtrl.removeProjectTechnique);
+// Communities where this project is linked
+router.get   ('/projects/:id/communities',                      authenticate, projectCtrl.listProjectCommunities);
 // History
 router.get   ('/projects/:id/history',                          authenticate, projectCtrl.getProjectHistory);
 

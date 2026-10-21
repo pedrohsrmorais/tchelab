@@ -5,6 +5,7 @@ const db = require('../config/db.config');
 const jobService = require('../services/job.service');
 const pipeline = require('../services/executionPipeline.service');
 const R = require('../utils/response');
+const { LEVEL, guardWorkflow } = require('../services/access.service');
 
 async function resolveWorkflow(uuid) {
   const [rows] = await db.query('SELECT * FROM workflows WHERE uuid = ? AND deleted_at IS NULL', [uuid]);
@@ -28,10 +29,16 @@ async function listExecutions(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
 
     const { status } = req.query;
     const conditions = ['e.workflow_id = ?'];
     const params = [workflow.id];
+    // Quem não é dono do workflow vê só as próprias execuções.
+    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') {
+      conditions.push('e.user_id = ?');
+      params.push(req.user.id);
+    }
     if (status) { conditions.push('e.status = ?'); params.push(status); }
 
     const where = conditions.join(' AND ');
@@ -169,7 +176,7 @@ async function dispatchExecution(req, res) {
   try {
     const workflow = await resolveWorkflow(req.params.wid);
     if (!workflow) return R.notFound(res, 'Workflow');
-    if (workflow.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (!(await guardWorkflow(req, res, workflow, LEVEL.EDIT))) return;
 
     const { parameters_override = {}, dataset_bindings = {} } = req.body;
     const result = await dispatchExecutionCore(workflow, req.user, { parameters_override, dataset_bindings });

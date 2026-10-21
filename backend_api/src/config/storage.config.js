@@ -12,4 +12,5 @@ module.exports = {
   outputs: path.join(BASE, 'outputs'),
   articles: path.join(BASE, 'articles'),
   avatars: path.join(BASE, 'avatars'),
+  communities: path.join(BASE, 'communities'),
 };
