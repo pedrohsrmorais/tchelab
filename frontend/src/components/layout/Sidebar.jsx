@@ -8,6 +8,7 @@ import {
   LayoutDashboard, FolderKanban, Database, GitBranch, Beaker,
   BookOpen, Users, Cpu, Zap, Sparkles, ShieldCheck, Library,
   LogOut, ChevronRight, Sun, Moon, Monitor, Globe, ChevronDown,
+  Table2,
 } from 'lucide-react';
 
 // ── Sections ──────────────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ const NAV_MAIN = [
   { to: '/',           icon: LayoutDashboard, key: 'dashboard'  },
   { to: '/projects',   icon: FolderKanban,   key: 'projects'   },
   { to: '/datasets',   icon: Database,        key: 'datasets'   },
+  { to: '/workspace',  icon: Table2,          key: 'workspace'  },
   { to: '/workflows',  icon: GitBranch,       key: 'workflows'  },
   { to: '/catalogo',   icon: Library,         key: 'catalog'    },
   { to: '/articles',   icon: BookOpen,        key: 'articles'   },

@@ -4,6 +4,7 @@ export default {
     dashboard:    'Dashboard',
     projects:     'Projetos',
     datasets:     'Datasets',
+    workspace:    'Workspace',
     workflows:    'Workflows',
     catalog:      'Catálogo',
     articles:     'Artigos',

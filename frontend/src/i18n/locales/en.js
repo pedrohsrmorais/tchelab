@@ -3,6 +3,7 @@ export default {
     dashboard:    'Dashboard',
     projects:     'Projects',
     datasets:     'Datasets',
+    workspace:    'Workspace',
     workflows:    'Workflows',
     catalog:      'Catalog',
     articles:     'Articles',
