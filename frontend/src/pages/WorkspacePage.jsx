@@ -1,65 +1,83 @@
 /**
- * WorkspacePage — Módulo Workspace estilo MATLAB para TcheLab.
+ * WorkspacePage — Interface estilo MATLAB para o TcheLab.
  *
- * Layout:
- *   ┌──────────────────────────────────────────────────────────────────┐
- *   │  Toolbar: [Import] [Clear]  [técnica ▼] [▶ Run]                 │
- *   ├─────────────┬────────────────────────────────────────────────────┤
- *   │ Variable    │  Operation / Preview panel                         │
- *   │ Browser     │                                                    │
- *   │             │                                                    │
- *   ├─────────────┴────────────────────────────────────────────────────┤
- *   │  >> console history (MATLAB-like)                                │
- *   └──────────────────────────────────────────────────────────────────┘
+ * Estrutura fiel ao MATLAB R2023:
+ *   ┌─────────────────────────────────────────────────────────────────────┐
+ *   │  [Toolbar com grupos de ações]                                      │
+ *   ├──────────────────────┬──────────────────────────────────────────────┤
+ *   │  Workspace           │  Painel direito: Operação / Variable Editor  │
+ *   │  ──────────────────  │                                              │
+ *   │  Name  Value  Size…  │                                              │
+ *   │  X     [1,2…  1×4   │                                              │
+ *   │  Y     [3,4…  2×2   │                                              │
+ *   │                      │                                              │
+ *   ├──────────────────────┴──────────────────────────────────────────────┤
+ *   │  Command Window  >>  cursor█                                        │
+ *   └─────────────────────────────────────────────────────────────────────┘
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, {
+  useState, useEffect, useRef, useCallback, useMemo,
+} from 'react';
 import { useTheme } from '../context/ThemeContext';
 import client from '../api/client';
 import {
   Play, Trash2, Plus, Eye, Terminal, RefreshCw,
-  X, ChevronDown, ChevronRight, AlertCircle,
-  Table2, Layers, Hash, Clock, Search,
-  Upload, FileText, Braces,
+  X, ChevronDown, Search, Upload, FileText,
+  Braces, AlertCircle, Table2, Layers, TriangleAlert,
+  FolderOpen, Save, Copy, ChevronRight, ArrowRight,
 } from 'lucide-react';
 
-// ─── Utilitários ──────────────────────────────────────────────────────────────
+// ─── Utils ────────────────────────────────────────────────────────────────────
 
-function parseJson(v, fb = null) {
+const pj = (v, fb = null) => {
   if (v == null) return fb;
   if (typeof v !== 'string') return v;
   try { return JSON.parse(v); } catch { return fb; }
-}
+};
 
-/** Formata dimensões como "100×5" ou "4×1×3" */
-function fmtDims(dims) {
+const fmtDims = (dims) => {
   if (!Array.isArray(dims) || !dims.length) return '—';
   return dims.join('×');
-}
+};
 
-/** Formata o tipo em sigla MATLAB-like */
-function fmtType(dataType) {
-  const map = { matrix: 'double', tensor: 'tensor', spectral: 'spectral', tabular: 'table' };
-  return map[dataType] || dataType || 'double';
-}
+const fmtBytes = (dims) => {
+  if (!Array.isArray(dims) || !dims.length) return '—';
+  const elems = dims.reduce((a, b) => a * b, 1);
+  const bytes = elems * 8; // float64
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+};
 
-/** Extrai preview de valor de um tensor (primeiros 4 números) */
-function tensorPreview(metadata) {
+const fmtClass = (dataType) => {
+  const m = { matrix: 'double', tensor: 'double', spectral: 'double', tabular: 'double' };
+  return m[dataType] || 'double';
+};
+
+const fmtSizeMat = (dims) => {
+  if (!Array.isArray(dims) || !dims.length) return '—';
+  return dims.join('x'); // "100x5" like MATLAB
+};
+
+const tensorPreview = (metadata) => {
   try {
-    const meta = parseJson(metadata, {});
+    const meta = pj(metadata, {});
     const t = meta?.data?.tensor ?? meta?.data?.matrix;
     if (!t) return null;
     const flat = Array.isArray(t[0]) ? t.flat(Infinity) : t;
-    const nums = flat.slice(0, 4).map(n => {
+    const nums = flat.slice(0, 5).map(n => {
       if (typeof n !== 'number') return '?';
-      return Math.abs(n) < 0.01 ? n.toExponential(2) : n.toPrecision(4);
+      const abs = Math.abs(n);
+      if (abs === 0) return '0';
+      if (abs < 0.001 || abs >= 1e6) return n.toExponential(3);
+      return parseFloat(n.toPrecision(5)).toString();
     });
-    return nums.join(', ') + (flat.length > 4 ? '...' : '');
+    return '[' + nums.join(', ') + (flat.length > 5 ? ', …' : '') + ']';
   } catch { return null; }
-}
+};
 
-/** Analisa texto "1,2,3;4,5,6" e retorna { tensor, dimensions } */
-function parseInlineData(text) {
+const parseInline = (text) => {
   const cleaned = text.trim().replace(/\s+/g, ' ');
   const rowTexts = cleaned.split(';').map(r => r.trim()).filter(Boolean);
   if (!rowTexts.length) return null;
@@ -70,244 +88,267 @@ function parseInlineData(text) {
       return n;
     })
   );
-  if (rows.length === 1) {
-    return { tensor: rows[0], dimensions: [rows[0].length] };
-  }
+  if (rows.length === 1) return { tensor: rows[0], dimensions: [rows[0].length] };
   const cols = rows[0].length;
-  if (!rows.every(r => r.length === cols)) throw new Error('Número de colunas inconsistente entre as linhas.');
+  if (!rows.every(r => r.length === cols)) throw new Error('Número de colunas inconsistente.');
   return { tensor: rows, dimensions: [rows.length, cols] };
-}
-
-/** Formata elapsed ms */
-function fmtMs(ms) {
-  if (ms == null) return '';
-  if (ms < 1000) return `${ms.toFixed(0)}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
-
-const POLL_INTERVAL = 1200;
-const MAX_POLL = 120;
-
-// ─── Estilos compartilhados ──────────────────────────────────────────────────
-
-const S = {
-  panelHeader: {
-    fontSize: '0.68rem',
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    color: 'var(--text-muted)',
-    padding: '0.5rem 0.75rem 0.25rem',
-    borderBottom: '1px solid var(--border)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.4rem',
-    background: 'var(--bg-surface)',
-    userSelect: 'none',
-  },
-  btn: (variant = 'default', active = false) => ({
-    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-    padding: '0.35rem 0.75rem',
-    fontSize: '0.78rem', fontWeight: 500,
-    borderRadius: 'var(--radius-sm)',
-    border: variant === 'primary' ? 'none' : '1px solid var(--border)',
-    background: variant === 'primary' ? 'var(--accent)' : active ? 'var(--bg-hover)' : 'var(--bg-elevated)',
-    color: variant === 'primary' ? '#fff' : 'var(--text-secondary)',
-    cursor: 'pointer',
-    transition: 'background 0.12s, opacity 0.12s',
-    whiteSpace: 'nowrap',
-  }),
-  btnIcon: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    padding: '0.3rem', borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--border)',
-    background: 'var(--bg-elevated)',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-  },
-  label: {
-    fontSize: '0.72rem', fontWeight: 600,
-    color: 'var(--text-secondary)',
-    marginBottom: '0.25rem',
-    display: 'block',
-  },
-  input: {
-    width: '100%', boxSizing: 'border-box',
-    padding: '0.375rem 0.5rem',
-    fontSize: '0.8rem',
-    fontFamily: 'var(--font-mono)',
-    background: 'var(--bg-base)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--text-primary)',
-    outline: 'none',
-  },
-  select: {
-    width: '100%', boxSizing: 'border-box',
-    padding: '0.375rem 0.5rem',
-    fontSize: '0.8rem',
-    background: 'var(--bg-base)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--text-primary)',
-    outline: 'none',
-    cursor: 'pointer',
-  },
 };
 
-// ─── Sub-componentes ─────────────────────────────────────────────────────────
+const fmtMs = (ms) => {
+  if (ms == null) return '';
+  return ms < 1000 ? `${ms.toFixed(0)}ms` : `${(ms / 1000).toFixed(2)}s`;
+};
 
-/** Linha de variável no browser */
-function VarRow({ v, selected, onClick, onDelete }) {
-  const dims = parseJson(v.dimensions, []);
-  const preview = tensorPreview(v.metadata);
+const POLL_MS = 1200;
+const MAX_POLLS = 120;
 
-  return (
-    <tr
-      onClick={onClick}
-      style={{
-        cursor: 'pointer',
-        background: selected ? 'var(--bg-hover)' : 'transparent',
-        borderBottom: '1px solid var(--border)',
-        transition: 'background 0.1s',
-      }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'var(--bg-card-hover)'; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
-    >
-      <td style={{ padding: '0.3rem 0.4rem 0.3rem 0.75rem', fontWeight: 600, fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-accent)', whiteSpace: 'nowrap' }}>
-        {v.name}
-      </td>
-      <td style={{ padding: '0.3rem 0.4rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-        {fmtDims(dims)}
-      </td>
-      <td style={{ padding: '0.3rem 0.4rem', fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-        {fmtType(v.data_type)}
-      </td>
-      <td style={{ padding: '0.3rem 0.75rem 0.3rem 0.4rem', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-muted)', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {preview}
-      </td>
-      <td style={{ padding: '0.25rem 0.4rem', textAlign: 'right' }}>
-        <button
-          onClick={e => { e.stopPropagation(); onDelete(); }}
-          style={{ ...S.btnIcon, padding: '0.15rem', border: 'none', background: 'none' }}
-          title="Remover variável"
-        >
-          <Trash2 size={11} style={{ color: 'var(--text-muted)' }} />
-        </button>
-      </td>
-    </tr>
-  );
+// ─── Tema / estilo helpers ─────────────────────────────────────────────────────
+
+/**
+ * Retorna estilos dependentes do tema atual.
+ * classic → visual MATLAB R2023 clássico (Windows-like)
+ * dark/light → design moderno do TcheLab
+ */
+function useWsStyles(theme) {
+  const cl = theme === 'classic';
+  const dk = theme === 'dark';
+
+  return {
+    // Toolbar principal
+    toolbar: {
+      display: 'flex', alignItems: 'center', gap: '0.25rem',
+      padding: cl ? '3px 6px' : '0.4rem 0.75rem',
+      background: cl
+        ? 'linear-gradient(180deg, #f0eeea 0%, #dcd8d0 100%)'
+        : 'var(--bg-surface)',
+      borderBottom: cl ? '1px solid #aca899' : '1px solid var(--border)',
+      flexShrink: 0,
+      boxShadow: cl ? '0 1px 0 #fff inset' : 'none',
+    },
+
+    // Separador vertical na toolbar
+    sep: {
+      width: 1, height: 22,
+      background: cl ? '#aca899' : 'var(--border)',
+      margin: '0 4px', flexShrink: 0,
+    },
+
+    // Botão toolbar (plano, estilo MATLAB)
+    tbBtn: (active = false) => ({
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: cl ? '3px 8px' : '0.3rem 0.65rem',
+      fontSize: cl ? '0.78rem' : '0.76rem',
+      fontFamily: cl ? 'var(--font-sans)' : 'inherit',
+      fontWeight: 500,
+      border: cl
+        ? (active ? '1px solid #7a9ac8' : '1px solid transparent')
+        : '1px solid var(--border)',
+      background: cl
+        ? (active ? 'linear-gradient(180deg,#c2d8f0,#a8c4e8)' : 'transparent')
+        : (active ? 'var(--bg-hover)' : 'var(--bg-elevated)'),
+      borderRadius: cl ? 2 : 'var(--radius-sm)',
+      color: cl ? '#1a1a1a' : 'var(--text-secondary)',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      transition: cl ? 'none' : 'background 0.1s',
+    }),
+
+    // Panel header (title strip like MATLAB panel headers)
+    panelHdr: {
+      display: 'flex', alignItems: 'center', gap: '0.35rem',
+      padding: cl ? '2px 8px' : '0.35rem 0.75rem',
+      background: cl
+        ? 'linear-gradient(180deg,#6fa3d4 0%,#4a7fbf 100%)'
+        : 'var(--bg-surface)',
+      color: cl ? '#fff' : 'var(--text-muted)',
+      fontSize: cl ? '0.72rem' : '0.67rem',
+      fontWeight: cl ? 700 : 700,
+      letterSpacing: '0.06em',
+      borderBottom: cl ? '1px solid #3a6fa0' : '1px solid var(--border)',
+      flexShrink: 0,
+      userSelect: 'none',
+      textShadow: cl ? '0 1px 1px rgba(0,0,0,0.3)' : 'none',
+    },
+
+    // Tabela workspace
+    tbl: {
+      width: '100%', borderCollapse: 'collapse',
+      fontFamily: 'var(--font-mono)',
+    },
+    tblHead: {
+      background: cl ? '#f0f0f0' : 'var(--bg-elevated)',
+      position: 'sticky', top: 0, zIndex: 1,
+    },
+    tblTh: (i) => ({
+      padding: cl ? '3px 6px' : '0.28rem 0.5rem',
+      fontSize: '0.67rem',
+      fontWeight: 700,
+      color: cl ? '#555' : 'var(--text-muted)',
+      textAlign: 'left',
+      letterSpacing: '0.04em',
+      borderBottom: cl ? '1px solid #ccc' : '1px solid var(--border)',
+      borderRight: cl && i < 4 ? '1px solid #ddd' : 'none',
+      paddingLeft: i === 0 ? (cl ? 8 : '0.75rem') : undefined,
+      whiteSpace: 'nowrap',
+      fontFamily: cl ? 'var(--font-sans)' : 'inherit',
+    }),
+
+    // Linha de variável
+    varRow: (selected) => ({
+      cursor: 'pointer',
+      background: selected
+        ? (cl ? '#c2d8f0' : 'var(--bg-hover)')
+        : 'transparent',
+      borderBottom: `1px solid ${cl ? '#e8e8e8' : 'var(--border)'}`,
+    }),
+    varTd: (i, selected) => ({
+      padding: cl ? '3px 6px' : '0.3rem 0.5rem',
+      fontSize: cl ? '0.76rem' : '0.74rem',
+      fontFamily: 'var(--font-mono)',
+      color: i === 0
+        ? (cl ? (selected ? '#003880' : '#003880') : 'var(--text-accent)')
+        : (cl ? '#2a2a2a' : 'var(--text-secondary)'),
+      fontWeight: i === 0 ? 600 : 400,
+      paddingLeft: i === 0 ? (cl ? 8 : '0.75rem') : undefined,
+      borderRight: cl && i < 4 ? '1px solid #e8e8e8' : 'none',
+      whiteSpace: 'nowrap',
+      maxWidth: i === 1 ? 100 : undefined,
+      overflow: i === 1 ? 'hidden' : undefined,
+      textOverflow: i === 1 ? 'ellipsis' : undefined,
+    }),
+
+    // Input/select
+    input: {
+      width: '100%', boxSizing: 'border-box',
+      padding: cl ? '3px 6px' : '0.35rem 0.5rem',
+      fontSize: cl ? '0.8rem' : '0.78rem',
+      fontFamily: 'var(--font-mono)',
+      background: cl ? '#fff' : 'var(--bg-base)',
+      border: cl ? '1px solid #aaa' : '1px solid var(--border)',
+      borderRadius: cl ? 1 : 'var(--radius-sm)',
+      color: 'var(--text-primary)',
+      outline: 'none',
+      boxShadow: cl ? 'inset 0 1px 2px rgba(0,0,0,0.12)' : 'none',
+    },
+    select: {
+      width: '100%', boxSizing: 'border-box',
+      padding: cl ? '3px 6px' : '0.35rem 0.5rem',
+      fontSize: cl ? '0.8rem' : '0.78rem',
+      background: cl ? '#fff' : 'var(--bg-base)',
+      border: cl ? '1px solid #aaa' : '1px solid var(--border)',
+      borderRadius: cl ? 1 : 'var(--radius-sm)',
+      color: 'var(--text-primary)',
+      outline: 'none',
+      cursor: 'pointer',
+      boxShadow: cl ? 'inset 0 1px 2px rgba(0,0,0,0.1)' : 'none',
+    },
+
+    // Label
+    label: {
+      display: 'block',
+      fontSize: cl ? '0.76rem' : '0.72rem',
+      fontWeight: cl ? 600 : 600,
+      color: cl ? '#333' : 'var(--text-secondary)',
+      marginBottom: cl ? 3 : '0.25rem',
+      fontFamily: cl ? 'var(--font-sans)' : 'inherit',
+    },
+
+    // Botão primário
+    btnPrimary: (disabled = false) => ({
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: cl ? '4px 14px' : '0.38rem 1rem',
+      fontSize: cl ? '0.8rem' : '0.8rem',
+      fontWeight: 600,
+      border: cl ? '1px solid #5a8fc8' : 'none',
+      background: cl
+        ? 'linear-gradient(180deg,#5a9fe0,#3d7ec8)'
+        : 'var(--accent)',
+      borderRadius: cl ? 2 : 'var(--radius-sm)',
+      color: '#fff',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.55 : 1,
+      boxShadow: cl ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+      textShadow: cl ? '0 1px 1px rgba(0,0,0,0.3)' : 'none',
+    }),
+
+    btnSecondary: {
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: cl ? '4px 10px' : '0.35rem 0.7rem',
+      fontSize: cl ? '0.78rem' : '0.77rem',
+      fontWeight: 500,
+      border: cl ? '1px solid #aaa' : '1px solid var(--border)',
+      background: cl
+        ? 'linear-gradient(180deg,#f5f5f5,#e5e5e5)'
+        : 'var(--bg-elevated)',
+      borderRadius: cl ? 2 : 'var(--radius-sm)',
+      color: cl ? '#333' : 'var(--text-secondary)',
+      cursor: 'pointer',
+      boxShadow: cl ? '0 1px 1px rgba(0,0,0,0.12)' : 'none',
+    },
+
+    // Painel de operação
+    opPanel: {
+      flex: 1, overflowY: 'auto',
+      background: cl ? '#f5f5f5' : 'var(--bg-base)',
+      padding: cl ? '10px 12px' : '0.875rem 1rem',
+    },
+
+    // Console
+    console: {
+      background: cl ? '#1a1a1a' : '#0d1117',
+      color: cl ? '#d4d0c8' : '#c9d1d9',
+    },
+    consoleHdr: {
+      background: cl ? '#2d2d2d' : '#161b22',
+      borderBottom: cl ? '1px solid #444' : '1px solid #21262d',
+      padding: cl ? '3px 8px' : '0.3rem 0.75rem',
+      display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+    },
+    consolePrompt: { color: cl ? '#e8a020' : '#7ee787' },  // laranja (MATLAB) ou verde
+    consoleText: { color: cl ? '#d4d0c8' : '#c9d1d9' },
+    consoleOk: { color: cl ? '#a8d080' : '#3fb950' },
+    consoleErr: { color: cl ? '#f08080' : '#f85149' },
+    consolePending: { color: cl ? '#888' : '#8b949e' },
+  };
 }
 
-/** Painel de preview de uma variável selecionada */
-function VariablePreview({ variable }) {
-  const dims = parseJson(variable.dimensions, []);
-  const meta = parseJson(variable.metadata, {});
-  const tensor = meta?.data?.tensor ?? meta?.data?.matrix ?? null;
+// ─── Componentes menores ───────────────────────────────────────────────────────
 
-  const rows2D = useMemo(() => {
-    if (!tensor) return null;
-    if (!Array.isArray(tensor[0])) {
-      return [tensor.slice(0, 12)]; // 1D → show as 1 row
-    }
-    return tensor.slice(0, 8).map(r => (Array.isArray(r) ? r.slice(0, 8) : [r]));
-  }, [tensor]);
-
-  return (
-    <div style={{ padding: '0.875rem 1rem', overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-accent)' }}>
-          {variable.name}
-        </span>
-        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-sm)' }}>
-          {fmtDims(dims)} {fmtType(variable.data_type)}
-        </span>
-      </div>
-
-      {rows2D && (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
-            <tbody>
-              {rows2D.map((row, ri) => (
-                <tr key={ri}>
-                  <td style={{ padding: '0.2rem 0.5rem', color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>
-                    {ri + 1}
-                  </td>
-                  {row.map((cell, ci) => (
-                    <td key={ci} style={{ padding: '0.2rem 0.65rem', textAlign: 'right', color: 'var(--text-primary)', borderRight: '1px solid var(--border)' }}>
-                      {typeof cell === 'number' ? (Math.abs(cell) < 0.001 ? cell.toExponential(3) : cell.toPrecision(5)) : String(cell)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {(dims[0] > 8 || dims[1] > 8) && (
-            <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-              Mostrando até 8×8 de {fmtDims(dims)}
-            </p>
-          )}
-        </div>
-      )}
-
-      {!rows2D && (
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Sem dados numéricos para exibir.</p>
-      )}
-    </div>
-  );
-}
-
-/** Editor de parâmetros a partir do parameter_schema */
-function ParamEditor({ schema, values, onChange }) {
+function ParamEditor({ schema, values, onChange, s }) {
   if (!schema || !Object.keys(schema).length) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {Object.entries(schema).map(([key, def]) => {
         const val = values[key] ?? def.default ?? '';
         return (
           <div key={key}>
-            <label style={S.label}>
-              {def.label || key}
-              {def.required && <span style={{ color: 'var(--danger)' }}> *</span>}
-            </label>
+            <label style={s.label}>{def.label || key}{def.required && <span style={{ color: 'var(--danger)' }}> *</span>}</label>
             {def.type === 'enum' ? (
-              <select
-                style={S.select}
-                value={val}
-                onChange={e => onChange({ ...values, [key]: e.target.value })}
-              >
+              <select style={s.select} value={val} onChange={e => onChange({ ...values, [key]: e.target.value })}>
                 {(def.options || []).map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             ) : def.type === 'boolean' ? (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: 4 }}>
                 {[true, false].map(bv => (
-                  <button
-                    key={String(bv)}
-                    style={{ ...S.btn('default', val === bv), flex: 1 }}
-                    onClick={() => onChange({ ...values, [key]: bv })}
-                    type="button"
-                  >
-                    {bv ? 'true' : 'false'}
+                  <button key={String(bv)} type="button"
+                    style={{ ...s.btnSecondary, flex: 1, justifyContent: 'center', fontWeight: val === bv ? 700 : 400, color: val === bv ? 'var(--accent)' : undefined }}
+                    onClick={() => onChange({ ...values, [key]: bv })}>
+                    {String(bv)}
                   </button>
                 ))}
               </div>
             ) : (
-              <input
-                style={S.input}
+              <input style={s.input}
                 type={def.type === 'integer' || def.type === 'float' ? 'number' : 'text'}
-                step={def.type === 'float' ? 'any' : 1}
-                min={def.min}
-                max={def.max}
+                step={def.type === 'float' ? 'any' : 1} min={def.min} max={def.max}
                 value={val}
                 onChange={e => {
                   const raw = e.target.value;
                   const num = def.type === 'integer' ? parseInt(raw, 10) : def.type === 'float' ? parseFloat(raw) : raw;
                   onChange({ ...values, [key]: isNaN(num) ? raw : num });
-                }}
-              />
+                }} />
             )}
-            {def.description && (
-              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>{def.description}</p>
-            )}
+            {def.description && <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>{def.description}</p>}
           </div>
         );
       })}
@@ -315,34 +356,104 @@ function ParamEditor({ schema, values, onChange }) {
   );
 }
 
-/** Linha no console history */
-function ConsoleLine({ entry }) {
-  const statusColor = entry.status === 'ok' ? 'var(--success)' : entry.status === 'error' ? 'var(--danger)' : 'var(--text-muted)';
+function ConsoleLine({ e, s }) {
+  const statusColor = e.status === 'ok' ? s.consoleOk.color : e.status === 'error' ? s.consoleErr.color : s.consolePending.color;
+  const mark = e.status === 'ok' ? '✓' : e.status === 'error' ? '✗' : '…';
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', padding: '0.15rem 0' }}>
-      <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', flexShrink: 0 }}>&gt;&gt;</span>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-primary)', flex: 1, wordBreak: 'break-all' }}>
-        {entry.cmd}
-      </span>
-      {entry.info && (
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-          [{entry.info}]
-        </span>
-      )}
-      {entry.ms && (
-        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0 }}>{entry.ms}</span>
-      )}
-      <span style={{ fontSize: '0.68rem', color: statusColor, flexShrink: 0 }}>
-        {entry.status === 'ok' ? '✓' : entry.status === 'error' ? '✗' : '…'}
-      </span>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '1px 0', lineHeight: 1.5 }}>
+      <span style={{ ...s.consolePrompt, fontFamily: 'var(--font-mono)', fontSize: '0.73rem', flexShrink: 0 }}>&gt;&gt;</span>
+      <span style={{ ...s.consoleText, fontFamily: 'var(--font-mono)', fontSize: '0.73rem', flex: 1, wordBreak: 'break-all' }}>{e.cmd}</span>
+      {e.info && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#666', flexShrink: 0 }}>{e.info}</span>}
+      {e.ms && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: '#666', flexShrink: 0 }}>{e.ms}</span>}
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: statusColor, flexShrink: 0 }}>{mark}</span>
     </div>
   );
 }
 
-// ─── Modal de Import ─────────────────────────────────────────────────────────
+/** Preview da variável no estilo Variable Editor do MATLAB */
+function VarEditor({ variable, s, theme }) {
+  const cl = theme === 'classic';
+  const dims = pj(variable.dimensions, []);
+  const meta = pj(variable.metadata, {});
+  const tensor = meta?.data?.tensor ?? meta?.data?.matrix ?? null;
 
-function ImportModal({ onClose, onImported }) {
-  const [tab, setTab] = useState('inline');   // 'inline' | 'csv'
+  const rows2D = useMemo(() => {
+    if (!tensor) return null;
+    if (!Array.isArray(tensor[0])) return [tensor.slice(0, 20)];
+    return tensor.slice(0, 12).map(r => (Array.isArray(r) ? r.slice(0, 12) : [r]));
+  }, [tensor]);
+
+  const colCount = rows2D?.[0]?.length ?? 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Title bar */}
+      <div style={{
+        ...s.panelHdr,
+        background: cl
+          ? 'linear-gradient(180deg,#6fa3d4 0%,#4a7fbf 100%)'
+          : 'var(--bg-surface)',
+        color: cl ? '#fff' : 'var(--text-muted)',
+      }}>
+        <Table2 size={11} />
+        {variable.name}
+        <span style={{ marginLeft: 6, fontWeight: 400, opacity: 0.8 }}>— {fmtSizeMat(dims)} {fmtClass(variable.data_type)}</span>
+      </div>
+
+      {rows2D ? (
+        <div style={{ flex: 1, overflowAuto: 'auto', overflow: 'auto' }}>
+          <table style={{
+            borderCollapse: 'collapse', fontSize: '0.75rem',
+            fontFamily: 'var(--font-mono)',
+            background: cl ? '#fff' : 'var(--bg-elevated)',
+          }}>
+            <thead>
+              <tr>
+                <th style={{ padding: cl ? '2px 6px' : '3px 8px', background: cl ? '#f0f0f0' : 'var(--bg-base)', color: 'var(--text-muted)', fontSize: '0.65rem', border: cl ? '1px solid #ddd' : '1px solid var(--border)', textAlign: 'center', fontFamily: cl ? 'var(--font-sans)' : 'inherit' }}></th>
+                {Array.from({ length: colCount }, (_, i) => (
+                  <th key={i} style={{ padding: cl ? '2px 10px' : '3px 12px', background: cl ? '#e8f0fb' : 'var(--bg-base)', color: cl ? '#2a4a80' : 'var(--text-muted)', fontSize: '0.67rem', border: cl ? '1px solid #c0d0e8' : '1px solid var(--border)', textAlign: 'center', fontWeight: 700, fontFamily: cl ? 'var(--font-sans)' : 'inherit' }}>
+                    {i + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows2D.map((row, ri) => (
+                <tr key={ri} style={{ background: ri % 2 === 0 ? (cl ? '#fff' : 'transparent') : (cl ? '#f8f8ff' : 'rgba(255,255,255,0.02)') }}>
+                  <td style={{ padding: cl ? '2px 8px' : '2px 8px', color: cl ? '#2a4a80' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.67rem', textAlign: 'center', background: cl ? '#e8f0fb' : 'var(--bg-base)', border: cl ? '1px solid #c0d0e8' : '1px solid var(--border)', fontFamily: cl ? 'var(--font-sans)' : 'inherit' }}>
+                    {ri + 1}
+                  </td>
+                  {row.map((cell, ci) => (
+                    <td key={ci} style={{ padding: cl ? '2px 10px' : '2px 12px', textAlign: 'right', color: cl ? '#1a1a1a' : 'var(--text-primary)', border: cl ? '1px solid #e8e8e8' : '1px solid var(--border)' }}>
+                      {typeof cell === 'number'
+                        ? (Math.abs(cell) < 0.001 || Math.abs(cell) >= 1e6 ? cell.toExponential(4) : parseFloat(cell.toPrecision(6)).toString())
+                        : String(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(dims[0] > 12 || (dims[1] && dims[1] > 12)) && (
+            <p style={{ fontSize: '0.67rem', color: 'var(--text-muted)', padding: '4px 8px', background: cl ? '#f8f8f8' : 'transparent' }}>
+              Exibindo até 12×12 de {fmtSizeMat(dims)}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+          Sem dados numéricos para exibir.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Modal de Import ──────────────────────────────────────────────────────────
+
+function ImportModal({ onClose, onImported, s, theme }) {
+  const cl = theme === 'classic';
+  const [tab, setTab] = useState('inline');
   const [name, setName] = useState('');
   const [raw, setRaw] = useState('');
   const [file, setFile] = useState(null);
@@ -354,18 +465,13 @@ function ImportModal({ onClose, onImported }) {
     setError('');
     const varName = name.trim();
     if (!varName) return setError('Dê um nome à variável.');
-
     setLoading(true);
     try {
       if (tab === 'inline') {
         if (!raw.trim()) { setError('Insira os dados.'); setLoading(false); return; }
         let parsed;
-        try { parsed = parseInlineData(raw); } catch (e) { setError(e.message); setLoading(false); return; }
-        await client.post('/datasets/import', {
-          name: varName,
-          tensor: parsed.tensor,
-          dimensions: parsed.dimensions,
-        });
+        try { parsed = parseInline(raw); } catch (e) { setError(e.message); setLoading(false); return; }
+        await client.post('/datasets/import', { name: varName, tensor: parsed.tensor, dimensions: parsed.dimensions });
       } else {
         if (!file) { setError('Selecione um arquivo.'); setLoading(false); return; }
         const form = new FormData();
@@ -380,97 +486,93 @@ function ImportModal({ onClose, onImported }) {
     } finally { setLoading(false); }
   }
 
+  const overlayBg = cl ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.6)';
+  const dlgBg = cl ? '#f0eeea' : 'var(--bg-elevated)';
+  const dlgBorder = cl ? '2px solid #aca899' : '1px solid var(--border)';
+  const hdrBg = cl ? 'linear-gradient(180deg,#6fa3d4,#4a7fbf)' : 'var(--bg-surface)';
+  const hdrColor = cl ? '#fff' : 'var(--text-primary)';
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 999,
-      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{
-        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)',
-        width: 460, maxWidth: '95vw',
-        display: 'flex', flexDirection: 'column',
-      }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>Importar Variável</span>
-          <button onClick={onClose} style={{ ...S.btnIcon, border: 'none', background: 'none' }}><X size={16} /></button>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: overlayBg, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: cl ? 'none' : 'blur(3px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: dlgBg, border: dlgBorder, borderRadius: cl ? 2 : 'var(--radius)', boxShadow: 'var(--shadow-lg)', width: 440, maxWidth: '95vw', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Title bar */}
+        <div style={{ background: hdrBg, padding: cl ? '4px 10px' : '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ color: hdrColor, fontSize: cl ? '0.82rem' : '0.875rem', fontWeight: 700, textShadow: cl ? '0 1px 1px rgba(0,0,0,0.3)' : 'none', fontFamily: cl ? 'var(--font-sans)' : 'inherit' }}>
+            Importar Variável — Workspace
+          </span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: hdrColor, cursor: 'pointer', opacity: 0.8, lineHeight: 1 }}>✕</button>
         </div>
 
-        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+        <div style={{ padding: cl ? '12px' : '1rem', display: 'flex', flexDirection: 'column', gap: cl ? 10 : 14 }}>
           {/* Nome */}
           <div>
-            <label style={S.label}>Nome da variável</label>
-            <input
-              style={S.input}
-              placeholder="ex: X"
-              value={name}
-              onChange={e => setName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-              autoFocus
-            />
+            <label style={s.label}>Nome da variável</label>
+            <input style={s.input} placeholder="ex: X" autoFocus
+              value={name} onChange={e => setName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} />
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
-            {[{ id: 'inline', icon: Braces, label: 'Inline' }, { id: 'csv', icon: FileText, label: 'CSV / arquivo' }].map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{ ...S.btn('default', tab === t.id), border: 'none', borderBottom: tab === t.id ? '2px solid var(--accent)' : '2px solid transparent' }}>
-                <t.icon size={12} />{t.label}
+          <div style={{ display: 'flex', borderBottom: `1px solid ${cl ? '#ccc' : 'var(--border)'}`, marginBottom: -1 }}>
+            {[{ id: 'inline', label: '  Inline', icon: Braces }, { id: 'csv', label: '  Arquivo', icon: FileText }].map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: cl ? '4px 10px' : '5px 12px',
+                fontSize: cl ? '0.77rem' : '0.75rem',
+                background: tab === t.id ? (cl ? '#fff' : 'var(--bg-elevated)') : 'transparent',
+                border: cl ? `1px solid ${tab === t.id ? '#ccc' : 'transparent'}` : 'none',
+                borderBottom: tab === t.id ? `2px solid ${cl ? '#4a7fbf' : 'var(--accent)'}` : '2px solid transparent',
+                cursor: 'pointer',
+                color: tab === t.id ? (cl ? '#003880' : 'var(--text-accent)') : 'var(--text-muted)',
+                fontWeight: tab === t.id ? 700 : 400,
+                borderRadius: cl ? '2px 2px 0 0' : 0,
+                marginBottom: -1,
+              }}>
+                <t.icon size={11} />{t.label}
               </button>
             ))}
           </div>
 
           {tab === 'inline' && (
             <div>
-              <label style={S.label}>Dados (vírgula = colunas, ponto-e-vírgula = linhas)</label>
-              <textarea
-                style={{ ...S.input, height: 80, resize: 'vertical' }}
-                placeholder={'1, 2, 3, 4\n% ou para 2D:\n1, 2; 3, 4'}
-                value={raw}
-                onChange={e => setRaw(e.target.value)}
-              />
-              <p style={{ fontSize: '0.67rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                Ex: <code style={{ background: 'var(--bg-hover)', padding: '0 3px', borderRadius: 2 }}>1,2,3,4</code> → vetor 1×4 &nbsp;|&nbsp;
-                <code style={{ background: 'var(--bg-hover)', padding: '0 3px', borderRadius: 2 }}>1,2;3,4</code> → matriz 2×2
+              <label style={s.label}>Dados</label>
+              <textarea style={{ ...s.input, height: 72, resize: 'vertical', fontFamily: 'var(--font-mono)' }}
+                placeholder={'1, 2, 3, 4         ← vetor 1×4\n1, 2; 3, 4       ← matriz 2×2'}
+                value={raw} onChange={e => setRaw(e.target.value)} />
+              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 3 }}>
+                Use <code>,</code> para colunas e <code>;</code> para linhas. Ex: <code>1,2,3</code> → 1×3 double
               </p>
             </div>
           )}
 
           {tab === 'csv' && (
             <div>
-              <label style={S.label}>Arquivo CSV ou JSON</label>
-              <div
-                style={{ border: '2px dashed var(--border)', borderRadius: 'var(--radius-sm)', padding: '1.25rem', textAlign: 'center', cursor: 'pointer', background: 'var(--bg-base)' }}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Upload size={20} style={{ color: 'var(--text-muted)', marginBottom: 6 }} />
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  {file ? file.name : 'Clique para selecionar'}
-                </p>
+              <label style={s.label}>Arquivo CSV ou JSON</label>
+              <div onClick={() => fileRef.current?.click()} style={{
+                border: cl ? '1px solid #aaa' : '2px dashed var(--border)',
+                borderRadius: cl ? 2 : 'var(--radius-sm)',
+                padding: '1rem', textAlign: 'center', cursor: 'pointer',
+                background: cl ? '#fff' : 'var(--bg-base)',
+              }}>
+                <Upload size={18} style={{ color: 'var(--text-muted)', marginBottom: 4 }} />
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{file ? file.name : 'Clique para selecionar'}</p>
                 <input ref={fileRef} type="file" accept=".csv,.txt,.json" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0])} />
               </div>
             </div>
           )}
 
           {error && (
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.75rem' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: '6px 10px' }}>
               <AlertCircle size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} />
               <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>{error}</span>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', padding: '0.75rem 1rem', borderTop: '1px solid var(--border)' }}>
-          <button style={S.btn()} onClick={onClose}>Cancelar</button>
-          <button
-            style={{ ...S.btn('primary'), opacity: loading ? 0.6 : 1 }}
-            onClick={submit}
-            disabled={loading}
-          >
-            {loading ? 'Importando…' : 'Importar'}
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', padding: cl ? '8px 12px' : '0.65rem 1rem', borderTop: cl ? '1px solid #ccc' : '1px solid var(--border)', background: cl ? '#ece8e0' : 'transparent' }}>
+          <button style={s.btnSecondary} onClick={onClose}>Cancelar</button>
+          <button style={s.btnPrimary(loading)} onClick={submit} disabled={loading}>
+            {loading ? 'Importando…' : 'OK'}
           </button>
         </div>
       </div>
@@ -482,33 +584,33 @@ function ImportModal({ onClose, onImported }) {
 
 export default function WorkspacePage() {
   const { theme } = useTheme();
+  const s = useWsStyles(theme);
+  const cl = theme === 'classic';
 
-  // Dados
-  const [variables, setVariables]     = useState([]);
-  const [techniques, setTechniques]   = useState([]);
-  const [loadingVars, setLoadingVars] = useState(true);
+  const [variables, setVariables]       = useState([]);
+  const [techniques, setTechniques]     = useState([]);
+  const [loadingVars, setLoadingVars]   = useState(true);
 
-  // Seleção e operação
-  const [selectedVar, setSelectedVar]         = useState(null);   // { uuid, name, ... }
-  const [selectedTech, setSelectedTech]       = useState(null);   // técnica completa
-  const [techFilter, setTechFilter]           = useState('');
-  const [techDropOpen, setTechDropOpen]       = useState(false);
-  const [inputBindings, setInputBindings]     = useState({});     // { portName: varUuid }
-  const [params, setParams]                   = useState({});
-  const [outputNames, setOutputNames]         = useState({});     // { portName: varName }
-  const [runningOp, setRunningOp]             = useState(null);   // { op_id, cmd, startMs }
+  const [selectedVar, setSelectedVar]   = useState(null);
+  const [selectedTech, setSelectedTech] = useState(null);
+  const [techFilter, setTechFilter]     = useState('');
+  const [techDropOpen, setTechDropOpen] = useState(false);
+  const [inputBindings, setInputBindings] = useState({});
+  const [params, setParams]             = useState({});
+  const [outputNames, setOutputNames]   = useState({});
+  const [runningOp, setRunningOp]       = useState(null);
 
-  // UI state
-  const [showImport, setShowImport]   = useState(false);
-  const [varFilter, setVarFilter]     = useState('');
-  const [history, setHistory]         = useState([]);
-  const [activePanel, setActivePanel] = useState('operation'); // 'operation' | 'preview'
+  const [showImport, setShowImport]     = useState(false);
+  const [varFilter, setVarFilter]       = useState('');
+  const [history, setHistory]           = useState([]);
+  const [activePanel, setActivePanel]   = useState('operation'); // 'operation'|'editor'
+  const [varSort, setVarSort]           = useState('name'); // 'name'|'size'|'class'
 
   const pollRef    = useRef(null);
   const consoleRef = useRef(null);
   const techDropRef = useRef(null);
 
-  // ── Carrega variáveis ────────────────────────────────────────────────────────
+  // ── Load ─────────────────────────────────────────────────────────────────────
   const loadVars = useCallback(async () => {
     try {
       setLoadingVars(true);
@@ -518,7 +620,6 @@ export default function WorkspacePage() {
     } catch { /* silencioso */ } finally { setLoadingVars(false); }
   }, []);
 
-  // ── Carrega técnicas ─────────────────────────────────────────────────────────
   const loadTechs = useCallback(async () => {
     try {
       const res = await client.get('/techniques?limit=500');
@@ -527,107 +628,89 @@ export default function WorkspacePage() {
     } catch { /* silencioso */ }
   }, []);
 
-  useEffect(() => {
-    loadVars();
-    loadTechs();
-  }, [loadVars, loadTechs]);
+  useEffect(() => { loadVars(); loadTechs(); }, [loadVars, loadTechs]);
 
-  // Fecha dropdown de técnica ao clicar fora
+  // Close tech dropdown on outside click
   useEffect(() => {
-    const handler = (e) => {
-      if (techDropRef.current && !techDropRef.current.contains(e.target)) setTechDropOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const h = (e) => { if (techDropRef.current && !techDropRef.current.contains(e.target)) setTechDropOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  // Scroll console ao fim
+  // Auto-scroll console
   useEffect(() => {
     if (consoleRef.current) consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
   }, [history]);
 
-  // ── Quando muda técnica, inicializa params/outputs ──────────────────────────
+  // ── Técnica selecionada: init defaults ─────────────────────────────────────
   useEffect(() => {
     if (!selectedTech) { setParams({}); setOutputNames({}); setInputBindings({}); return; }
-    const schema = parseJson(selectedTech.parameter_schema, {});
+    const pSchema = pj(selectedTech.parameter_schema, {});
     const defaults = {};
-    Object.entries(schema).forEach(([k, def]) => { if (def.default !== undefined) defaults[k] = def.default; });
+    Object.entries(pSchema).forEach(([k, def]) => { if (def.default !== undefined) defaults[k] = def.default; });
     setParams(defaults);
 
-    const outSchema = parseJson(selectedTech.output_schema, {});
-    const outNames = {};
-    const techSlug = selectedTech.slug || '';
-    Object.keys(outSchema).forEach((k, i) => {
-      outNames[k] = i === 0 ? `${techSlug.split('_')[0]}_out` : `${techSlug.split('_')[0]}_${k}`;
-    });
-    setOutputNames(outNames);
+    const oSchema = pj(selectedTech.output_schema, {});
+    const oNames = {};
+    const slug = selectedTech.slug || '';
+    const prefix = slug.replace(/_/g, '').slice(0, 6);
+    Object.keys(oSchema).forEach((k, i) => { oNames[k] = i === 0 ? `${prefix}_out` : `${prefix}_${k}`; });
+    setOutputNames(oNames);
 
-    // Reset input bindings; se houver variável selecionada, pré-vincula
-    const inSchema = parseJson(selectedTech.input_schema, {});
+    const iSchema = pj(selectedTech.input_schema, {});
     const bindings = {};
-    Object.keys(inSchema).forEach((k, i) => {
-      if (i === 0 && selectedVar) bindings[k] = selectedVar.uuid;
-    });
+    Object.keys(iSchema).forEach((k, i) => { if (i === 0 && selectedVar) bindings[k] = selectedVar.uuid; });
     setInputBindings(bindings);
   }, [selectedTech, selectedVar]);
 
   // ── Delete variável ──────────────────────────────────────────────────────────
   async function deleteVar(v) {
-    if (!window.confirm(`Remover variável "${v.name}" do workspace?`)) return;
+    if (!window.confirm(`Remover "${v.name}" do workspace?`)) return;
     try {
       await client.delete(`/datasets/${v.uuid}`);
       setVariables(vs => vs.filter(x => x.uuid !== v.uuid));
       if (selectedVar?.uuid === v.uuid) setSelectedVar(null);
-      addHistory({ cmd: `clear ${v.name}`, status: 'ok' });
+      addHist({ cmd: `clear ${v.name}`, status: 'ok' });
     } catch (e) {
-      addHistory({ cmd: `clear ${v.name}`, status: 'error', info: e.response?.data?.message || 'Erro' });
+      addHist({ cmd: `clear ${v.name}`, status: 'error', info: e.response?.data?.message || 'Erro' });
     }
   }
 
-  // ── Executa operação ─────────────────────────────────────────────────────────
+  // ── Executar operação ─────────────────────────────────────────────────────────
   async function runOperation() {
     if (!selectedTech) return;
-    const inSchema = parseJson(selectedTech.input_schema, {});
-    const inKeys = Object.keys(inSchema);
-    const primaryKey = inKeys[0] || 'X';
-    const primaryVarId = inputBindings[primaryKey];
-
-    if (!primaryVarId) {
-      addHistory({ cmd: `${selectedTech.slug}(?)`, status: 'error', info: `Vincula a entrada "${primaryKey}"` });
+    const iSchema = pj(selectedTech.input_schema, {});
+    const iKeys = Object.keys(iSchema);
+    const primaryKey = iKeys[0] || 'X';
+    const primaryId = inputBindings[primaryKey];
+    if (!primaryId) {
+      addHist({ cmd: `${selectedTech.slug}(?)`, status: 'error', info: `Vincule a entrada "${primaryKey}"` });
       return;
     }
 
-    const primaryVar = variables.find(v => v.uuid === primaryVarId);
-    if (!primaryVar) return;
-
-    // Monta extra_inputs
     const extra_inputs = {};
-    inKeys.slice(1).forEach(k => {
-      const varId = inputBindings[k];
-      if (varId) extra_inputs[k] = { type: 'dataset', dataset_id: varId };
+    iKeys.slice(1).forEach(k => {
+      if (inputBindings[k]) extra_inputs[k] = { type: 'dataset', dataset_id: inputBindings[k] };
     });
 
-    // Nome do workflow: "workspace_<slug>_<timestamp>"
     const ts = Date.now();
     const wfName = `workspace_${selectedTech.slug}_${ts}`;
+    const oSchema = pj(selectedTech.output_schema, {});
+    const oKeys = Object.keys(oSchema);
+    const firstOutName = outputNames[oKeys[0]] || `${selectedTech.slug}_out`;
 
-    // Nome da variável de saída (usa o primeiro output)
-    const outKeys = Object.keys(parseJson(selectedTech.output_schema, {}));
-    const firstOutName = outputNames[outKeys[0]] || `${selectedTech.slug}_out`;
-
-    // Monta cmd para console
-    const inStr = inKeys.map(k => {
+    const inStr = iKeys.map(k => {
       const v = variables.find(x => x.uuid === inputBindings[k]);
       return v?.name || '?';
     }).join(', ');
-    const paramStr = Object.entries(params).map(([k, v]) => `${k}=${v}`).join(', ');
-    const cmd = `${firstOutName} = ${selectedTech.slug}(${inStr}${paramStr ? ', ' + paramStr : ''})`;
+    const pStr = Object.entries(params).filter(([, v]) => v !== '' && v != null).map(([k, v]) => `${k}=${v}`).join(', ');
+    const cmd = `${firstOutName} = ${selectedTech.slug}(${inStr}${pStr ? ', ' + pStr : ''})`;
 
     const histId = ts;
-    addHistory({ id: histId, cmd, status: 'pending' });
+    addHist({ id: histId, cmd, status: 'pending' });
 
     try {
-      const res = await client.post(`/datasets/${primaryVarId}/operations`, {
+      const res = await client.post(`/datasets/${primaryId}/operations`, {
         technique_id: selectedTech.uuid,
         params,
         workflow_name: wfName,
@@ -636,175 +719,163 @@ export default function WorkspacePage() {
         extra_inputs,
       });
       const opId = res.data?.data?.operation_id;
-      setRunningOp({ op_id: opId, histId, startMs: Date.now(), firstOutName, cmd });
-      startPolling(opId, histId, Date.now(), firstOutName);
+      setRunningOp({ op_id: opId, histId, startMs: ts });
+      startPoll(opId, histId, ts);
     } catch (e) {
       const msg = e.response?.data?.errors?.[0]?.message || e.response?.data?.message || e.message;
-      updateHistory(histId, { status: 'error', info: msg });
+      updHist(histId, { status: 'error', info: msg });
       setRunningOp(null);
     }
   }
 
-  function startPolling(opId, histId, startMs, outName) {
-    let count = 0;
+  function startPoll(opId, histId, startMs) {
+    let n = 0;
     clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
-      count++;
-      if (count > MAX_POLL) {
+      if (++n > MAX_POLLS) {
         clearInterval(pollRef.current);
-        updateHistory(histId, { status: 'error', info: 'Timeout' });
+        updHist(histId, { status: 'error', info: 'Timeout' });
         setRunningOp(null);
         return;
       }
       try {
         const r = await client.get(`/operations/${opId}`);
         const op = r.data?.data ?? r.data;
-        const status = op?.execution_status || op?.status;
-        if (status === 'completed' || status === 'done') {
+        const st = op?.execution_status || op?.status;
+        if (st === 'completed' || st === 'done') {
           clearInterval(pollRef.current);
-          const elapsed = Date.now() - startMs;
           await loadVars();
-          updateHistory(histId, { status: 'ok', ms: fmtMs(elapsed) });
+          updHist(histId, { status: 'ok', ms: fmtMs(Date.now() - startMs) });
           setRunningOp(null);
-        } else if (status === 'failed' || status === 'error') {
+        } else if (st === 'failed' || st === 'error') {
           clearInterval(pollRef.current);
-          updateHistory(histId, { status: 'error', info: op?.error_message || 'Falha' });
+          updHist(histId, { status: 'error', info: op?.error_message || 'Falha' });
           setRunningOp(null);
         }
-      } catch { /* continua polling */ }
-    }, POLL_INTERVAL);
+      } catch { /* continua */ }
+    }, POLL_MS);
   }
 
-  function addHistory(entry) {
-    setHistory(h => [...h, { id: entry.id || Date.now() + Math.random(), ...entry }]);
-  }
-  function updateHistory(id, patch) {
-    setHistory(h => h.map(e => e.id === id ? { ...e, ...patch } : e));
-  }
+  function addHist(entry) { setHistory(h => [...h, { id: entry.id || Date.now() + Math.random(), ...entry }]); }
+  function updHist(id, patch) { setHistory(h => h.map(e => e.id === id ? { ...e, ...patch } : e)); }
 
-  // ── Filtragem ─────────────────────────────────────────────────────────────────
-  const filteredVars = useMemo(() =>
-    variables.filter(v => !varFilter || v.name.toLowerCase().includes(varFilter.toLowerCase())),
-    [variables, varFilter]
-  );
+  // ── Filtragem / ordenação ──────────────────────────────────────────────────
+  const filteredVars = useMemo(() => {
+    let list = variables.filter(v => !varFilter || v.name.toLowerCase().includes(varFilter.toLowerCase()));
+    if (varSort === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    else if (varSort === 'size') list = [...list].sort((a, b) => {
+      const da = (pj(a.dimensions, []) || []).reduce((x, y) => x * y, 1);
+      const db = (pj(b.dimensions, []) || []).reduce((x, y) => x * y, 1);
+      return db - da;
+    });
+    return list;
+  }, [variables, varFilter, varSort]);
 
   const filteredTechs = useMemo(() => {
     const q = techFilter.toLowerCase();
-    return techniques.filter(t => !q || t.name?.toLowerCase().includes(q) || t.slug?.toLowerCase().includes(q) || t.family?.includes(q));
+    return techniques.filter(t => !q || t.name?.toLowerCase().includes(q) || t.slug?.toLowerCase().includes(q));
   }, [techniques, techFilter]);
 
-  // Agrupa técnicas por família para o dropdown
   const techsByFamily = useMemo(() => {
-    const groups = {};
+    const g = {};
     filteredTechs.forEach(t => {
-      const fam = t.family || 'outros';
-      if (!groups[fam]) groups[fam] = [];
-      groups[fam].push(t);
+      const f = t.family || 'outros';
+      if (!g[f]) g[f] = [];
+      g[f].push(t);
     });
-    return groups;
+    return g;
   }, [filteredTechs]);
 
-  // ── Schemas da técnica selecionada ─────────────────────────────────────────
-  const inSchema  = selectedTech ? parseJson(selectedTech.input_schema, {}) : {};
-  const outSchema = selectedTech ? parseJson(selectedTech.output_schema, {}) : {};
-  const paramSchema = selectedTech ? parseJson(selectedTech.parameter_schema, {}) : {};
+  const iSchema = selectedTech ? pj(selectedTech.input_schema, {}) : {};
+  const oSchema = selectedTech ? pj(selectedTech.output_schema, {}) : {};
+  const pSchema = selectedTech ? pj(selectedTech.parameter_schema, {}) : {};
 
-  // ── CSS do workspace (classic overrides) ──────────────────────────────────
-  const isClassic = theme === 'classic';
-
-  // ─── Render ─────────────────────────────────────────────────────────────────
-
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      height: '100%', overflow: 'hidden',
-      background: 'var(--bg-base)',
-      fontFamily: 'var(--font-sans)',
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: cl ? '#d4d0c8' : 'var(--bg-base)', fontFamily: 'var(--font-sans)' }}>
 
-      {/* ── Toolbar estilo MATLAB ─────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.5rem',
-        padding: '0.45rem 0.875rem',
-        background: isClassic ? '#d4d0c8' : 'var(--bg-surface)',
-        borderBottom: isClassic ? '2px solid #aca899' : '1px solid var(--border)',
-        flexShrink: 0,
-        boxShadow: isClassic ? 'inset 0 -1px 0 #fff' : 'none',
-      }}>
-        {/* Logo/title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginRight: '0.5rem' }}>
-          <Table2 size={15} style={{ color: 'var(--accent)' }} />
-          <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', letterSpacing: isClassic ? 0 : '-0.01em' }}>
+      {/* ════════════════ TOOLBAR ════════════════ */}
+      <div style={s.toolbar}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginRight: 4 }}>
+          <Table2 size={14} style={{ color: cl ? '#0a5fa8' : 'var(--accent)' }} />
+          <span style={{ fontWeight: 700, fontSize: cl ? '0.82rem' : '0.83rem', color: cl ? '#1a1a1a' : 'var(--text-primary)', letterSpacing: cl ? 0 : '-0.01em' }}>
             Workspace
           </span>
         </div>
 
-        <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 0.25rem' }} />
+        <div style={s.sep} />
 
         {/* Import */}
-        <button
-          style={S.btn('default')}
-          onClick={() => setShowImport(true)}
-          title="Importar nova variável"
-        >
-          <Plus size={12} /> Importar
+        <button style={s.tbBtn()} onClick={() => setShowImport(true)} title="Importar variável (Ctrl+I)">
+          <FolderOpen size={12} /> Importar
         </button>
 
         {/* Refresh */}
-        <button
-          style={{ ...S.btnIcon, opacity: loadingVars ? 0.5 : 1 }}
-          onClick={loadVars}
-          title="Recarregar variáveis"
-        >
-          <RefreshCw size={13} style={{ animation: loadingVars ? 'spin 1s linear infinite' : 'none' }} />
+        <button style={s.tbBtn()} onClick={loadVars} title="Atualizar workspace">
+          <RefreshCw size={12} style={{ animation: loadingVars ? 'spin 0.9s linear infinite' : 'none' }} />
+          {!cl && 'Atualizar'}
         </button>
 
-        {/* Spacer */}
+        <div style={s.sep} />
+
+        {/* Clear all */}
+        <button style={s.tbBtn()} onClick={async () => {
+          if (!variables.length) return;
+          if (!window.confirm(`Remover todas as ${variables.length} variáveis do workspace?`)) return;
+          for (const v of variables) {
+            try { await client.delete(`/datasets/${v.uuid}`); } catch { /* ignora */ }
+          }
+          setVariables([]); setSelectedVar(null);
+          addHist({ cmd: 'clear all', status: 'ok' });
+        }}>
+          <Trash2 size={12} /> Clear All
+        </button>
+
         <div style={{ flex: 1 }} />
 
-        {/* Indicator quando rodando */}
+        {/* Running indicator */}
         {runningOp && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warning)', animation: 'pulse 1.2s infinite' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: cl ? '#666' : 'var(--text-muted)' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.1s infinite' }} />
             Executando…
           </div>
         )}
+        <div style={{ width: 4 }} />
 
-        {/* Tag de tema */}
-        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', padding: '0.2rem 0.5rem', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)' }}>
-          {theme}
-        </span>
+        {/* Var count badge */}
+        <div style={{ fontSize: '0.68rem', color: cl ? '#666' : 'var(--text-muted)', padding: '2px 8px', background: cl ? 'rgba(0,0,0,0.08)' : 'var(--bg-hover)', borderRadius: cl ? 2 : 'var(--radius-sm)', border: cl ? '1px solid #bbb' : 'none' }}>
+          {variables.length} variável{variables.length !== 1 ? 'is' : ''}
+        </div>
       </div>
 
-      {/* ── Body: 3 painéis ──────────────────────────────────────────────────────── */}
+      {/* ════════════════ BODY ════════════════ */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
-        {/* ── Painel esquerdo: Variable Browser ────────────────────────────────── */}
+        {/* ──── Painel esquerdo: Workspace Browser ──── */}
         <div style={{
-          width: 270, flexShrink: 0,
-          borderRight: `1px solid var(--border)`,
+          width: 300, flexShrink: 0,
+          borderRight: cl ? '1px solid #aca899' : '1px solid var(--border)',
           display: 'flex', flexDirection: 'column',
-          background: 'var(--bg-surface)',
-          overflow: 'hidden',
+          background: cl ? '#f0eeea' : 'var(--bg-surface)',
         }}>
           {/* Header */}
-          <div style={{
-            ...S.panelHeader,
-            background: isClassic ? '#d4d0c8' : 'var(--bg-surface)',
-            borderBottom: isClassic ? '1px solid #aca899' : '1px solid var(--border)',
-          }}>
+          <div style={s.panelHdr}>
             <Layers size={11} />
             WORKSPACE
-            <span style={{ marginLeft: 'auto', fontWeight: 400, opacity: 0.6 }}>{variables.length} var</span>
           </div>
 
-          {/* Search */}
-          <div style={{ padding: '0.375rem 0.5rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.5rem' }}>
+          {/* Search bar */}
+          <div style={{
+            padding: '4px 6px',
+            background: cl ? '#e8e4dc' : 'var(--bg-surface)',
+            borderBottom: cl ? '1px solid #bbb' : '1px solid var(--border)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: cl ? '#fff' : 'var(--bg-base)', border: cl ? '1px inset #aaa' : '1px solid var(--border)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: '2px 6px', boxShadow: cl ? 'inset 0 1px 2px rgba(0,0,0,0.1)' : 'none' }}>
               <Search size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
               <input
-                style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.75rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
-                placeholder="filtrar..."
+                style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.76rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+                placeholder="filtrar variáveis…"
                 value={varFilter}
                 onChange={e => setVarFilter(e.target.value)}
               />
@@ -812,199 +883,223 @@ export default function WorkspacePage() {
           </div>
 
           {/* Table */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ flex: 1, overflowY: 'auto', background: cl ? '#fff' : 'transparent' }}>
+            <table style={s.tbl}>
               <thead>
-                <tr style={{
-                  background: isClassic ? '#4a90d9' : 'var(--bg-elevated)',
-                  position: 'sticky', top: 0, zIndex: 1,
-                }}>
-                  {['Nome', 'Tamanho', 'Tipo', 'Valor', ''].map((h, i) => (
-                    <th key={i} style={{
-                      padding: i === 0 ? '0.3rem 0.4rem 0.3rem 0.75rem' : '0.3rem 0.4rem',
-                      fontSize: '0.65rem', fontWeight: 700,
-                      color: isClassic ? '#fff' : 'var(--text-muted)',
-                      textAlign: 'left', letterSpacing: '0.04em',
-                      borderBottom: `1px solid ${isClassic ? '#357abd' : 'var(--border)'}`,
-                      whiteSpace: 'nowrap',
-                    }}>
+                <tr style={s.tblHead}>
+                  {['Name', 'Value', 'Size', 'Bytes', 'Class', ''].map((h, i) => (
+                    <th key={i} style={{ ...s.tblTh(i), cursor: ['Name','Size','Class'].includes(h) ? 'pointer' : 'default' }}
+                      onClick={() => {
+                        if (h === 'Name') setVarSort('name');
+                        if (h === 'Size') setVarSort('size');
+                        if (h === 'Class') setVarSort('class');
+                      }}>
                       {h}
+                      {(h === 'Name' && varSort === 'name') || (h === 'Size' && varSort === 'size')
+                        ? ' ▴' : ''}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loadingVars && (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Carregando…</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Carregando…</td></tr>
                 )}
                 {!loadingVars && filteredVars.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '1.25rem 0.75rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '1.5rem 0.75rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                      <div style={{ marginBottom: 6 }}>
+                        <Table2 size={20} style={{ opacity: 0.3 }} />
+                      </div>
                       Workspace vazio.<br />
-                      <span style={{ fontSize: '0.68rem' }}>Clique em <b>Importar</b> para adicionar variáveis.</span>
+                      <span style={{ fontSize: '0.68rem' }}>Use <b>Importar</b> para adicionar variáveis.</span>
                     </td>
                   </tr>
                 )}
-                {filteredVars.map(v => (
-                  <VarRow
-                    key={v.uuid}
-                    v={v}
-                    selected={selectedVar?.uuid === v.uuid}
-                    onClick={() => {
-                      setSelectedVar(v);
-                      setActivePanel(selectedTech ? 'operation' : 'preview');
-                    }}
-                    onDelete={() => deleteVar(v)}
-                  />
-                ))}
+                {filteredVars.map((v) => {
+                  const dims = pj(v.dimensions, []);
+                  const preview = tensorPreview(v.metadata);
+                  const sel = selectedVar?.uuid === v.uuid;
+                  return (
+                    <tr key={v.uuid}
+                      style={s.varRow(sel)}
+                      onClick={() => { setSelectedVar(v); if (!selectedTech) setActivePanel('editor'); }}
+                      onDoubleClick={() => { setSelectedVar(v); setActivePanel('editor'); }}
+                      onMouseEnter={e => { if (!sel) e.currentTarget.style.background = cl ? '#e8f0fb' : 'var(--bg-card-hover)'; }}
+                      onMouseLeave={e => { if (!sel) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <td style={s.varTd(0, sel)}>{v.name}</td>
+                      <td style={{ ...s.varTd(1, sel), color: cl ? '#444' : 'var(--text-muted)' }}>{preview || '—'}</td>
+                      <td style={s.varTd(2, sel)}>{fmtSizeMat(dims)}</td>
+                      <td style={s.varTd(3, sel)}>{fmtBytes(dims)}</td>
+                      <td style={s.varTd(4, sel)}>{fmtClass(v.data_type)}</td>
+                      <td style={{ padding: '2px 4px', textAlign: 'right' }}>
+                        <button
+                          onClick={e => { e.stopPropagation(); deleteVar(v); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px 3px', borderRadius: 2, opacity: 0.4, color: 'var(--text-muted)' }}
+                          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--danger)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.opacity = '0.4'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                          title="Remover"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* ── Painel central: Operação / Preview ──────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        {/* ──── Painel central: Operação / Variable Editor ──── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, background: cl ? '#f5f5f5' : 'var(--bg-base)' }}>
 
-          {/* Sub-tabs */}
+          {/* Sub-tabs (MATLAB-style panel tabs) */}
           <div style={{
             display: 'flex', alignItems: 'center',
-            padding: '0 0.75rem',
-            background: isClassic ? '#d4d0c8' : 'var(--bg-surface)',
-            borderBottom: '1px solid var(--border)',
-            flexShrink: 0, gap: 0,
+            background: cl ? '#d4d0c8' : 'var(--bg-surface)',
+            borderBottom: cl ? '1px solid #aca899' : '1px solid var(--border)',
+            flexShrink: 0,
+            paddingLeft: 4,
+            gap: 0,
           }}>
             {[
-              { id: 'operation', label: 'Operação', icon: Play },
-              { id: 'preview', label: 'Preview', icon: Eye },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActivePanel(tab.id)}
-                style={{
-                  ...S.btn('default'),
-                  border: 'none', borderBottom: activePanel === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
-                  borderRadius: 0,
-                  background: 'none',
-                  color: activePanel === tab.id ? 'var(--text-accent)' : 'var(--text-muted)',
-                  fontWeight: activePanel === tab.id ? 600 : 400,
-                  padding: '0.5rem 0.75rem',
-                }}
-              >
-                <tab.icon size={11} />{tab.label}
-              </button>
-            ))}
+              { id: 'operation', label: 'Operação' },
+              { id: 'editor', label: selectedVar ? `${selectedVar.name} ×` : 'Variable Editor' },
+            ].map((tab) => {
+              const active = activePanel === tab.id;
+              return (
+                <button key={tab.id} onClick={() => setActivePanel(tab.id)} style={{
+                  padding: cl ? '4px 14px' : '0.42rem 1rem',
+                  fontSize: cl ? '0.78rem' : '0.76rem',
+                  fontWeight: active ? (cl ? 700 : 600) : 400,
+                  background: active
+                    ? (cl ? '#f5f5f5' : 'var(--bg-base)')
+                    : 'transparent',
+                  border: cl ? `1px solid ${active ? '#aca899' : 'transparent'}` : 'none',
+                  borderBottom: cl
+                    ? (active ? '1px solid #f5f5f5' : '1px solid #aca899')
+                    : `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+                  borderRadius: cl ? '3px 3px 0 0' : 0,
+                  color: active ? (cl ? '#1a1a1a' : 'var(--text-primary)') : (cl ? '#555' : 'var(--text-muted)'),
+                  cursor: 'pointer',
+                  marginBottom: cl ? -1 : 0,
+                  fontFamily: cl ? 'var(--font-sans)' : 'inherit',
+                }}>
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Content */}
-          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
-            {/* ── Preview ─────────────────────────────────────────────────────── */}
-            {activePanel === 'preview' && (
-              <div>
+            {/* Variable Editor */}
+            {activePanel === 'editor' && (
+              <div style={{ flex: 1, overflow: 'auto', background: cl ? '#fff' : 'var(--bg-elevated)' }}>
                 {selectedVar
-                  ? <VariablePreview variable={selectedVar} />
-                  : <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                      Selecione uma variável no painel esquerdo.
+                  ? <VarEditor variable={selectedVar} s={s} theme={theme} />
+                  : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: 8 }}>
+                      <Table2 size={28} style={{ opacity: 0.2 }} />
+                      <span style={{ fontSize: '0.78rem' }}>Selecione ou dê duplo-clique em uma variável para inspecionar.</span>
                     </div>
+                  )
                 }
               </div>
             )}
 
-            {/* ── Operação ────────────────────────────────────────────────────── */}
+            {/* Operation panel */}
             {activePanel === 'operation' && (
-              <div style={{ padding: '0.875rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: cl ? '12px 14px' : '0.875rem 1rem', display: 'flex', flexDirection: 'column', gap: cl ? 12 : 16 }}>
 
                 {/* Técnica */}
                 <div ref={techDropRef} style={{ position: 'relative' }}>
-                  <label style={S.label}>Técnica / Função</label>
+                  <label style={s.label}>Técnica / Função</label>
                   <button
                     onClick={() => setTechDropOpen(v => !v)}
                     style={{
-                      ...S.select, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '0.375rem 0.5rem', cursor: 'pointer',
-                      fontFamily: 'var(--font-sans)',
+                      ...s.select,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-sans)',
                     }}
                   >
-                    <span style={{ color: selectedTech ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                      {selectedTech ? `${selectedTech.slug} — ${selectedTech.name}` : 'Selecione uma técnica…'}
+                    <span style={{ color: selectedTech ? (cl ? '#1a1a1a' : 'var(--text-primary)') : 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: cl ? '0.8rem' : '0.78rem' }}>
+                      {selectedTech ? `${selectedTech.slug}` : '— selecionar função —'}
                     </span>
-                    <ChevronDown size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    {selectedTech && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 8, fontFamily: 'var(--font-sans)' }}>
+                        {selectedTech.name}
+                      </span>
+                    )}
+                    <ChevronDown size={12} style={{ color: 'var(--text-muted)', flexShrink: 0, marginLeft: 4 }} />
                   </button>
 
                   {techDropOpen && (
                     <div style={{
                       position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 99,
-                      background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-lg)',
-                      maxHeight: 320, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                      background: cl ? '#fff' : 'var(--bg-elevated)',
+                      border: cl ? '1px solid #aaa' : '1px solid var(--border)',
+                      borderRadius: cl ? 1 : 'var(--radius-sm)',
+                      boxShadow: 'var(--shadow-lg)',
+                      maxHeight: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column',
                     }}>
-                      <div style={{ padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <div style={{ padding: '4px 6px', borderBottom: cl ? '1px solid #ddd' : '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <Search size={11} style={{ color: 'var(--text-muted)' }} />
-                        <input
-                          autoFocus
+                        <input autoFocus
                           style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.78rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
-                          placeholder="buscar técnica…"
+                          placeholder="buscar…"
                           value={techFilter}
-                          onChange={e => setTechFilter(e.target.value)}
-                        />
+                          onChange={e => setTechFilter(e.target.value)} />
                       </div>
                       <div style={{ overflowY: 'auto' }}>
                         {Object.entries(techsByFamily).map(([fam, techs]) => (
                           <div key={fam}>
-                            <div style={{ padding: '0.35rem 0.65rem', fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', background: 'var(--bg-base)', position: 'sticky', top: 0 }}>
+                            <div style={{ padding: '3px 8px', fontSize: '0.62rem', fontWeight: 700, color: cl ? '#fff' : 'var(--text-muted)', letterSpacing: '0.07em', background: cl ? '#4a7fbf' : 'var(--bg-base)', position: 'sticky', top: 0 }}>
                               {fam.replace(/^\d+_/, '').toUpperCase()}
                             </div>
                             {techs.map(t => (
-                              <button
-                                key={t.uuid}
+                              <button key={t.uuid}
                                 onClick={() => { setSelectedTech(t); setTechDropOpen(false); setTechFilter(''); setActivePanel('operation'); }}
                                 style={{
                                   width: '100%', textAlign: 'left',
-                                  padding: '0.35rem 0.875rem',
-                                  background: selectedTech?.uuid === t.uuid ? 'var(--bg-hover)' : 'none',
+                                  padding: cl ? '3px 12px' : '4px 10px',
+                                  background: selectedTech?.uuid === t.uuid ? (cl ? '#c2d8f0' : 'var(--bg-hover)') : 'none',
                                   border: 'none', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'baseline', gap: '0.5rem',
-                                  transition: 'background 0.1s',
-                                }}
-                                onMouseEnter={e => { if (selectedTech?.uuid !== t.uuid) e.currentTarget.style.background = 'var(--bg-card-hover)'; }}
-                                onMouseLeave={e => { if (selectedTech?.uuid !== t.uuid) e.currentTarget.style.background = 'none'; }}
-                              >
-                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-accent)', flexShrink: 0 }}>{t.slug}</span>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                                  display: 'flex', alignItems: 'baseline', gap: 8,
+                                }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: cl ? '#003880' : 'var(--text-accent)', flexShrink: 0 }}>{t.slug}</span>
+                                <span style={{ fontSize: '0.71rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
                               </button>
                             ))}
                           </div>
                         ))}
                         {!filteredTechs.length && (
-                          <p style={{ padding: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhuma técnica encontrada.</p>
+                          <p style={{ padding: '10px', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhuma função encontrada.</p>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Inputs */}
-                {selectedTech && Object.keys(inSchema).length > 0 && (
+                {/* Entradas */}
+                {selectedTech && Object.keys(iSchema).length > 0 && (
                   <div>
-                    <label style={{ ...S.label, marginBottom: '0.5rem' }}>Entradas</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {Object.entries(inSchema).map(([key, def]) => (
-                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-accent)', fontWeight: 600, minWidth: 40 }}>{key}</span>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{def.type}</span>
-                          <select
-                            style={{ ...S.select, flex: 1 }}
+                    <label style={s.label}>Entradas</label>
+                    <div style={{ background: cl ? '#fff' : 'var(--bg-card)', border: cl ? '1px solid #ccc' : '1px solid var(--border)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: cl ? '8px' : '0.625rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {Object.entries(iSchema).map(([key, def]) => (
+                        <div key={key} style={{ display: 'grid', gridTemplateColumns: '50px 60px 1fr', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: cl ? '#003880' : 'var(--text-accent)', fontWeight: 700 }}>{key}</span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{def.type}</span>
+                          <select style={s.select}
                             value={inputBindings[key] || ''}
-                            onChange={e => setInputBindings(b => ({ ...b, [key]: e.target.value }))}
-                          >
-                            <option value="">— selecionar variável —</option>
+                            onChange={e => setInputBindings(b => ({ ...b, [key]: e.target.value }))}>
+                            <option value="">— variável —</option>
                             {variables.map(v => {
-                              const dims = parseJson(v.dimensions, []);
-                              return (
-                                <option key={v.uuid} value={v.uuid}>
-                                  {v.name} [{fmtDims(dims)} {fmtType(v.data_type)}]
-                                </option>
-                              );
+                              const dims = pj(v.dimensions, []);
+                              return <option key={v.uuid} value={v.uuid}>{v.name}  [{fmtSizeMat(dims)} {fmtClass(v.data_type)}]</option>;
                             })}
                           </select>
                         </div>
@@ -1014,125 +1109,127 @@ export default function WorkspacePage() {
                 )}
 
                 {/* Parâmetros */}
-                {selectedTech && Object.keys(paramSchema).length > 0 && (
+                {selectedTech && Object.keys(pSchema).length > 0 && (
                   <div>
-                    <label style={{ ...S.label, marginBottom: '0.5rem' }}>Parâmetros</label>
-                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '0.625rem 0.75rem' }}>
-                      <ParamEditor schema={paramSchema} values={params} onChange={setParams} />
+                    <label style={s.label}>Parâmetros</label>
+                    <div style={{ background: cl ? '#fff' : 'var(--bg-card)', border: cl ? '1px solid #ccc' : '1px solid var(--border)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: cl ? '8px' : '0.625rem' }}>
+                      <ParamEditor schema={pSchema} values={params} onChange={setParams} s={s} />
                     </div>
                   </div>
                 )}
 
                 {/* Saídas */}
-                {selectedTech && Object.keys(outSchema).length > 0 && (
+                {selectedTech && Object.keys(oSchema).length > 0 && (
                   <div>
-                    <label style={{ ...S.label, marginBottom: '0.5rem' }}>Nome(s) da(s) saída(s)</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      {Object.keys(outSchema).map(k => (
-                        <div key={k} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)', minWidth: 60 }}>{k} =</span>
-                          <input
-                            style={{ ...S.input, flex: 1 }}
-                            placeholder={`nome_variavel`}
+                    <label style={s.label}>Salvar saída como</label>
+                    <div style={{ background: cl ? '#fff' : 'var(--bg-card)', border: cl ? '1px solid #ccc' : '1px solid var(--border)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: cl ? '8px' : '0.625rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {Object.keys(oSchema).map(k => (
+                        <div key={k} style={{ display: 'grid', gridTemplateColumns: '60px 1fr', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{k} =</span>
+                          <input style={s.input} placeholder="nome_variavel"
                             value={outputNames[k] || ''}
-                            onChange={e => setOutputNames(o => ({ ...o, [k]: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') }))}
-                          />
+                            onChange={e => setOutputNames(o => ({ ...o, [k]: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') }))} />
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Run button */}
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', paddingTop: '0.25rem', borderTop: '1px solid var(--border)' }}>
-                  <button
-                    style={{
-                      ...S.btn('primary'),
-                      opacity: (!selectedTech || !!runningOp) ? 0.5 : 1,
-                      fontSize: '0.825rem',
-                      padding: '0.45rem 1.25rem',
-                    }}
-                    onClick={runOperation}
-                    disabled={!selectedTech || !!runningOp}
-                  >
-                    <Play size={13} />
-                    {runningOp ? 'Executando…' : 'Executar'}
+                {/* Botão run */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', paddingTop: 6, borderTop: cl ? '1px solid #ccc' : '1px solid var(--border)' }}>
+                  <button style={s.btnPrimary(!selectedTech || !!runningOp)} onClick={runOperation} disabled={!selectedTech || !!runningOp}>
+                    <Play size={12} />
+                    {runningOp ? 'Executando…' : 'Executar  ▶'}
                   </button>
                   {selectedTech && (
-                    <button style={S.btn()} onClick={() => { setSelectedTech(null); setParams({}); setInputBindings({}); }}>
+                    <button style={s.btnSecondary} onClick={() => { setSelectedTech(null); setParams({}); setInputBindings({}); }}>
                       <X size={11} /> Limpar
                     </button>
                   )}
                   {!selectedTech && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Selecione uma técnica e configure as entradas para executar.
+                    <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
+                      Selecione uma função e configure as entradas.
                     </span>
                   )}
                 </div>
 
+                {/* Hint: double-click on variable */}
+                {!selectedTech && (
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Eye size={11} /> Dê duplo-clique em uma variável para abrir o Variable Editor.
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* ── Console (history) ─────────────────────────────────────────────── */}
-          <div style={{
-            height: 150, flexShrink: 0,
-            borderTop: `1px solid ${isClassic ? '#aca899' : 'var(--border)'}`,
-            background: isClassic ? '#1e1e1e' : '#0d1117',
-            display: 'flex', flexDirection: 'column',
-          }}>
-            {/* Console header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.3rem 0.75rem',
-              background: isClassic ? '#2d2d2d' : '#161b22',
-              borderBottom: `1px solid ${isClassic ? '#444' : '#21262d'}`,
-              flexShrink: 0,
-            }}>
-              <Terminal size={11} style={{ color: '#8b949e' }} />
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#8b949e', letterSpacing: '0.08em' }}>COMMAND WINDOW</span>
-              <button
-                onClick={() => setHistory([])}
-                style={{ marginLeft: 'auto', fontSize: '0.62rem', color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                limpar
-              </button>
+          {/* ──── Command Window ──── */}
+          <div style={{ height: 155, flexShrink: 0, ...s.console, display: 'flex', flexDirection: 'column', borderTop: cl ? '1px solid #555' : '1px solid var(--border)' }}>
+            <div style={s.consoleHdr}>
+              <Terminal size={11} style={{ color: cl ? '#a8a8a8' : '#8b949e' }} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: cl ? '#a8a8a8' : '#8b949e', letterSpacing: '0.08em' }}>COMMAND WINDOW</span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => setHistory([])} style={{ fontSize: '0.62rem', color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>limpar</button>
             </div>
-
-            {/* Console body */}
-            <div ref={consoleRef} style={{ flex: 1, overflowY: 'auto', padding: '0.375rem 0.75rem' }}>
+            <div ref={consoleRef} style={{ flex: 1, overflowY: 'auto', padding: '3px 10px 4px' }}>
               {history.length === 0 && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: '#555', padding: '0.25rem 0' }}>
-                  % TcheLab Workspace — pronto
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: '#555', padding: '2px 0', lineHeight: 1.5 }}>
+                  % TcheLab Workspace {new Date().getFullYear()} — {theme} theme
                 </div>
               )}
-              {history.map(e => <ConsoleLine key={e.id} entry={e} />)}
-              {/* Cursor */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.15rem 0' }}>
-                <span style={{ color: '#555', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>&gt;&gt;</span>
-                <span style={{ display: 'inline-block', width: 7, height: 13, background: '#4b8eed', animation: 'blink 1.1s step-end infinite' }} />
+              {history.map(e => <ConsoleLine key={e.id} e={e} s={s} />)}
+              {/* Blinking cursor */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0' }}>
+                <span style={{ ...s.consolePrompt, fontFamily: 'var(--font-mono)', fontSize: '0.73rem' }}>&gt;&gt;</span>
+                <span style={{ display: 'inline-block', width: 7, height: 13, background: cl ? '#e8a020' : '#7ee787', animation: 'blink 1.1s step-end infinite' }} />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Modal import ─────────────────────────────────────────────────────── */}
+      {/* Status bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        padding: cl ? '1px 8px' : '2px 10px',
+        background: cl ? '#d4d0c8' : 'var(--bg-surface)',
+        borderTop: cl ? '1px solid #aca899' : '1px solid var(--border)',
+        flexShrink: 0,
+        fontSize: '0.68rem',
+        color: cl ? '#666' : 'var(--text-muted)',
+        gap: 12,
+        fontFamily: cl ? 'var(--font-sans)' : 'inherit',
+      }}>
+        <span>TcheLab Workspace</span>
+        <span style={{ color: cl ? '#bbb' : 'var(--border)' }}>|</span>
+        {selectedVar ? (
+          <>
+            <span>Selecionado: <b style={{ color: cl ? '#003880' : 'var(--text-accent)', fontFamily: 'var(--font-mono)' }}>{selectedVar.name}</b></span>
+            <span style={{ color: cl ? '#bbb' : 'var(--border)' }}>|</span>
+            <span>{fmtSizeMat(pj(selectedVar.dimensions, []))} {fmtClass(selectedVar.data_type)}</span>
+          </>
+        ) : <span>Nenhuma variável selecionada</span>}
+        <div style={{ flex: 1 }} />
+        <span>{theme === 'classic' ? 'Classic' : theme === 'dark' ? 'Dark' : 'Light'}</span>
+      </div>
+
+      {/* Import modal */}
       {showImport && (
         <ImportModal
+          s={s} theme={theme}
           onClose={() => setShowImport(false)}
           onImported={(name) => {
             loadVars();
-            addHistory({ cmd: `${name} = importdata(...)`, status: 'ok', info: 'importado' });
+            addHist({ cmd: `${name} = importdata(...)`, status: 'ok', info: 'importado' });
           }}
         />
       )}
 
-      {/* ── CSS keyframes ─────────────────────────────────────────────────────── */}
+      {/* Keyframes */}
       <style>{`
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-        @keyframes spin  { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes spin   { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.35} }
       `}</style>
     </div>
   );
