@@ -20,6 +20,9 @@ const DatasetVizPage     = lazy(() => import('./pages/DatasetVizPage'));
 const CommunitiesPage    = lazy(() => import('./pages/CommunitiesPage'));
 const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
 const QuizPage           = lazy(() => import('./pages/QuizPage'));
+const EquipmentPage      = lazy(() => import('./pages/EquipmentPage'));
+const PublicEquipmentPage = lazy(() => import('./pages/public/PublicEquipmentPage'));
+const PublicBookingPage  = lazy(() => import('./pages/public/PublicBookingPage'));
 const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
 const WorkflowEditorPage = lazy(() => import('./pages/WorkflowEditorPage'));
 const CatalogPage        = lazy(() => import('./pages/CatalogPage'));
@@ -93,6 +96,10 @@ export default function App() {
           <PublicRoute><LoginPage /></PublicRoute>
         } />
 
+        {/* Páginas públicas do agendador (QR Code): sem login e fora do shell */}
+        <Route path="/e/:token" element={<PublicEquipmentPage />} />
+        <Route path="/e/:token/b/:mt" element={<PublicBookingPage />} />
+
         {/* Shell da aplicação — AppLayout é estático, nunca suspende */}
         <Route path="/" element={
           <ProtectedRoute><AppLayout /></ProtectedRoute>
@@ -106,6 +113,7 @@ export default function App() {
           <Route path="communities" element={<CommunitiesPage />} />
           <Route path="communities/:id" element={<CommunityDetailPage />} />
           <Route path="communities/:id/quizzes/:qid" element={<QuizPage />} />
+          <Route path="communities/:id/equipment/:eid" element={<EquipmentPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="workflows/:id" element={<WorkflowEditorPage />} />
           <Route path="catalogo" element={<CatalogPage />} />

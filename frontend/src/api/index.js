@@ -13,6 +13,39 @@ const del   = (url)         => client.delete(url);
 
 export const api = {
 
+  // ── Equipamentos (agendador) ──────────────────────────────────────────────
+  equipment: {
+    list:            (cid)            => get(`/communities/${cid}/equipment`),
+    create:          (cid, d)         => post(`/communities/${cid}/equipment`, d),
+    get:             (cid, eid)       => get(`/communities/${cid}/equipment/${eid}`),
+    update:          (cid, eid, d)    => put(`/communities/${cid}/equipment/${eid}`, d),
+    remove:          (cid, eid)       => del(`/communities/${cid}/equipment/${eid}`),
+    rotateToken:     (cid, eid)       => post(`/communities/${cid}/equipment/${eid}/public-token`, {}),
+    imageBlob:       (cid, eid)       => client.get(`/communities/${cid}/equipment/${eid}/image`, { responseType: 'blob' }),
+    uploadImage:     (cid, eid, fd)   => client.post(`/communities/${cid}/equipment/${eid}/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    deleteImage:     (cid, eid)       => del(`/communities/${cid}/equipment/${eid}/image`),
+    saveWindows:     (cid, eid, w)    => put(`/communities/${cid}/equipment/${eid}/windows`, { windows: w }),
+    blocks:          (cid, eid)       => get(`/communities/${cid}/equipment/${eid}/blocks`),
+    createBlock:     (cid, eid, d)    => post(`/communities/${cid}/equipment/${eid}/blocks`, d),
+    deleteBlock:     (cid, eid, bid)  => del(`/communities/${cid}/equipment/${eid}/blocks/${bid}`),
+    availability:    (cid, eid, from, to) => get(`/communities/${cid}/equipment/${eid}/availability`, { from, to }),
+    bookings:        (cid, eid, p)    => get(`/communities/${cid}/equipment/${eid}/bookings`, p),
+    mine:            (cid)            => get(`/communities/${cid}/equipment/bookings/mine`),
+    book:            (cid, eid, d)    => post(`/communities/${cid}/equipment/${eid}/bookings`, d),
+    act:             (cid, eid, bid, action, note) => post(`/communities/${cid}/equipment/${eid}/bookings/${bid}/${action}`, { note }),
+  },
+
+  // ── Página pública de equipamento (sem login) ─────────────────────────────
+  publicEquipment: {
+    get:             (token)          => get(`/public/equipment/${token}`),
+    imageUrl:        (token, v)       => `${client.defaults.baseURL}/public/equipment/${token}/image${v ? `?v=${v}` : ''}`,
+    availability:    (token, from, to) => get(`/public/equipment/${token}/availability`, { from, to }),
+    book:            (token, d)       => post(`/public/equipment/${token}/bookings`, d),
+    booking:         (mt)             => get(`/public/bookings/${mt}`),
+    confirm:         (mt)             => post(`/public/bookings/${mt}/confirm`),
+    cancel:          (mt)             => post(`/public/bookings/${mt}/cancel`),
+  },
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   auth: {
     login:           (d)       => post('/auth/login', d),

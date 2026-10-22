@@ -104,6 +104,19 @@ const inviteLimiter = rateLimit({
 app.use('/api/v1/communities/join', inviteLimiter);
 app.use('/api/v1/communities/invite', inviteLimiter);
 
+// Páginas públicas (sem login): leitura moderada e criação de reservas bem restrita, por IP.
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false,
+  message: { data: null, meta: null, error: { code: 'RATE_LIMIT', message: 'Muitas requisições. Tente novamente em alguns minutos.' } },
+});
+const publicBookingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 12, standardHeaders: true, legacyHeaders: false, skipFailedRequests: false,
+  message: { data: null, meta: null, error: { code: 'RATE_LIMIT', message: 'Muitos pedidos de reserva a partir desta rede. Tente mais tarde.' } },
+});
+app.use('/api/v1/public/', publicLimiter);
+app.post('/api/v1/public/equipment/:token/bookings', publicBookingLimiter);
+app.use('/api/v1/public/bookings/', rateLimit({ windowMs: 15 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false, message: { data: null, meta: null, error: { code: 'RATE_LIMIT', message: 'Muitas tentativas.' } } }));
+
 // ─── API routes ──────────────────────────────────────────────────────────────
 app.use('/api/v1', apiRouter);
 

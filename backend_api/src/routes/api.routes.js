@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
-const { datasetUpload, pdfUpload } = require('../utils/multer');
+const { datasetUpload, pdfUpload, equipmentImageUpload } = require('../utils/multer');
 
 // Controllers
 const authCtrl            = require('../controllers/auth.controller');
@@ -54,6 +54,8 @@ router.delete('/users/:id',             authenticate, userCtrl.deleteUser);
 // ─── COMMUNITIES ───────────────────────────────────────────────────────────────
 // Papéis: owner > admin > moderator > member (ver community.controller.js)
 const quizCtrl = require('../controllers/quiz.controller');
+const equipmentCtrl = require('../controllers/equipment.controller');
+const publicEquipmentCtrl = require('../controllers/publicEquipment.controller');
 const cg = communityCtrl.guard;
 router.get   ('/communities',                                   authenticate, communityCtrl.listMyCommunities);
 router.get   ('/communities/public',                            authenticate, communityCtrl.listPublicCommunities);
@@ -115,6 +117,35 @@ router.get   ('/communities/:id/quizzes/:qid/submissions',       authenticate, c
 router.get   ('/communities/:id/quizzes/:qid/submissions/:sid',  authenticate, cg('moderator'), quizCtrl.getSubmission);
 router.put   ('/communities/:id/quizzes/:qid/submissions/:sid/grade',  authenticate, cg('moderator'), quizCtrl.gradeSubmission);
 router.post  ('/communities/:id/quizzes/:qid/submissions/:sid/reopen', authenticate, cg('moderator'), quizCtrl.reopenSubmission);
+
+// ─── Equipamentos (agendador) ───────────────────────────────────────────────
+router.get   ('/communities/:id/equipment',                          authenticate, cg('member'),    equipmentCtrl.listEquipment);
+router.post  ('/communities/:id/equipment',                          authenticate, cg('moderator'), equipmentCtrl.createEquipment);
+router.get   ('/communities/:id/equipment/bookings/mine',            authenticate, cg('member'),    equipmentCtrl.myBookings);
+router.get   ('/communities/:id/equipment/:eid',                     authenticate, cg('member'),    equipmentCtrl.getEquipment);
+router.put   ('/communities/:id/equipment/:eid',                     authenticate, cg('moderator'), equipmentCtrl.updateEquipment);
+router.delete('/communities/:id/equipment/:eid',                     authenticate, cg('moderator'), equipmentCtrl.deleteEquipment);
+router.post  ('/communities/:id/equipment/:eid/public-token',        authenticate, cg('moderator'), equipmentCtrl.rotateToken);
+router.get   ('/communities/:id/equipment/:eid/image',               authenticate, cg('member'),    equipmentCtrl.getImage);
+router.post  ('/communities/:id/equipment/:eid/image',               authenticate, cg('moderator'), equipmentImageUpload.single('image'), equipmentCtrl.uploadImage);
+router.delete('/communities/:id/equipment/:eid/image',               authenticate, cg('moderator'), equipmentCtrl.deleteImage);
+router.put   ('/communities/:id/equipment/:eid/windows',             authenticate, cg('moderator'), equipmentCtrl.saveWindows);
+router.get   ('/communities/:id/equipment/:eid/blocks',              authenticate, cg('moderator'), equipmentCtrl.listBlocks);
+router.post  ('/communities/:id/equipment/:eid/blocks',              authenticate, cg('moderator'), equipmentCtrl.createBlock);
+router.delete('/communities/:id/equipment/:eid/blocks/:bid',         authenticate, cg('moderator'), equipmentCtrl.deleteBlock);
+router.get   ('/communities/:id/equipment/:eid/availability',        authenticate, cg('member'),    equipmentCtrl.availability);
+router.get   ('/communities/:id/equipment/:eid/bookings',            authenticate, cg('member'),    equipmentCtrl.listBookings);
+router.post  ('/communities/:id/equipment/:eid/bookings',            authenticate, cg('member'),    equipmentCtrl.createBooking);
+router.post  ('/communities/:id/equipment/:eid/bookings/:bid/:action', authenticate, cg('member'),  equipmentCtrl.bookingAction);
+
+// Página pública do equipamento (SEM login; limitadores próprios em server.js)
+router.get   ('/public/equipment/:token',                            publicEquipmentCtrl.getPublic);
+router.get   ('/public/equipment/:token/image',                      publicEquipmentCtrl.getImage);
+router.get   ('/public/equipment/:token/availability',               publicEquipmentCtrl.availability);
+router.post  ('/public/equipment/:token/bookings',                   publicEquipmentCtrl.createGuestBooking);
+router.get   ('/public/bookings/:mt',                                publicEquipmentCtrl.getManaged);
+router.post  ('/public/bookings/:mt/confirm',                        publicEquipmentCtrl.confirmManaged);
+router.post  ('/public/bookings/:mt/cancel',                         publicEquipmentCtrl.cancelManaged);
 
 router.get   ('/communities/:id/messages',                      authenticate, cg('member'),    communityCtrl.listMessages);
 router.post  ('/communities/:id/messages',                      authenticate, cg('member'),    communityCtrl.sendMessage);

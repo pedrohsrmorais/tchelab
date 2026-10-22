@@ -75,4 +75,18 @@ const communityUpload = multer({
   },
 });
 
-module.exports = { datasetUpload, pdfUpload, avatarUpload, communityUpload };
+// Foto de equipamento: só JPEG/PNG/WebP (sem SVG, que poderia carregar script), até 5 MB.
+const EQUIPMENT_EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' };
+const equipmentImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, storage.equipment),
+    filename: (_req, file, cb) => cb(null, `eq-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${EQUIPMENT_EXT[file.mimetype] || '.bin'}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter(_req, file, cb) {
+    if (!EQUIPMENT_EXT[file.mimetype]) return cb(new Error('Use uma imagem JPEG, PNG ou WebP.'));
+    return cb(null, true);
+  },
+});
+
+module.exports = { datasetUpload, pdfUpload, avatarUpload, communityUpload, equipmentImageUpload };

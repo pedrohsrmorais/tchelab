@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Users, MessageSquare, FolderOpen, Plus, Send, BookOpen, Link2, FileText, File as FileIcon,
   Trash2, Eye, EyeOff, Pencil, Copy, KeyRound, Settings, LogOut, Globe, Lock, Download, ExternalLink,
-  Crown, Ban, X, GitBranch, Database, ChevronUp, ChevronDown, Presentation, FileSpreadsheet, Image as ImageIcon, Upload, FolderPlus, ChevronRight, ClipboardList, LayoutGrid, Sparkles,
+  Crown, Ban, X, GitBranch, Database, ChevronUp, ChevronDown, Presentation, FileSpreadsheet, Image as ImageIcon, Upload, FolderPlus, ChevronRight, ClipboardList, LayoutGrid, Sparkles, CalendarClock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,7 @@ import { RoleBadge } from './CommunitiesPage';
 import { AccessPicker } from './ProjectDetailPage';
 import PreviewModal from '../components/community/PreviewModal';
 import { StatusBadge, SubStatusBadge } from './QuizPage';
+import EquipmentSection, { EquipmentCreateModal } from '../components/equipment/EquipmentSection';
 
 const arr = (x) => (Array.isArray(x) ? x : []);
 const lbl = { color: 'var(--text-secondary)' };
@@ -61,6 +62,7 @@ export default function CommunityDetailPage() {
   const [itemModal, setItemModal] = useState(null);       // {sectionId, type?}
   const [sectionModal, setSectionModal] = useState(null); // {section?, parent?}
   const [quizModal, setQuizModal] = useState(null);       // {sectionId}
+  const [equipmentModal, setEquipmentModal] = useState(false);
 
   const { data: community, loading, error, refetch } = useApi(() => api.communities.get(id), [id]);
   const perms = community?.permissions || {};
@@ -149,7 +151,7 @@ export default function CommunityDetailPage() {
       {activeTab === 'apps' && (
         <AppsTab id={id} data={content} perms={perms}
           onAddItem={(type) => setItemModal({ sectionId: '', type })} onAddTopic={() => setSectionModal({ parent: null })}
-          onAddQuiz={() => setQuizModal({ sectionId: '' })} onLinkProject={() => setItemModal({ sectionId: '', type: 'project' })} />
+          onAddQuiz={() => setQuizModal({ sectionId: '' })} onAddEquipment={() => setEquipmentModal(true)} onLinkProject={() => setItemModal({ sectionId: '', type: 'project' })} />
       )}
       {activeTab === 'projects' && (
         <ProjectsTab id={id} list={projectList} perms={perms} isMember={isMember} me={me} run={run} reload={refetchProjects} onLink={() => setModal('link')} />
@@ -166,6 +168,7 @@ export default function CommunityDetailPage() {
 
       <SectionModal state={sectionModal} onClose={() => setSectionModal(null)} id={id} sections={flattenSections(content?.sections)} reload={refetchContent} />
       <ItemModal state={itemModal} onClose={() => setItemModal(null)} id={id} sections={flattenSections(content?.sections)} reload={async () => { await refetchContent(); await refetchProjects(); await refetch(); }} />
+      <EquipmentCreateModal open={equipmentModal} onClose={() => setEquipmentModal(false)} id={id} />
       <QuizModal state={quizModal} onClose={() => setQuizModal(null)} id={id} sections={flattenSections(content?.sections)} />
 
       <LinkProjectModal open={modal === 'link'} onClose={() => setModal(null)} id={id} linked={projectList}
@@ -843,7 +846,7 @@ function AppCard({ icon: Icon, color, title, desc, onClick, disabled, testid }) 
   );
 }
 
-function AppsTab({ id, data, perms, onAddItem, onAddTopic, onAddQuiz }) {
+function AppsTab({ id, data, perms, onAddItem, onAddTopic, onAddQuiz, onAddEquipment }) {
   const { t } = useTranslation();
   const canEdit = !!perms.can_moderate;
   const { data: quizzes } = useApi(() => api.quizzes.list(id), [id, data]);
@@ -855,6 +858,7 @@ function AppsTab({ id, data, perms, onAddItem, onAddTopic, onAddQuiz }) {
           <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={muted}>{t('communities.appsCreate')}</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <AppCard testid="app-quiz" icon={ClipboardList} color="text-pink-400" title={t('quiz.appTitle')} desc={t('quiz.appDesc')} onClick={onAddQuiz} />
+            <AppCard testid="app-equipment" icon={CalendarClock} color="text-teal-400" title={t('equipment.appTitle')} desc={t('equipment.appDesc')} onClick={onAddEquipment} />
             <AppCard testid="app-file" icon={Presentation} color="text-orange-400" title={t('communities.appFileTitle')} desc={t('communities.appFileDesc')} onClick={() => onAddItem('file')} />
             <AppCard testid="app-workflow" icon={GitBranch} color="text-purple-400" title={t('communities.appWorkflowTitle')} desc={t('communities.appWorkflowDesc')} onClick={() => onAddItem('workflow')} />
             <AppCard testid="app-dataset" icon={Database} color="text-cyan-400" title={t('communities.appDatasetTitle')} desc={t('communities.appDatasetDesc')} onClick={() => onAddItem('dataset')} />
@@ -893,6 +897,7 @@ function AppsTab({ id, data, perms, onAddItem, onAddTopic, onAddQuiz }) {
           </ul>
         )}
       </section>
+      <EquipmentSection id={id} canEdit={canEdit} onAdd={onAddEquipment} refreshKey={data} />
     </div>
   );
 }

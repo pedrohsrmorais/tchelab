@@ -147,6 +147,105 @@ const TABLES = [
       CONSTRAINT \`fk_quiz_section\` FOREIGN KEY (\`section_id\`) REFERENCES \`community_sections\` (\`id\`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
 
+  // ── Equipamentos (agendador) ────────────────────────────────────────────
+  ['equipment', `
+    CREATE TABLE IF NOT EXISTS \`equipment\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`community_id\` bigint unsigned NOT NULL,
+      \`name\` varchar(150) ${COLLATE} NOT NULL,
+      \`description\` text ${COLLATE},
+      \`location\` varchar(200) ${COLLATE} DEFAULT NULL,
+      \`responsible_id\` bigint unsigned DEFAULT NULL,
+      \`specs\` json DEFAULT NULL,
+      \`image_path\` varchar(255) ${COLLATE} DEFAULT NULL,
+      \`status\` enum('active','maintenance','archived') ${COLLATE} NOT NULL DEFAULT 'active',
+      \`timezone\` varchar(64) ${COLLATE} NOT NULL DEFAULT 'America/Sao_Paulo',
+      \`slot_minutes\` int NOT NULL DEFAULT 30,
+      \`min_minutes\` int NOT NULL DEFAULT 30,
+      \`max_minutes\` int NOT NULL DEFAULT 240,
+      \`min_notice_minutes\` int NOT NULL DEFAULT 60,
+      \`max_advance_days\` int NOT NULL DEFAULT 30,
+      \`cancel_until_minutes\` int NOT NULL DEFAULT 0,
+      \`member_approval\` enum('auto','manual') ${COLLATE} NOT NULL DEFAULT 'auto',
+      \`guest_approval\` enum('auto','manual') ${COLLATE} NOT NULL DEFAULT 'manual',
+      \`access\` enum('community','public') ${COLLATE} NOT NULL DEFAULT 'community',
+      \`public_token\` varchar(64) ${COLLATE} DEFAULT NULL,
+      \`created_by\` bigint unsigned DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_equipment_uuid\` (\`uuid\`),
+      UNIQUE KEY \`uq_equipment_token\` (\`public_token\`),
+      KEY \`idx_equipment_community\` (\`community_id\`,\`status\`),
+      CONSTRAINT \`fk_equipment_community\` FOREIGN KEY (\`community_id\`) REFERENCES \`communities\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['equipment_windows', `
+    CREATE TABLE IF NOT EXISTS \`equipment_windows\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`equipment_id\` bigint unsigned NOT NULL,
+      \`weekday\` tinyint NOT NULL,
+      \`start_time\` time NOT NULL,
+      \`end_time\` time NOT NULL,
+      \`audience\` enum('members','public') ${COLLATE} NOT NULL DEFAULT 'members',
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_window_equipment\` (\`equipment_id\`),
+      CONSTRAINT \`fk_window_equipment\` FOREIGN KEY (\`equipment_id\`) REFERENCES \`equipment\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['equipment_blocks', `
+    CREATE TABLE IF NOT EXISTS \`equipment_blocks\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`equipment_id\` bigint unsigned NOT NULL,
+      \`start_at\` datetime NOT NULL,
+      \`end_at\` datetime NOT NULL,
+      \`reason\` varchar(200) ${COLLATE} DEFAULT NULL,
+      \`show_reason\` tinyint(1) NOT NULL DEFAULT 0,
+      \`repeat_until\` date DEFAULT NULL,
+      \`created_by\` bigint unsigned DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_block_uuid\` (\`uuid\`),
+      KEY \`idx_block_equipment\` (\`equipment_id\`,\`start_at\`),
+      CONSTRAINT \`fk_block_equipment\` FOREIGN KEY (\`equipment_id\`) REFERENCES \`equipment\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['equipment_bookings', `
+    CREATE TABLE IF NOT EXISTS \`equipment_bookings\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`equipment_id\` bigint unsigned NOT NULL,
+      \`start_at\` datetime NOT NULL,
+      \`end_at\` datetime NOT NULL,
+      \`status\` enum('awaiting_email','pending','confirmed','rejected','cancelled','no_show') ${COLLATE} NOT NULL DEFAULT 'pending',
+      \`source\` enum('member','public') ${COLLATE} NOT NULL DEFAULT 'member',
+      \`user_id\` bigint unsigned DEFAULT NULL,
+      \`guest_name\` varchar(120) ${COLLATE} DEFAULT NULL,
+      \`guest_email\` varchar(190) ${COLLATE} DEFAULT NULL,
+      \`guest_phone\` varchar(40) ${COLLATE} DEFAULT NULL,
+      \`guest_institution\` varchar(160) ${COLLATE} DEFAULT NULL,
+      \`guest_lang\` varchar(5) ${COLLATE} DEFAULT NULL,
+      \`purpose\` varchar(500) ${COLLATE} DEFAULT NULL,
+      \`project_note\` varchar(300) ${COLLATE} DEFAULT NULL,
+      \`manage_token_hash\` char(64) ${COLLATE} DEFAULT NULL,
+      \`hold_expires_at\` datetime DEFAULT NULL,
+      \`created_ip\` varchar(64) ${COLLATE} DEFAULT NULL,
+      \`decided_by\` bigint unsigned DEFAULT NULL,
+      \`decided_at\` datetime DEFAULT NULL,
+      \`decision_note\` varchar(300) ${COLLATE} DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_booking_uuid\` (\`uuid\`),
+      UNIQUE KEY \`uq_booking_manage\` (\`manage_token_hash\`),
+      KEY \`idx_booking_equipment\` (\`equipment_id\`,\`start_at\`,\`end_at\`),
+      KEY \`idx_booking_user\` (\`user_id\`,\`start_at\`),
+      KEY \`idx_booking_email\` (\`guest_email\`),
+      CONSTRAINT \`fk_booking_equipment\` FOREIGN KEY (\`equipment_id\`) REFERENCES \`equipment\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
   ['quiz_questions', `
     CREATE TABLE IF NOT EXISTS \`quiz_questions\` (
       \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
