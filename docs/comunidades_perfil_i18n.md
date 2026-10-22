@@ -105,8 +105,9 @@ Dentro de **Conteúdo**, o professor monta a aula em tópicos. *Adicionar materi
   opcional `SOFFICE_BIN` aponta para o executável. Se o `soffice` não existir ou a conversão falhar, o item fica com
   `preview_status = failed` e a tela oferece apenas o download — nada quebra. A lista recarrega sozinha enquanto houver
   conversão pendente (`preview_status = pending`).
+- Tópicos aceitam `parent` (até 3 níveis) e `GET …/content` traz também `quizzes` por tópico.
 - API nova: `PUT /communities/:id/items-order`, `GET …/items/:iid/file?preview=1`, `POST /datasets/:id/copy`;
   `POST /communities/:id/items` aceita `type = workflow|dataset` com `ref` (uuid) e `access`.
 - Tabela `community_items`: colunas `ref_id`, `access`, `preview_path`, `preview_status`.
 
-Arquitetura dos próximos sub-apps (quizzes/exercícios): `docs/comunidade_subapps_quizzes.md`.
+Subtópicos, aba **Apps**, pré-visualização e **quizzes**: `docs/comunidade_subapps_quizzes.md`.

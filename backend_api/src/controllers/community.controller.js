@@ -747,6 +747,63 @@ async function sectionRow(communityId, uuid) {
   return rows[0] || null;
 }
 
+const MAX_SECTION_DEPTH = 3; // Parte > Aula > Subaula
+
+/** Cadeia de ancestrais (do pai para cima) de uma seção. */
+async function sectionAncestors(sec) {
+  const chain = [];
+  let cur = sec;
+  while (cur && cur.parent_id && chain.length < 10) {
+    const [rows] = await db.query('SELECT * FROM community_sections WHERE id = ?', [cur.parent_id]);
+    cur = rows[0];
+    if (cur) chain.push(cur);
+  }
+  return chain;
+}
+
+/** Ids de todos os descendentes de uma seção. */
+async function sectionDescendants(id) {
+  const out = [];
+  let frontier = [id];
+  for (let d = 0; d < 10 && frontier.length; d += 1) {
+    const [rows] = await db.query('SELECT id FROM community_sections WHERE parent_id IN (?)', [frontier]);
+    frontier = rows.map((r) => r.id);
+    out.push(...frontier);
+  }
+  return out;
+}
+
+/** Altura da subárvore (1 = sem filhos). */
+async function subtreeHeight(id) {
+  let h = 1; let frontier = [id];
+  for (let d = 0; d < 10; d += 1) {
+    const [rows] = await db.query('SELECT id FROM community_sections WHERE parent_id IN (?)', [frontier]);
+    if (!rows.length) break;
+    h += 1; frontier = rows.map((r) => r.id);
+  }
+  return h;
+}
+
+/** Um tópico só é visível a membros comuns se ele e todos os ancestrais forem visíveis. */
+async function sectionVisibleTo(sec) {
+  if (!sec) return false;
+  if (!sec.is_visible) return false;
+  return (await sectionAncestors(sec)).every((a) => a.is_visible);
+}
+
+/** Resolve `parent` (uuid|null) validando existência, profundidade e ciclos. `selfSec` = tópico sendo movido. */
+async function resolveParent(communityId, parentUuid, selfSec) {
+  if (!parentUuid) return { id: null };
+  const parent = await sectionRow(communityId, String(parentUuid));
+  if (!parent) return { error: 'Tópico pai não encontrado.' };
+  const chain = await sectionAncestors(parent);
+  if (selfSec && (parent.id === selfSec.id || chain.some((a) => a.id === selfSec.id))) return { error: 'Um tópico não pode ficar dentro de si mesmo.' };
+  const depthOfParent = chain.length + 1;
+  const height = selfSec ? await subtreeHeight(selfSec.id) : 1;
+  if (depthOfParent + height > MAX_SECTION_DEPTH) return { error: `No máximo ${MAX_SECTION_DEPTH} níveis de tópicos.` };
+  return { id: parent.id };
+}
+
 /** Linha do banco -> item da API (referências a workflow/variável viram `ref`). */
 function shapeItem(row) {
   const { section_id, is_visible, wf_uuid, wf_name, ds_uuid, ds_name, ds_dimensions, ...it } = row;
@@ -765,11 +822,15 @@ function shapeItem(row) {
 async function getContent(req, res) {
   try {
     const canSeeHidden = rankOf(req.cRole) >= RANK.moderator;
-    const [sections] = await db.query(
-      `SELECT id, uuid, title, description, position, is_visible, created_at
-         FROM community_sections WHERE community_id = ? ${canSeeHidden ? '' : 'AND is_visible = 1'}
-        ORDER BY position, id`, [req.community.id],
+    const [allSections] = await db.query(
+      `SELECT id, uuid, parent_id, title, description, position, is_visible, created_at
+         FROM community_sections WHERE community_id = ? ORDER BY position, id`, [req.community.id],
     );
+    // visibilidade efetiva: o tópico e todos os ancestrais precisam estar visíveis
+    const byId = new Map(allSections.map((x) => [x.id, x]));
+    const effVisible = (x) => { let c = x; let n = 0; while (c && n < 10) { if (!c.is_visible) return false; c = c.parent_id ? byId.get(c.parent_id) : null; n += 1; } return true; };
+    const sections = canSeeHidden ? allSections : allSections.filter(effVisible);
+    const visibleIds = new Set(sections.map((x) => x.id));
     const [items] = await db.query(
       `SELECT i.uuid, i.section_id, i.type, i.title, i.description, i.url, i.file_name, i.file_mime, i.file_size,
               i.position, i.is_visible, i.created_at, i.access, i.preview_status, u.name AS created_by_name,
@@ -789,14 +850,25 @@ async function getContent(req, res) {
          JOIN users ou ON ou.id = p.user_id
         WHERE cp.community_id = ? ORDER BY cp.position, cp.shared_at`, [req.community.id],
     );
+    const [quizzes] = await db.query(
+      `SELECT q.uuid, q.section_id, q.title, q.description, q.status, q.due_at, q.show_results, q.position, q.created_at,
+              (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.id) AS question_count,
+              (SELECT COUNT(*) FROM quiz_submissions WHERE quiz_id = q.id AND status <> 'in_progress') AS submission_count,
+              (SELECT status FROM quiz_submissions WHERE quiz_id = q.id AND user_id = ?) AS my_status
+         FROM quizzes q WHERE q.community_id = ? ${canSeeHidden ? '' : "AND q.status <> 'draft'"}
+        ORDER BY q.position, q.id`, [req.user.id, req.community.id],
+    );
 
     const bySection = (sid) => ({
       items: items.filter((i) => i.section_id === sid).map(shapeItem),
       projects: projects.filter((p) => p.section_id === sid).map(({ section_id, ...p }) => p),
+      quizzes: quizzes.filter((q) => q.section_id === sid).map(({ section_id, ...q }) => q),
     });
+    const parentUuid = (x) => (x.parent_id && byId.get(x.parent_id) ? byId.get(x.parent_id).uuid : null);
     return R.ok(res, {
-      sections: sections.map((s) => ({
-        uuid: s.uuid, title: s.title, description: s.description, position: s.position,
+      // lista plana; `parent` (uuid) monta a árvore. Mantém a ordem por position entre irmãos.
+      sections: sections.filter((x) => visibleIds.has(x.id)).map((s) => ({
+        uuid: s.uuid, parent: parentUuid(s), title: s.title, description: s.description, position: s.position,
         is_visible: !!s.is_visible, ...bySection(s.id),
       })),
       general: bySection(null),
@@ -807,20 +879,22 @@ async function getContent(req, res) {
 // POST /communities/:id/sections  { title, description? }
 async function createSection(req, res) {
   try {
-    const { title, description } = req.body || {};
+    const { title, description, parent } = req.body || {};
     const t = String(title || '').trim();
     if (!t) return R.unprocessable(res, [{ field: 'title', message: 'Obrigatório.' }]);
     if (t.length > 255) return R.unprocessable(res, [{ field: 'title', message: 'Máximo 255 caracteres.' }]);
+    const par = await resolveParent(req.community.id, parent, null);
+    if (par.error) return R.unprocessable(res, [{ field: 'parent', message: par.error }]);
     const [[{ next }]] = await db.query(
-      'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM community_sections WHERE community_id = ?', [req.community.id],
+      'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM community_sections WHERE community_id = ? AND parent_id <=> ?', [req.community.id, par.id],
     );
     const uuid = uuidv4();
     await db.query(
-      `INSERT INTO community_sections (uuid, community_id, title, description, position, created_by)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [uuid, req.community.id, t, description ? String(description).slice(0, 5000) : null, next, req.user.id],
+      `INSERT INTO community_sections (uuid, community_id, parent_id, title, description, position, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [uuid, req.community.id, par.id, t, description ? String(description).slice(0, 5000) : null, next, req.user.id],
     );
-    return R.created(res, { uuid, title: t, description: description || null, position: next, is_visible: true, items: [], projects: [] });
+    return R.created(res, { uuid, parent: parent || null, title: t, description: description || null, position: next, is_visible: true, items: [], projects: [], quizzes: [] });
   } catch (err) { return R.serverError(res, err); }
 }
 
@@ -829,14 +903,27 @@ async function updateSection(req, res) {
   try {
     const s = await sectionRow(req.community.id, req.params.sid);
     if (!s) return R.notFound(res, 'Tópico');
-    const { title, description, is_visible } = req.body || {};
+    const { title, description, is_visible, parent } = req.body || {};
     if (title !== undefined && !String(title).trim()) return R.unprocessable(res, [{ field: 'title', message: 'Obrigatório.' }]);
+    let parentId = s.parent_id; let position = s.position;
+    if (parent !== undefined) {
+      const par = await resolveParent(req.community.id, parent, s);
+      if (par.error) return R.unprocessable(res, [{ field: 'parent', message: par.error }]);
+      if ((par.id || null) !== (s.parent_id || null)) {
+        parentId = par.id;
+        const [[{ next }]] = await db.query(
+          'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM community_sections WHERE community_id = ? AND parent_id <=> ?', [req.community.id, par.id],
+        );
+        position = next;
+      }
+    }
     await db.query(
-      'UPDATE community_sections SET title = ?, description = ?, is_visible = ? WHERE id = ?',
+      'UPDATE community_sections SET title = ?, description = ?, is_visible = ?, parent_id = ?, position = ? WHERE id = ?',
       [
         title !== undefined ? String(title).trim().slice(0, 255) : s.title,
         description !== undefined ? (description ? String(description).slice(0, 5000) : null) : s.description,
         is_visible !== undefined ? (is_visible ? 1 : 0) : s.is_visible,
+        parentId, position,
         s.id,
       ],
     );
@@ -861,10 +948,12 @@ async function deleteSection(req, res) {
   try {
     const s = await sectionRow(req.community.id, req.params.sid);
     if (!s) return R.notFound(res, 'Tópico');
-    const [files] = await db.query('SELECT file_path, preview_path FROM community_items WHERE section_id = ? AND file_path IS NOT NULL', [s.id]);
-    // Projetos do tópico voltam para "geral" (o vínculo é preservado).
-    await db.query('UPDATE community_projects SET section_id = NULL WHERE section_id = ?', [s.id]);
-    await db.query('DELETE FROM community_sections WHERE id = ?', [s.id]);
+    const ids = [s.id, ...(await sectionDescendants(s.id))];
+    const [files] = await db.query('SELECT file_path, preview_path FROM community_items WHERE section_id IN (?) AND file_path IS NOT NULL', [ids]);
+    // Projetos do tópico (e dos subtópicos) voltam para "geral" (o vínculo é preservado).
+    await db.query('UPDATE community_projects SET section_id = NULL WHERE section_id IN (?)', [ids]);
+    // filhos primeiro (itens e quizzes saem por cascata)
+    await db.query('DELETE FROM community_sections WHERE id IN (?) ORDER BY id DESC', [ids]);
     files.forEach((f) => { removeStoredFile(f.file_path); removeStoredFile(f.preview_path); });
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
@@ -1055,8 +1144,8 @@ async function downloadItemFile(req, res) {
       // item oculto, ou dentro de um tópico oculto, não é servido a membros comuns
       let hidden = !it.is_visible;
       if (!hidden && it.section_id) {
-        const [[sec]] = await db.query('SELECT is_visible FROM community_sections WHERE id = ?', [it.section_id]);
-        hidden = !sec || !sec.is_visible;
+        const [[sec]] = await db.query('SELECT * FROM community_sections WHERE id = ?', [it.section_id]);
+        hidden = !(await sectionVisibleTo(sec));
       }
       if (hidden) return R.notFound(res, 'Arquivo');
     }

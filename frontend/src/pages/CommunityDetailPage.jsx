@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Users, MessageSquare, FolderOpen, Plus, Send, BookOpen, Link2, FileText, File as FileIcon,
   Trash2, Eye, EyeOff, Pencil, Copy, KeyRound, Settings, LogOut, Globe, Lock, Download, ExternalLink,
-  Crown, Ban, X, GitBranch, Database, ChevronUp, ChevronDown, Presentation, FileSpreadsheet, Image as ImageIcon, Upload,
+  Crown, Ban, X, GitBranch, Database, ChevronUp, ChevronDown, Presentation, FileSpreadsheet, Image as ImageIcon, Upload, FolderPlus, ChevronRight, ClipboardList, LayoutGrid, Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -19,10 +19,21 @@ import Modal from '../components/ui/Modal';
 import Avatar from '../components/ui/Avatar';
 import { RoleBadge } from './CommunitiesPage';
 import { AccessPicker } from './ProjectDetailPage';
+import PreviewModal from '../components/community/PreviewModal';
+import { StatusBadge, SubStatusBadge } from './QuizPage';
 
 const arr = (x) => (Array.isArray(x) ? x : []);
 const lbl = { color: 'var(--text-secondary)' };
 const muted = { color: 'var(--text-muted)' };
+
+/** Lista plana de tópicos (com `parent`) -> ordem de árvore com `depth` (para selects e para a UI). */
+function flattenSections(list) {
+  const secs = arr(list); const out = [];
+  const walk = (parent, depth) => secs.filter(x => (x.parent || null) === parent).forEach(x => { out.push({ ...x, depth }); walk(x.uuid, depth + 1); });
+  walk(null, 0);
+  return out;
+}
+const indent = (depth) => '\u2003'.repeat(depth || 0) + (depth ? '↳ ' : '');
 
 function Tab({ active, onClick, icon: Icon, children, count }) {
   return (
@@ -47,6 +58,9 @@ export default function CommunityDetailPage() {
   const [tab, setTab] = useState('content');
   const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [itemModal, setItemModal] = useState(null);       // {sectionId, type?}
+  const [sectionModal, setSectionModal] = useState(null); // {section?, parent?}
+  const [quizModal, setQuizModal] = useState(null);       // {sectionId}
 
   const { data: community, loading, error, refetch } = useApi(() => api.communities.get(id), [id]);
   const perms = community?.permissions || {};
@@ -75,6 +89,7 @@ export default function CommunityDetailPage() {
 
   const tabs = [
     isMember && { key: 'content', icon: BookOpen, label: t('communities.tabContent') },
+    isMember && { key: 'apps', icon: LayoutGrid, label: t('communities.tabApps') },
     { key: 'projects', icon: FolderOpen, label: t('communities.tabProjects'), count: projectList.length },
     isMember && { key: 'members', icon: Users, label: t('communities.members'), count: arr(members).length },
     isMember && { key: 'chat', icon: MessageSquare, label: t('communities.tabChat') },
@@ -127,7 +142,14 @@ export default function CommunityDetailPage() {
       </div>
 
       {activeTab === 'content' && (
-        <ContentTab id={id} data={content} perms={perms} run={run} reload={refetchContent} onLink={() => setModal('link')} />
+        <ContentTab id={id} data={content} perms={perms} run={run} reload={refetchContent} onLink={() => setModal('link')}
+          onAddItem={(sectionId, type) => setItemModal({ sectionId, type })} onAddTopic={(parent) => setSectionModal({ parent })}
+          onEditTopic={(section) => setSectionModal({ section })} onAddQuiz={(sectionId) => setQuizModal({ sectionId })} />
+      )}
+      {activeTab === 'apps' && (
+        <AppsTab id={id} data={content} perms={perms}
+          onAddItem={(type) => setItemModal({ sectionId: '', type })} onAddTopic={() => setSectionModal({ parent: null })}
+          onAddQuiz={() => setQuizModal({ sectionId: '' })} onLinkProject={() => setItemModal({ sectionId: '', type: 'project' })} />
       )}
       {activeTab === 'projects' && (
         <ProjectsTab id={id} list={projectList} perms={perms} isMember={isMember} me={me} run={run} reload={refetchProjects} onLink={() => setModal('link')} />
@@ -142,8 +164,12 @@ export default function CommunityDetailPage() {
           onDeleted={() => navigate('/communities')} onTransferred={async () => { await refetch(); await refetchMembers(); }} />
       )}
 
+      <SectionModal state={sectionModal} onClose={() => setSectionModal(null)} id={id} sections={flattenSections(content?.sections)} reload={refetchContent} />
+      <ItemModal state={itemModal} onClose={() => setItemModal(null)} id={id} sections={flattenSections(content?.sections)} reload={async () => { await refetchContent(); await refetchProjects(); await refetch(); }} />
+      <QuizModal state={quizModal} onClose={() => setQuizModal(null)} id={id} sections={flattenSections(content?.sections)} />
+
       <LinkProjectModal open={modal === 'link'} onClose={() => setModal(null)} id={id} linked={projectList}
-        sections={arr(content?.sections)} onDone={async () => { setModal(null); await refreshAll(); }} />
+        sections={flattenSections(content?.sections)} onDone={async () => { setModal(null); await refreshAll(); }} />
 
       <Modal open={modal === 'leave'} onClose={() => setModal(null)} title={t('communities.leave')} size="sm">
         <p className="mb-6" style={lbl}>{t('communities.leaveConfirm', { name: c.name })}</p>
@@ -187,16 +213,17 @@ const moveInList = (list, i, dir) => {
   return out;
 };
 
-function ContentTab({ id, data, perms, run, reload, onLink }) {
+function ContentTab({ id, data, perms, run, reload, onAddItem, onAddTopic, onEditTopic, onAddQuiz }) {
   const { t } = useTranslation();
-  const [sectionModal, setSectionModal] = useState(null); // {section?}
-  const [itemModal, setItemModal] = useState(null);       // {sectionId}
   const [editModal, setEditModal] = useState(null);       // item
   const [viewer, setViewer] = useState(null);             // {uuid} | {text}
+  const [preview, setPreview] = useState(null);           // {kind, uuid, name}
+  const [collapsed, setCollapsed] = useState(() => new Set());
   const canEdit = !!perms.can_moderate;
   const sections = arr(data?.sections);
-  const general = data?.general || { items: [], projects: [] };
-  const empty = !sections.length && !arr(general.items).length && !arr(general.projects).length;
+  const flat = flattenSections(sections);
+  const general = data?.general || { items: [], projects: [], quizzes: [] };
+  const empty = !sections.length && !arr(general.items).length && !arr(general.projects).length && !arr(general.quizzes).length;
 
   const allItems = [...arr(general.items), ...sections.flatMap(s => arr(s.items))];
   const viewerItem = viewer?.uuid ? allItems.find(i => i.uuid === viewer.uuid) : null;
@@ -209,47 +236,56 @@ function ContentTab({ id, data, perms, run, reload, onLink }) {
     return () => clearTimeout(timer);
   }, [hasPending, data]); // eslint-disable-line
 
-  const moveTopic = (i, dir) => run(() => api.communities.reorderSections(id, moveInList(sections, i, dir).map(s => s.uuid)), null, reload);
+  const toggle = (uuid) => setCollapsed(prev => { const n = new Set(prev); if (n.has(uuid)) n.delete(uuid); else n.add(uuid); return n; });
+  const siblingsOf = (s) => sections.filter(x => (x.parent || null) === (s.parent || null));
+  const moveTopic = (s, dir) => run(() => api.communities.reorderSections(id, moveInList(siblingsOf(s), siblingsOf(s).findIndex(x => x.uuid === s.uuid), dir).map(x => x.uuid)), null, reload);
   const moveItem = (topic, i, dir) => run(
     () => api.communities.reorderItems(id, topic.uuid || null, moveInList(arr(topic.items), i, dir).map(x => x.uuid)), null, reload);
 
-  const cardProps = { canEdit, id, run, reload, onOpen: setViewer, onEditItem: setEditModal };
+  const cardProps = { canEdit, id, run, reload, onOpen: setViewer, onEditItem: setEditModal, onPreview: setPreview, onAddItem, onAddTopic, onEditTopic, onAddQuiz };
+  const renderTopic = (s) => {
+    const sib = siblingsOf(s); const i = sib.findIndex(x => x.uuid === s.uuid);
+    const kids = sections.filter(x => x.parent === s.uuid);
+    return (
+      <TopicCard key={s.uuid} {...cardProps} topic={s} depth={s.depth}
+        collapsed={collapsed.has(s.uuid)} onToggle={() => toggle(s.uuid)}
+        onMoveTopic={(d) => moveTopic(s, d)} canUp={i > 0} canDown={i < sib.length - 1}
+        onMoveItem={(j, d) => moveItem(s, j, d)}>
+        {kids.map(k => renderTopic({ ...k, depth: s.depth + 1 }))}
+      </TopicCard>
+    );
+  };
+
   return (
     <div className="space-y-5">
       {canEdit && (
         <div className="flex flex-wrap gap-2 justify-end">
-          <button className="btn-primary text-sm py-1.5 flex items-center gap-1.5" onClick={() => setSectionModal({})}><Plus className="w-3.5 h-3.5" /> {t('communities.addTopic')}</button>
-          <button className="btn-ghost text-sm py-1.5 flex items-center gap-1.5" onClick={() => setItemModal({ sectionId: '' })}><Plus className="w-3.5 h-3.5" /> {t('communities.addItem')}</button>
+          <button className="btn-primary text-sm py-1.5 flex items-center gap-1.5" onClick={() => onAddTopic(null)}><Plus className="w-3.5 h-3.5" /> {t('communities.addTopic')}</button>
+          <button className="btn-ghost text-sm py-1.5 flex items-center gap-1.5" onClick={() => onAddItem('', undefined)}><Plus className="w-3.5 h-3.5" /> {t('communities.addItem')}</button>
+          <button className="btn-ghost text-sm py-1.5 flex items-center gap-1.5" onClick={() => onAddQuiz('')}><ClipboardList className="w-3.5 h-3.5" /> {t('quiz.newQuiz')}</button>
         </div>
       )}
       {empty && (
         <EmptyState icon={BookOpen} title={t('communities.contentEmptyTitle')} description={canEdit ? t('communities.contentEmptyDescEdit') : t('communities.contentEmptyDesc')}
-          action={canEdit ? <button className="btn-primary text-sm flex items-center gap-1.5" onClick={() => setSectionModal({})}><Plus className="w-3.5 h-3.5" /> {t('communities.addTopic')}</button> : undefined} />
+          action={canEdit ? <button className="btn-primary text-sm flex items-center gap-1.5" onClick={() => onAddTopic(null)}><Plus className="w-3.5 h-3.5" /> {t('communities.addTopic')}</button> : undefined} />
       )}
 
-      {(arr(general.items).length > 0 || arr(general.projects).length > 0) && (
-        <TopicCard {...cardProps} topic={{ title: t('communities.generalTopic'), description: null, items: general.items, projects: general.projects }}
-          onMoveItem={(i, d) => moveItem({ uuid: null, items: general.items }, i, d)}
-          onAdd={() => setItemModal({ sectionId: '' })} />
+      {(arr(general.items).length > 0 || arr(general.projects).length > 0 || arr(general.quizzes).length > 0) && (
+        <TopicCard {...cardProps} topic={{ title: t('communities.generalTopic'), description: null, items: general.items, projects: general.projects, quizzes: general.quizzes }} depth={0}
+          onMoveItem={(i, d) => moveItem({ uuid: null, items: general.items }, i, d)} />
       )}
-      {sections.map((s, i) => (
-        <TopicCard key={s.uuid} {...cardProps} topic={s}
-          onEdit={() => setSectionModal({ section: s })} onAdd={() => setItemModal({ sectionId: s.uuid })}
-          onMoveTopic={(d) => moveTopic(i, d)} canUp={i > 0} canDown={i < sections.length - 1}
-          onMoveItem={(j, d) => moveItem(s, j, d)} />
-      ))}
+      {flat.filter(s => s.depth === 0).map(renderTopic)}
 
-      <SectionModal state={sectionModal} onClose={() => setSectionModal(null)} id={id} reload={reload} />
-      <ItemModal state={itemModal} onClose={() => setItemModal(null)} id={id} sections={sections} reload={reload} />
-      <EditItemModal item={editModal} onClose={() => setEditModal(null)} id={id} sections={sections} general={general} reload={reload} />
+      <EditItemModal item={editModal} onClose={() => setEditModal(null)} id={id} sections={flat} reload={reload} />
       <FileViewer state={viewer} item={viewerItem} onClose={() => setViewer(null)} id={id} />
+      <PreviewModal target={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
 
 const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
-function ItemRow({ it, idx, total, canEdit, id, run, reload, onOpen, onEditItem, onMoveItem }) {
+function ItemRow({ it, idx, total, canEdit, id, run, reload, onOpen, onEditItem, onMoveItem, onPreview }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -303,6 +339,7 @@ function ItemRow({ it, idx, total, canEdit, id, run, reload, onOpen, onEditItem,
         </div>
         {!gone && (it.type === 'workflow' || it.type === 'dataset') && (
           <div className="flex flex-wrap gap-2 mt-2">
+            <button type="button" className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1.5" onClick={() => onPreview({ kind: it.type, uuid: it.ref.uuid, name: it.title })}><Eye className="w-3 h-3" /> {t('quiz.preview')}</button>
             <Link to={it.type === 'workflow' ? `/workflows/${it.ref.uuid}` : `/datasets/${it.ref.uuid}`} className="btn-ghost text-xs py-1 px-2.5">{t('communities.open')}</Link>
             <button className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1.5" disabled={busy} onClick={it.type === 'workflow' ? copyWorkflow : copyDataset}>
               <Copy className="w-3 h-3" /> {it.type === 'workflow' ? t('communities.copyWorkflow') : t('communities.copyDataset')}
@@ -334,27 +371,78 @@ function ItemRow({ it, idx, total, canEdit, id, run, reload, onOpen, onEditItem,
   );
 }
 
-function TopicCard({ topic, canEdit, id, run, reload, onOpen, onEdit, onAdd, onEditItem, onMoveItem, onMoveTopic, canUp, canDown }) {
+function TopicCard({ topic, canEdit, id, run, reload, onOpen, onEditTopic, onAddItem, onAddTopic, onAddQuiz, onEditItem, onPreview, onMoveItem, onMoveTopic, canUp, canDown, depth = 0, collapsed, onToggle, children }) {
   const { t } = useTranslation();
   const items = arr(topic.items);
   const projs = arr(topic.projects);
+  const quizzes = arr(topic.quizzes);
+  const kids = React.Children.toArray(children);
+  const isTopic = !!topic.uuid;
+  const total = items.length + projs.length + quizzes.length;
+  const body = (
+    <>
+      {total === 0 && kids.length === 0 && <p className="text-sm" style={muted}>{t('communities.topicEmpty')}</p>}
+      <ul className="space-y-1.5">
+        {items.map((it, i) => (
+          <ItemRow key={it.uuid} it={it} idx={i} total={items.length} canEdit={canEdit} id={id} run={run} reload={reload}
+            onOpen={onOpen} onEditItem={onEditItem} onMoveItem={onMoveItem} onPreview={onPreview} />
+        ))}
+        {quizzes.map(q => (
+          <li key={q.uuid}>
+            <Link to={`/communities/${id}/quizzes/${q.uuid}`} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:opacity-90" style={{ background: 'var(--bg-hover)' }} data-testid="quiz-row">
+              <ClipboardList className="w-4 h-4 flex-shrink-0 text-pink-400" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{q.title}</span>
+                <span className="block text-xs" style={muted}>
+                  {t('quiz.questionsCount', { count: q.question_count })}
+                  {q.due_at ? ` · ${t('quiz.dueOn', { date: new Date(q.due_at).toLocaleString(currentLocale(), { dateStyle: 'short', timeStyle: 'short' }) })}` : ''}
+                  {canEdit ? ` · ${t('quiz.submissionsShort', { count: q.submission_count })}` : ''}
+                </span>
+              </span>
+              {canEdit ? <StatusBadge status={q.status} /> : (q.my_status ? <SubStatusBadge status={q.my_status} /> : <StatusBadge status={q.status} />)}
+              <ChevronRight className="w-4 h-4" style={muted} />
+            </Link>
+          </li>
+        ))}
+        {projs.map(p => (
+          <li key={p.uuid} className="flex items-center gap-3 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-hover)' }}>
+            <FolderOpen className="w-4 h-4 flex-shrink-0 text-purple-400" />
+            <Link to={`/projects/${p.uuid}`} className="min-w-0 flex-1 text-sm font-medium hover:underline truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</Link>
+            <span className="text-xs hidden sm:inline" style={muted}>{p.owner_name}</span>
+            <AccessChip access={p.access} />
+          </li>
+        ))}
+      </ul>
+      {kids.length > 0 && <div className="mt-4 space-y-3 pl-3 sm:pl-5" style={{ borderLeft: '2px solid var(--border)' }}>{kids}</div>}
+    </>
+  );
   return (
-    <div className="card p-5" style={topic.is_visible === false ? { opacity: 0.7 } : undefined} data-testid="community-topic">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0">
-          <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            {topic.title}
-            {topic.is_visible === false && <span className="badge badge-amber">{t('communities.hidden')}</span>}
-          </h3>
-          {topic.description && <p className="text-sm mt-1" style={muted}>{topic.description}</p>}
+    <div className={depth === 0 ? 'card p-5' : 'rounded-xl p-4'} style={{ ...(depth > 0 ? { background: 'var(--bg-card, rgba(255,255,255,0.03))', border: '1px solid var(--border)' } : {}), ...(topic.is_visible === false ? { opacity: 0.7 } : {}) }} data-testid="community-topic" data-depth={depth}>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-3">
+        <div className="min-w-0 flex-1 flex items-start gap-2">
+          {isTopic && (
+            <button type="button" className="btn-ghost p-1 mt-0.5" onClick={onToggle} aria-expanded={!collapsed} aria-label={collapsed ? t('communities.expand') : t('communities.collapse')}>
+              <ChevronDown className="w-4 h-4" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
+            </button>
+          )}
+          <div className="min-w-0">
+            <h3 className={`font-semibold flex items-center gap-2 ${depth > 0 ? 'text-sm' : ''}`} style={{ color: 'var(--text-primary)' }}>
+              {topic.title}
+              {topic.is_visible === false && <span className="badge badge-amber">{t('communities.hidden')}</span>}
+              {collapsed && total + kids.length > 0 && <span className="text-xs font-normal" style={muted}>({total + kids.length})</span>}
+            </h3>
+            {topic.description && <p className="text-sm mt-1" style={muted}>{topic.description}</p>}
+          </div>
         </div>
         {canEdit && (
-          <div className="flex flex-wrap justify-end gap-1 flex-shrink-0">
-            <button className="btn-ghost p-1.5" aria-label={t('communities.addItem')} title={t('communities.addItem')} onClick={onAdd}><Plus className="w-4 h-4" /></button>
-            {onEdit && <>
+          <div className="flex flex-wrap sm:justify-end gap-1 sm:flex-shrink-0">
+            <button className="btn-ghost p-1.5" aria-label={t('communities.addItem')} title={t('communities.addItem')} onClick={() => onAddItem(topic.uuid || '', undefined)}><Plus className="w-4 h-4" /></button>
+            {isTopic && <>
+              {depth < 2 && <button className="btn-ghost p-1.5" aria-label={t('communities.addSubtopic')} title={t('communities.addSubtopic')} onClick={() => onAddTopic(topic.uuid)}><FolderPlus className="w-4 h-4" /></button>}
+              <button className="btn-ghost p-1.5" aria-label={t('quiz.newQuiz')} title={t('quiz.newQuiz')} onClick={() => onAddQuiz(topic.uuid)}><ClipboardList className="w-4 h-4" /></button>
               <button className="btn-ghost p-1.5" aria-label={t('communities.moveTopicUp')} title={t('communities.moveTopicUp')} disabled={!canUp} onClick={() => onMoveTopic(-1)}><ChevronUp className="w-4 h-4" /></button>
               <button className="btn-ghost p-1.5" aria-label={t('communities.moveTopicDown')} title={t('communities.moveTopicDown')} disabled={!canDown} onClick={() => onMoveTopic(1)}><ChevronDown className="w-4 h-4" /></button>
-              <button className="btn-ghost p-1.5" aria-label={t('common.edit')} title={t('common.edit')} onClick={onEdit}><Pencil className="w-4 h-4" /></button>
+              <button className="btn-ghost p-1.5" aria-label={t('common.edit')} title={t('common.edit')} onClick={() => onEditTopic(topic)}><Pencil className="w-4 h-4" /></button>
               <button className="btn-ghost p-1.5" aria-label={topic.is_visible ? t('communities.hide') : t('communities.show')} title={topic.is_visible ? t('communities.hide') : t('communities.show')}
                 onClick={() => run(() => api.communities.updateSection(id, topic.uuid, { is_visible: !topic.is_visible }), null, reload)}>
                 {topic.is_visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -367,43 +455,43 @@ function TopicCard({ topic, canEdit, id, run, reload, onOpen, onEdit, onAdd, onE
           </div>
         )}
       </div>
-
-      {items.length === 0 && projs.length === 0 && <p className="text-sm" style={muted}>{t('communities.topicEmpty')}</p>}
-      <ul className="space-y-1.5">
-        {items.map((it, i) => (
-          <ItemRow key={it.uuid} it={it} idx={i} total={items.length} canEdit={canEdit} id={id} run={run} reload={reload}
-            onOpen={onOpen} onEditItem={onEditItem} onMoveItem={onMoveItem} />
-        ))}
-        {projs.map(p => (
-          <li key={p.uuid} className="flex items-center gap-3 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-hover)' }}>
-            <FolderOpen className="w-4 h-4 flex-shrink-0 text-purple-400" />
-            <Link to={`/projects/${p.uuid}`} className="min-w-0 flex-1 text-sm font-medium hover:underline truncate" style={{ color: 'var(--text-primary)' }}>{p.name}</Link>
-            <span className="text-xs hidden sm:inline" style={muted}>{p.owner_name}</span>
-            <AccessChip access={p.access} />
-          </li>
-        ))}
-      </ul>
+      {!collapsed && body}
     </div>
   );
 }
 
-function SectionModal({ state, onClose, id, reload }) {
+function SectionModal({ state, onClose, id, sections, reload }) {
   const { t } = useTranslation();
   const s = state?.section;
-  const [form, setForm] = useState({ title: '', description: '' });
+  const [form, setForm] = useState({ title: '', description: '', parent: '' });
   const [saving, setSaving] = useState(false);
-  useEffect(() => { if (state) setForm({ title: s?.title || '', description: s?.description || '' }); }, [state]); // eslint-disable-line
+  useEffect(() => { if (state) setForm({ title: s?.title || '', description: s?.description || '', parent: (s ? s.parent : state.parent) || '' }); }, [state]); // eslint-disable-line
+
+  // Destinos válidos: nunca o próprio tópico nem seus descendentes; e respeitando 3 níveis no máximo.
+  const options = useMemo(() => {
+    const banned = new Set();
+    if (s) {
+      banned.add(s.uuid);
+      let grew = true;
+      while (grew) { grew = false; sections.forEach(x => { if (x.parent && banned.has(x.parent) && !banned.has(x.uuid)) { banned.add(x.uuid); grew = true; } }); }
+    }
+    const height = (uuid) => 1 + Math.max(0, ...sections.filter(x => x.parent === uuid).map(x => height(x.uuid)));
+    const h = s ? height(s.uuid) : 1;
+    return sections.filter(x => !banned.has(x.uuid) && x.depth + 1 + h <= 3);
+  }, [sections, s]);
+
   const submit = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
     setSaving(true);
     try {
-      if (s) await api.communities.updateSection(id, s.uuid, form); else await api.communities.createSection(id, form);
+      const body = { title: form.title, description: form.description, parent: form.parent || null };
+      if (s) await api.communities.updateSection(id, s.uuid, body); else await api.communities.createSection(id, body);
       toast.success(t('communities.topicSaved')); await reload(); onClose();
     } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setSaving(false); }
   };
   return (
-    <Modal open={!!state} onClose={onClose} title={s ? t('communities.editTopic') : t('communities.addTopic')} size="md">
+    <Modal open={!!state} onClose={onClose} title={s ? t('communities.editTopic') : (state?.parent ? t('communities.addSubtopic') : t('communities.addTopic'))} size="md">
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.topicTitle')}</label>
@@ -412,6 +500,14 @@ function SectionModal({ state, onClose, id, reload }) {
         <div>
           <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('common.description')}</label>
           <textarea className="input-field resize-none" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.insideTopic')}</label>
+          <select className="input-field" value={form.parent} onChange={e => setForm(f => ({ ...f, parent: e.target.value }))} aria-label={t('communities.insideTopic')}>
+            <option value="">{t('communities.topLevel')}</option>
+            {options.map(o => <option key={o.uuid} value={o.uuid}>{indent(o.depth)}{o.title}</option>)}
+          </select>
+          <p className="text-xs mt-1" style={muted}>{t('communities.nestingHint')}</p>
         </div>
         <div className="flex gap-3">
           <button type="button" className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
@@ -435,7 +531,7 @@ function ItemModal({ state, onClose, id, sections, reload }) {
   const inputRef = useRef(null);
   useEffect(() => {
     if (state) {
-      setType('file'); setFiles([]); setProgress(null); setDragOver(false);
+      setType(state.type || 'file'); setFiles([]); setProgress(null); setDragOver(false);
       setForm({ title: '', url: '', description: '', section_id: state.sectionId || '', ref: '', access: 'read' });
     }
   }, [state]);
@@ -593,7 +689,7 @@ function ItemModal({ state, onClose, id, sections, reload }) {
           <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.topic')}</label>
           <select className="input-field" value={form.section_id} onChange={e => setForm(f => ({ ...f, section_id: e.target.value }))}>
             <option value="">{t('communities.generalTopic')}</option>
-            {sections.map(s => <option key={s.uuid} value={s.uuid}>{s.title}</option>)}
+            {sections.map(s => <option key={s.uuid} value={s.uuid}>{indent(s.depth)}{s.title}</option>)}
           </select>
         </div>
         <div className="flex gap-3">
@@ -650,7 +746,7 @@ function EditItemModal({ item, onClose, id, sections, general, reload }) {
           <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.topic')}</label>
           <select className="input-field" value={form.section_id} onChange={e => setForm(f => ({ ...f, section_id: e.target.value }))}>
             <option value="">{t('communities.generalTopic')}</option>
-            {sections.map(s => <option key={s.uuid} value={s.uuid}>{s.title}</option>)}
+            {sections.map(s => <option key={s.uuid} value={s.uuid}>{indent(s.depth)}{s.title}</option>)}
           </select>
         </div>
         <div className="flex gap-3">
@@ -727,6 +823,120 @@ function FileViewer({ state, item, onClose, id }) {
         )}
         <button className="btn-primary flex items-center gap-2" disabled={downloading} onClick={download}><Download className="w-4 h-4" /> {t('communities.download')}</button>
       </div>
+    </Modal>
+  );
+}
+
+/* ═══════════════════════ Apps da comunidade ═══════════════════════ */
+
+function AppCard({ icon: Icon, color, title, desc, onClick, disabled, testid }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} data-testid={testid}
+      className="card p-4 text-left flex items-start gap-3 transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+      style={{ cursor: disabled ? 'default' : 'pointer' }}>
+      <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-hover)' }}><Icon className={`w-5 h-5 ${color}`} /></span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</span>
+        <span className="block text-xs mt-0.5" style={muted}>{desc}</span>
+      </span>
+    </button>
+  );
+}
+
+function AppsTab({ id, data, perms, onAddItem, onAddTopic, onAddQuiz }) {
+  const { t } = useTranslation();
+  const canEdit = !!perms.can_moderate;
+  const { data: quizzes } = useApi(() => api.quizzes.list(id), [id, data]);
+  const list = arr(quizzes);
+  return (
+    <div className="space-y-6">
+      {canEdit && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={muted}>{t('communities.appsCreate')}</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <AppCard testid="app-quiz" icon={ClipboardList} color="text-pink-400" title={t('quiz.appTitle')} desc={t('quiz.appDesc')} onClick={onAddQuiz} />
+            <AppCard testid="app-file" icon={Presentation} color="text-orange-400" title={t('communities.appFileTitle')} desc={t('communities.appFileDesc')} onClick={() => onAddItem('file')} />
+            <AppCard testid="app-workflow" icon={GitBranch} color="text-purple-400" title={t('communities.appWorkflowTitle')} desc={t('communities.appWorkflowDesc')} onClick={() => onAddItem('workflow')} />
+            <AppCard testid="app-dataset" icon={Database} color="text-cyan-400" title={t('communities.appDatasetTitle')} desc={t('communities.appDatasetDesc')} onClick={() => onAddItem('dataset')} />
+            <AppCard testid="app-project" icon={FolderOpen} color="text-indigo-400" title={t('communities.appProjectTitle')} desc={t('communities.appProjectDesc')} onClick={() => onAddItem('project')} />
+            <AppCard testid="app-link" icon={Link2} color="text-blue-400" title={t('communities.appLinkTitle')} desc={t('communities.appLinkDesc')} onClick={() => onAddItem('link')} />
+            <AppCard testid="app-text" icon={FileText} color="text-emerald-400" title={t('communities.appTextTitle')} desc={t('communities.appTextDesc')} onClick={() => onAddItem('text')} />
+            <AppCard testid="app-topic" icon={FolderPlus} color="text-amber-400" title={t('communities.appTopicTitle')} desc={t('communities.appTopicDesc')} onClick={onAddTopic} />
+            <AppCard icon={Sparkles} color="text-slate-400" title={t('communities.appStudyTitle')} desc={t('communities.appStudyDesc')} disabled />
+          </div>
+        </section>
+      )}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={muted}>{t('quiz.appTitle')}</h2>
+        {list.length === 0 ? (
+          <EmptyState icon={ClipboardList} title={t('quiz.noneTitle')} description={canEdit ? t('quiz.noneDescEdit') : t('quiz.noneDesc')}
+            action={canEdit ? <button className="btn-primary text-sm flex items-center gap-1.5" onClick={onAddQuiz}><Plus className="w-3.5 h-3.5" /> {t('quiz.newQuiz')}</button> : undefined} />
+        ) : (
+          <ul className="space-y-2">
+            {list.map(q => (
+              <li key={q.uuid}>
+                <Link to={`/communities/${id}/quizzes/${q.uuid}`} className="card p-4 flex items-center gap-3 hover:opacity-90" data-testid="quiz-list-row">
+                  <ClipboardList className="w-5 h-5 text-pink-400 flex-shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{q.title}</span>
+                    <span className="block text-xs" style={muted}>
+                      {t('quiz.questionsCount', { count: q.question_count })}
+                      {q.due_at ? ` · ${t('quiz.dueOn', { date: new Date(q.due_at).toLocaleString(currentLocale(), { dateStyle: 'short', timeStyle: 'short' }) })}` : ''}
+                      {canEdit ? ` · ${t('quiz.submissionsShort', { count: q.submission_count })}` : (q.my_score != null && q.my_status === 'graded' ? ` · ${t('quiz.yourScore')}: ${q.my_score}/${q.total_points}` : '')}
+                    </span>
+                  </span>
+                  {canEdit ? <StatusBadge status={q.status} /> : (q.my_status ? <SubStatusBadge status={q.my_status} /> : <StatusBadge status={q.status} />)}
+                  <ChevronRight className="w-4 h-4" style={muted} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function QuizModal({ state, onClose, id, sections }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ title: '', description: '', section: '' });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { if (state) setForm({ title: '', description: '', section: state.sectionId || '' }); }, [state]);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    setSaving(true);
+    try {
+      const res = await api.quizzes.create(id, { title: form.title.trim(), description: form.description, section: form.section || null });
+      const q = res.data?.data ?? res.data;
+      toast.success(t('quiz.created')); onClose(); navigate(`/communities/${id}/quizzes/${q.uuid}`);
+    } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setSaving(false); }
+  };
+  return (
+    <Modal open={!!state} onClose={onClose} title={t('quiz.newQuiz')} size="md">
+      <form onSubmit={submit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.itemTitle')}</label>
+          <input className="input-field" value={form.title} maxLength={255} autoFocus placeholder={t('quiz.titlePlaceholder')} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('common.description')}</label>
+          <textarea className="input-field resize-none" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.topic')}</label>
+          <select className="input-field" value={form.section} onChange={e => setForm(f => ({ ...f, section: e.target.value }))}>
+            <option value="">{t('communities.generalTopic')}</option>
+            {sections.map(s => <option key={s.uuid} value={s.uuid}>{indent(s.depth)}{s.title}</option>)}
+          </select>
+        </div>
+        <p className="text-xs" style={muted}>{t('quiz.createHint')}</p>
+        <div className="flex gap-3">
+          <button type="button" className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
+          <button type="submit" className="btn-primary flex-1" disabled={saving || !form.title.trim()}>{saving ? t('common.saving') : t('quiz.createAndEdit')}</button>
+        </div>
+      </form>
     </Modal>
   );
 }
@@ -812,7 +1022,7 @@ function LinkProjectModal({ open, onClose, id, linked, sections, onDone }) {
             <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.topic')}</label>
             <select className="input-field" value={sectionId} onChange={e => setSectionId(e.target.value)}>
               <option value="">{t('communities.generalTopic')}</option>
-              {sections.map(s => <option key={s.uuid} value={s.uuid}>{s.title}</option>)}
+              {sections.map(s => <option key={s.uuid} value={s.uuid}>{indent(s.depth)}{s.title}</option>)}
             </select>
           </div>
         )}

@@ -84,6 +84,7 @@ const TABLES = [
       \`community_id\` bigint unsigned NOT NULL,
       \`title\` varchar(255) ${COLLATE} NOT NULL,
       \`description\` text ${COLLATE},
+      \`parent_id\` bigint unsigned DEFAULT NULL,
       \`position\` int NOT NULL DEFAULT 0,
       \`is_visible\` tinyint(1) NOT NULL DEFAULT 1,
       \`created_by\` bigint unsigned DEFAULT NULL,
@@ -119,6 +120,96 @@ const TABLES = [
       KEY \`idx_items_community\` (\`community_id\`,\`section_id\`,\`position\`),
       CONSTRAINT \`fk_items_community\` FOREIGN KEY (\`community_id\`) REFERENCES \`communities\` (\`id\`) ON DELETE CASCADE,
       CONSTRAINT \`fk_items_section\` FOREIGN KEY (\`section_id\`) REFERENCES \`community_sections\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  // ── Quizzes / exercícios da comunidade ──────────────────────────────────
+  ['quizzes', `
+    CREATE TABLE IF NOT EXISTS \`quizzes\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`community_id\` bigint unsigned NOT NULL,
+      \`section_id\` bigint unsigned DEFAULT NULL,
+      \`title\` varchar(255) ${COLLATE} NOT NULL,
+      \`description\` text ${COLLATE},
+      \`status\` enum('draft','open','closed') ${COLLATE} NOT NULL DEFAULT 'draft',
+      \`due_at\` datetime DEFAULT NULL,
+      \`show_results\` enum('after_submit','after_close','never') ${COLLATE} NOT NULL DEFAULT 'after_submit',
+      \`position\` int NOT NULL DEFAULT 0,
+      \`created_by\` bigint unsigned DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_quiz_uuid\` (\`uuid\`),
+      KEY \`idx_quiz_community\` (\`community_id\`,\`section_id\`,\`position\`),
+      CONSTRAINT \`fk_quiz_community\` FOREIGN KEY (\`community_id\`) REFERENCES \`communities\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_quiz_section\` FOREIGN KEY (\`section_id\`) REFERENCES \`community_sections\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['quiz_questions', `
+    CREATE TABLE IF NOT EXISTS \`quiz_questions\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`quiz_id\` bigint unsigned NOT NULL,
+      \`position\` int NOT NULL DEFAULT 0,
+      \`kind\` enum('tf','choice','text','dataset','workflow') ${COLLATE} NOT NULL,
+      \`prompt\` text ${COLLATE} NOT NULL,
+      \`points\` decimal(6,2) NOT NULL DEFAULT 1,
+      \`config\` json DEFAULT NULL,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_question_uuid\` (\`uuid\`),
+      KEY \`idx_question_quiz\` (\`quiz_id\`,\`position\`),
+      CONSTRAINT \`fk_question_quiz\` FOREIGN KEY (\`quiz_id\`) REFERENCES \`quizzes\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  // dados/modelos que o professor entrega junto com a pergunta (ex.: o multiway X, um workflow-modelo)
+  ['quiz_attachments', `
+    CREATE TABLE IF NOT EXISTS \`quiz_attachments\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`question_id\` bigint unsigned NOT NULL,
+      \`kind\` enum('dataset','workflow') ${COLLATE} NOT NULL,
+      \`ref_id\` bigint unsigned NOT NULL,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_quiz_attachment\` (\`question_id\`,\`kind\`,\`ref_id\`),
+      KEY \`idx_attachment_ref\` (\`kind\`,\`ref_id\`),
+      CONSTRAINT \`fk_attachment_question\` FOREIGN KEY (\`question_id\`) REFERENCES \`quiz_questions\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['quiz_submissions', `
+    CREATE TABLE IF NOT EXISTS \`quiz_submissions\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`quiz_id\` bigint unsigned NOT NULL,
+      \`user_id\` bigint unsigned NOT NULL,
+      \`status\` enum('in_progress','submitted','graded') ${COLLATE} NOT NULL DEFAULT 'in_progress',
+      \`score\` decimal(7,2) DEFAULT NULL,
+      \`feedback\` text ${COLLATE},
+      \`submitted_at\` datetime DEFAULT NULL,
+      \`graded_by\` bigint unsigned DEFAULT NULL,
+      \`graded_at\` datetime DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_submission_uuid\` (\`uuid\`),
+      UNIQUE KEY \`uq_submission_user\` (\`quiz_id\`,\`user_id\`),
+      CONSTRAINT \`fk_submission_quiz\` FOREIGN KEY (\`quiz_id\`) REFERENCES \`quizzes\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_submission_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['quiz_answers', `
+    CREATE TABLE IF NOT EXISTS \`quiz_answers\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`submission_id\` bigint unsigned NOT NULL,
+      \`question_id\` bigint unsigned NOT NULL,
+      \`value\` json DEFAULT NULL,
+      \`ref_type\` enum('workflow','dataset') ${COLLATE} DEFAULT NULL,
+      \`ref_id\` bigint unsigned DEFAULT NULL,
+      \`points\` decimal(6,2) DEFAULT NULL,
+      \`feedback\` text ${COLLATE},
+      \`updated_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_answer\` (\`submission_id\`,\`question_id\`),
+      KEY \`idx_answer_ref\` (\`ref_type\`,\`ref_id\`),
+      CONSTRAINT \`fk_answer_submission\` FOREIGN KEY (\`submission_id\`) REFERENCES \`quiz_submissions\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_answer_question\` FOREIGN KEY (\`question_id\`) REFERENCES \`quiz_questions\` (\`id\`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
 
   // ── Técnicas dentro de um projeto (favoritas / próprias) ────────────────
@@ -176,6 +267,8 @@ async function migrate() {
          SELECT c.id, c.owner_id, 'admin', c.created_at, 1 FROM communities c`,
     );
   }
+
+  await addColumn('community_sections', 'parent_id', 'bigint unsigned DEFAULT NULL');
 
   for (const [name, ddl] of TABLES) {
     if (!(await hasTable(name))) {

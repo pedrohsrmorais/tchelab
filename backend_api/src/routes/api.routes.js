@@ -53,6 +53,7 @@ router.delete('/users/:id',             authenticate, userCtrl.deleteUser);
 
 // ─── COMMUNITIES ───────────────────────────────────────────────────────────────
 // Papéis: owner > admin > moderator > member (ver community.controller.js)
+const quizCtrl = require('../controllers/quiz.controller');
 const cg = communityCtrl.guard;
 router.get   ('/communities',                                   authenticate, communityCtrl.listMyCommunities);
 router.get   ('/communities/public',                            authenticate, communityCtrl.listPublicCommunities);
@@ -100,6 +101,21 @@ router.put   ('/communities/:id/items/:iid',                    authenticate, cg
 router.delete('/communities/:id/items/:iid',                    authenticate, cg('moderator'), communityCtrl.deleteItem);
 router.get   ('/communities/:id/items/:iid/file',               authenticate, cg('member'),    communityCtrl.downloadItemFile);
 // Messages
+// Quizzes / exercícios
+router.get   ('/communities/:id/quizzes',                        authenticate, cg('member'),    quizCtrl.listQuizzes);
+router.post  ('/communities/:id/quizzes',                        authenticate, cg('moderator'), quizCtrl.createQuiz);
+router.get   ('/communities/:id/quizzes/:qid',                   authenticate, cg('member'),    quizCtrl.getQuiz);
+router.put   ('/communities/:id/quizzes/:qid',                   authenticate, cg('moderator'), quizCtrl.updateQuiz);
+router.delete('/communities/:id/quizzes/:qid',                   authenticate, cg('moderator'), quizCtrl.deleteQuiz);
+router.put   ('/communities/:id/quizzes/:qid/questions',         authenticate, cg('moderator'), quizCtrl.saveQuestions);
+router.post  ('/communities/:id/quizzes/:qid/start',             authenticate, cg('member'),    quizCtrl.startQuiz);
+router.put   ('/communities/:id/quizzes/:qid/answers/:question', authenticate, cg('member'),    quizCtrl.saveAnswer);
+router.post  ('/communities/:id/quizzes/:qid/submit',            authenticate, cg('member'),    quizCtrl.submitQuiz);
+router.get   ('/communities/:id/quizzes/:qid/submissions',       authenticate, cg('moderator'), quizCtrl.listSubmissions);
+router.get   ('/communities/:id/quizzes/:qid/submissions/:sid',  authenticate, cg('moderator'), quizCtrl.getSubmission);
+router.put   ('/communities/:id/quizzes/:qid/submissions/:sid/grade',  authenticate, cg('moderator'), quizCtrl.gradeSubmission);
+router.post  ('/communities/:id/quizzes/:qid/submissions/:sid/reopen', authenticate, cg('moderator'), quizCtrl.reopenSubmission);
+
 router.get   ('/communities/:id/messages',                      authenticate, cg('member'),    communityCtrl.listMessages);
 router.post  ('/communities/:id/messages',                      authenticate, cg('member'),    communityCtrl.sendMessage);
 router.delete('/communities/:id/messages/:mid',                 authenticate, cg('member'),    communityCtrl.deleteMessage);

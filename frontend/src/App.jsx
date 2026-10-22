@@ -19,6 +19,7 @@ const DatasetDetailPage  = lazy(() => import('./pages/DatasetDetailPage'));
 const DatasetVizPage     = lazy(() => import('./pages/DatasetVizPage'));
 const CommunitiesPage    = lazy(() => import('./pages/CommunitiesPage'));
 const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
+const QuizPage           = lazy(() => import('./pages/QuizPage'));
 const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
 const WorkflowEditorPage = lazy(() => import('./pages/WorkflowEditorPage'));
 const CatalogPage        = lazy(() => import('./pages/CatalogPage'));
@@ -104,6 +105,7 @@ export default function App() {
           <Route path="datasets/:id/viz" element={<DatasetVizPage />} />
           <Route path="communities" element={<CommunitiesPage />} />
           <Route path="communities/:id" element={<CommunityDetailPage />} />
+          <Route path="communities/:id/quizzes/:qid" element={<QuizPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="workflows/:id" element={<WorkflowEditorPage />} />
           <Route path="catalogo" element={<CatalogPage />} />

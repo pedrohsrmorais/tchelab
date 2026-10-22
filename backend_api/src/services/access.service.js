@@ -79,18 +79,54 @@ async function bestProjectLevel(projects, user) {
  * Nível concedido por um MATERIAL de comunidade (item `workflow`/`dataset` visível num tópico visível)
  * a quem é membro dessa comunidade: 1 (leitura) ou 2 (edição, só workflows com access='edit').
  */
+/** SQL: o tópico `a` e todos os seus ancestrais (até 3 níveis) estão visíveis. */
+const sectionOkSql = (a) => `(${a}.is_visible = 1 AND (${a}.parent_id IS NULL OR EXISTS (
+  SELECT 1 FROM community_sections p1 WHERE p1.id = ${a}.parent_id AND p1.is_visible = 1 AND (p1.parent_id IS NULL OR EXISTS (
+    SELECT 1 FROM community_sections p2 WHERE p2.id = p1.parent_id AND p2.is_visible = 1)))))`;
+
 async function communityItemLevel(type, refId, user) {
+  let level = LEVEL.NONE;
+  // 1) material de aula (item workflow/dataset num tópico visível)
   const [rows] = await db.query(
     `SELECT i.access
        FROM community_items i
        JOIN community_members cm ON cm.community_id = i.community_id AND cm.user_id = ?
       WHERE i.type = ? AND i.ref_id = ? AND i.is_visible = 1
-        AND (i.section_id IS NULL OR EXISTS (SELECT 1 FROM community_sections s WHERE s.id = i.section_id AND s.is_visible = 1))`,
+        AND (i.section_id IS NULL OR EXISTS (SELECT 1 FROM community_sections s WHERE s.id = i.section_id AND ${sectionOkSql('s')}))`,
     [user.id, type, refId],
   );
-  let level = LEVEL.NONE;
   for (const r of rows) level = Math.max(level, type === 'workflow' && r.access === 'edit' ? LEVEL.EDIT : LEVEL.READ);
-  return level;
+  if (level >= LEVEL.READ) return level;
+
+  // 2) dados/modelo anexados a uma pergunta de quiz publicado (leitura; o aluno copia para trabalhar)
+  const [att] = await db.query(
+    `SELECT 1
+       FROM quiz_attachments at
+       JOIN quiz_questions qq ON qq.id = at.question_id
+       JOIN quizzes q ON q.id = qq.quiz_id AND q.status IN ('open','closed')
+       JOIN community_members cm ON cm.community_id = q.community_id AND cm.user_id = ?
+      WHERE at.kind = ? AND at.ref_id = ?
+        AND (q.section_id IS NULL OR EXISTS (SELECT 1 FROM community_sections s WHERE s.id = q.section_id AND ${sectionOkSql('s')}))
+      LIMIT 1`,
+    [user.id, type, refId],
+  );
+  if (att.length) return LEVEL.READ;
+
+  // 3) resposta de aluno entregue: o professor (moderator+ da comunidade) lê o workflow/variável da resposta
+  const [ans] = await db.query(
+    `SELECT 1
+       FROM quiz_answers qa
+       JOIN quiz_submissions sub ON sub.id = qa.submission_id AND sub.status <> 'in_progress'
+       JOIN quizzes q ON q.id = sub.quiz_id
+       JOIN communities c ON c.id = q.community_id
+       LEFT JOIN community_members cm ON cm.community_id = q.community_id AND cm.user_id = ?
+      WHERE qa.ref_type = ? AND qa.ref_id = ?
+        AND (c.owner_id = ? OR cm.role IN ('admin','moderator'))
+      LIMIT 1`,
+    [user.id, type, refId, user.id],
+  );
+  if (ans.length) return LEVEL.READ;
+  return LEVEL.NONE;
 }
 
 /** Nível sobre um workflow (linha de `workflows`). */

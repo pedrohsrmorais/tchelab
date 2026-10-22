@@ -139,6 +139,23 @@ export const api = {
   },
 
   // ── Datasets ─────────────────────────────────────────────────────────────
+  // ── Quizzes da comunidade ─────────────────────────────────────────────────
+  quizzes: {
+    list:            (cid)            => get(`/communities/${cid}/quizzes`),
+    create:          (cid, d)         => post(`/communities/${cid}/quizzes`, d),
+    get:             (cid, qid)       => get(`/communities/${cid}/quizzes/${qid}`),
+    update:          (cid, qid, d)    => put(`/communities/${cid}/quizzes/${qid}`, d),
+    remove:          (cid, qid)       => del(`/communities/${cid}/quizzes/${qid}`),
+    saveQuestions:   (cid, qid, list) => put(`/communities/${cid}/quizzes/${qid}/questions`, { questions: list }),
+    start:           (cid, qid)       => post(`/communities/${cid}/quizzes/${qid}/start`),
+    answer:          (cid, qid, qn, d) => put(`/communities/${cid}/quizzes/${qid}/answers/${qn}`, d),
+    submit:          (cid, qid)       => post(`/communities/${cid}/quizzes/${qid}/submit`),
+    submissions:     (cid, qid)       => get(`/communities/${cid}/quizzes/${qid}/submissions`),
+    submission:      (cid, qid, sid)  => get(`/communities/${cid}/quizzes/${qid}/submissions/${sid}`),
+    grade:           (cid, qid, sid, d) => put(`/communities/${cid}/quizzes/${qid}/submissions/${sid}/grade`, d),
+    reopen:          (cid, qid, sid)  => post(`/communities/${cid}/quizzes/${qid}/submissions/${sid}/reopen`),
+  },
+
   datasets: {
     list:            (p)       => get('/datasets', p),
     create:          (d)       => post('/datasets', d),

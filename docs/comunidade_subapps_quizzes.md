@@ -1,96 +1,75 @@
-# Comunidade institucional: sub-apps e quizzes (proposta de arquitetura)
+# Comunidade: aba Apps, subtópicos e quizzes
 
-> Status: **proposta** — a base de "aula completa" (tópicos, arquivos/PPT, workflows, variáveis, projetos) já está
-> implementada (`comunidades_perfil_i18n.md` §7). Este documento define como encaixar quizzes e outros sub-apps sem
-> reescrever a comunidade.
+> Implementado. Testes: `backend_api/tests/community_quiz_e2e.mjs` (92 checagens). Complementa `comunidades_perfil_i18n.md` §7.
 
-## 1. Objetivo
+## 1. Subtópicos (estilo Moodle)
 
-Uma comunidade deve aceitar vários **sub-apps** (módulos) que o professor liga/desliga. O primeiro são os **exercícios/quizzes**:
+`community_sections.parent_id` permite **Parte → Aula → Subaula** (máximo 3 níveis).
 
-- perguntas de **múltipla escolha**, **descritivas** e **resposta por workflow/Workspace**;
-- exercícios **periódicos** com **dados da comunidade** (ex.: um multiway X) — "faça um Tucker3 com o conjunto X";
-- o professor abre a resposta e vê **o workflow/variável do aluno**.
+- `POST /communities/:id/sections { title, description?, parent? }` — `parent` é o uuid do tópico pai.
+- `PUT /communities/:id/sections/:sid { …, parent }` — move o tópico (`null` = nível principal). O servidor recusa mover um
+  tópico para dentro de si mesmo ou de um descendente e recusa passar de 3 níveis (422).
+- `PUT /communities/:id/sections-order { order }` reordena **entre irmãos**.
+- `GET /communities/:id/content` devolve `sections` como lista plana com `parent` (uuid) em cada tópico; o frontend monta a árvore.
+- **Ocultar um tópico oculta toda a subárvore** para membros comuns (conteúdo, download de arquivos, quizzes e o acesso
+  concedido a workflows/variáveis do tópico). Excluir um tópico exclui os descendentes (arquivos são removidos do disco).
+- UI: cartões aninhados e recolhíveis; por tópico: adicionar material, **novo subtópico**, novo quiz, subir/descer, editar
+  (inclusive "dentro de" para mover), ocultar e excluir.
 
-## 2. Modelo de sub-apps
+## 2. Aba "Apps"
 
-Registro de módulos por comunidade, em vez de colunas soltas:
+Visível a todos os membros. Para professores (moderator+) mostra os atalhos de criação — **Quiz, PDF/slides/arquivos,
+workflow, variável (dataset), projeto, link, texto, tópico** (cada atalho abre o modal já no tipo certo) — e um espaço
+"Estudo dirigido — em breve". Abaixo, a lista de quizzes (professor: status e nº de entregas; aluno: situação e nota).
 
-```
-community_apps(id, community_id, app_key, title, is_enabled, position, config JSON, created_at)
-```
+## 3. Pré-visualização sem baixar
 
-- `app_key` ∈ `content` (já existe, sempre ativo), `quizzes`, e futuros (`assignments`, `grades`, `calendar`, `forum`).
-- Frontend: um **registry** `communityApps = { quizzes: { icon, tab, component, i18n } }`; a página lê
-  `GET /communities/:id/apps` e renderiza uma aba por app habilitado. Novo sub-app = nova entrada no registry +
-  rotas `/communities/:id/<app_key>/…` + migração própria. O papel (`guard('moderator')` etc.) é reaproveitado.
-- Itens de conteúdo podem **apontar para um sub-app** (`community_items.type = 'quiz'`, `ref_id`), de modo que um quiz
-  apareça dentro de um tópico da aula, ao lado do PPT.
+| Material | Pré-visualização |
+|---|---|
+| PDF, imagem | inline no modal (botão "Abrir em nova aba") |
+| PPT/PPTX/DOC/XLS… | PDF convertido pelo LibreOffice, inline; original disponível para baixar |
+| Variável (dataset) | tabela com as primeiras linhas/colunas e dimensões (multiway: dimensões + aviso) |
+| Workflow | diagrama somente leitura (nós e conexões), sem abrir o editor |
+| Anexos e respostas de quiz | mesmos modais de pré-visualização |
 
-## 3. Quizzes — esquema de dados
+## 4. Quizzes
 
-```
-quizzes(id, uuid, community_id, section_id NULL, title, description, status ENUM('draft','open','closed'),
-        opens_at, due_at, attempts_allowed, shuffle, show_feedback ENUM('never','after_submit','after_due'),
-        created_by, created_at)
-quiz_questions(id, uuid, quiz_id, position, kind ENUM('single','multiple','text','workflow','dataset'),
-               prompt, points, config JSON)
-   -- single/multiple: config={options:[{id,text,correct}]}
-   -- text:           config={rubric?}
-   -- workflow:       config={required_technique?:'tucker3', input_dataset_uuid?, template_workflow_uuid?, hint}
-   -- dataset:        config={expected_dims?}   (aluno entrega uma variável do Workspace)
-quiz_attachments(question_id, kind ENUM('dataset','file','workflow'), ref_id)   -- dados X fornecidos ao aluno
-quiz_submissions(id, uuid, quiz_id, user_id, attempt, status ENUM('in_progress','submitted','graded'),
-                 submitted_at, score, graded_by, feedback)
-quiz_answers(id, submission_id, question_id, value JSON, ref_type ENUM('workflow','dataset') NULL, ref_id NULL,
-             points, feedback)
-```
+Perguntas (`quiz_questions.kind`): **`tf`** (V/F), **`choice`** (múltipla escolha; uma ou várias corretas), **`text`**
+(descritiva), **`dataset`** (aluno entrega uma variável do Workspace) e **`workflow`** (aluno entrega um workflow).
+Qualquer pergunta pode ter **anexos** (`quiz_attachments`): dados (ex.: o multiway X da turma) e/ou um workflow-modelo.
 
-## 4. Exercício com dados da comunidade (Tucker3)
+Ciclo: `draft` → `open` (publicado) → `closed`. Opções: prazo (`due_at`; depois dele não recebe respostas) e
+`show_results` (`after_submit` | `after_close` | `never`) que controla quando o aluno vê o gabarito.
 
-1. O professor cria a questão `workflow`, anexa o multiway X (variável do Workspace dele, 3 vias) e, opcionalmente,
-   um workflow-modelo e a técnica exigida (`tucker3`).
-2. Ao abrir a questão, o aluno vê o enunciado e o botão **"Começar com os dados da turma"**: o sistema **copia X** para
-   o Workspace dele (`POST /datasets/:id/copy`, já existe) e **copia o workflow-modelo** (`POST /workflows/:id/fork`, já
-   existe) apontando para a cópia.
-3. O aluno executa no editor normal. Para responder, escolhe o **workflow (ou variável) resultante** na questão.
-4. A resposta grava `ref_type/ref_id`. Isso concede ao professor (e moderadores) **leitura** do workflow/variável do
-   aluno **enquanto a submissão existir** — mesma ideia do `communityItemLevel` de hoje:
-   `quiz_answers` → nível READ para `quizzes.created_by` e papéis moderator+ da comunidade.
-5. Na correção, o professor clica na resposta e abre o workflow do aluno em somente-leitura (resultados, parâmetros,
-   gráficos). Validações automáticas opcionais: o workflow contém a técnica exigida; a execução terminou com sucesso.
+| Rota (`/communities/:id/quizzes…`) | Quem |
+|---|---|
+| `GET /`, `GET /:qid` | membros (rascunho só para moderator+) |
+| `POST /`, `PUT /:qid`, `DELETE /:qid`, `PUT /:qid/questions` | moderator+ |
+| `POST /:qid/start`, `PUT /:qid/answers/:question`, `POST /:qid/submit` | membros |
+| `GET /:qid/submissions`, `GET /:qid/submissions/:sid`, `PUT …/:sid/grade`, `POST …/:sid/reopen` | moderator+ |
 
-## 5. Correção e periodicidade
+Regras:
+- Publicar exige ao menos uma pergunta. Com entregas feitas, as perguntas ficam bloqueadas (409): devolva as entregas ou crie outro quiz.
+- O aluno **nunca recebe o gabarito** (V/F, alternativas corretas, resposta-modelo) antes da regra `show_results`.
+- Correção: `tf`/`choice` automática (múltipla escolha com várias corretas é tudo-ou-nada); `text`/`dataset`/`workflow`
+  manual (nota até o máximo da pergunta + comentário). A entrega vira `graded` quando todas as manuais têm nota; um quiz só
+  com perguntas automáticas é corrigido no ato.
+- `quiz_answers.value` guarda `{ "v": … }` (o driver devolve JSON já parseado; o envelope evita confundir texto puro com JSON).
 
-- Múltipla escolha: nota automática. Descritiva/workflow: nota manual (`points` + `feedback` por resposta).
-- Exercícios periódicos: `opens_at`/`due_at` + `status` mudando por tarefa agendada (job existente do worker/cron);
-  recorrência opcional `config.recurrence = {every:'week', count:N}` gera rascunhos clonados do modelo.
-- Visão do professor: matriz alunos × questões com status (pendente/entregue/corrigido) e link direto para a resposta.
+### Acesso a workflows e variáveis (`access.service.js → communityItemLevel`)
+1. Material de aula visível → **leitura** (workflow `edit` → edição).
+2. Anexo de pergunta de quiz **publicado** → **leitura** para membros (o aluno copia para trabalhar:
+   `POST /datasets/:id/copy`, `POST /workflows/:id/fork`).
+3. Resposta de aluno **entregue** (`submitted`/`graded`) → **leitura** do workflow/variável da resposta para o dono,
+   administradores e moderadores da comunidade. Voltar a entrega ao aluno (`reopen`) revoga o acesso. O aluno só pode
+   entregar recursos **dele**.
 
-## 6. API prevista
+### Exemplo: "faça um Tucker3 com o conjunto X"
+O professor posta o multiway X, cria uma pergunta do tipo *workflow* com X (e, se quiser, um workflow-modelo) como anexos →
+publica → o aluno copia X, monta/executa o workflow no editor e seleciona o resultado na pergunta → entrega → o professor
+abre a entrega, pré-visualiza ou **abre o workflow do aluno (somente leitura)** e atribui a nota.
 
-```
-GET/PUT   /communities/:id/apps                        # liga/desliga sub-apps
-GET/POST  /communities/:id/quizzes                     # moderator+ cria; membros veem open/closed
-GET/PUT/DELETE /communities/:id/quizzes/:qid
-PUT       /communities/:id/quizzes/:qid/questions-order
-POST      /communities/:id/quizzes/:qid/start          # cria/continua a submissão do aluno
-PUT       /communities/:id/quizzes/:qid/answers/:qn    # grava resposta (valor ou ref de workflow/variável)
-POST      /communities/:id/quizzes/:qid/submit
-GET       /communities/:id/quizzes/:qid/submissions    # moderator+: lista; aluno: só a própria
-PUT       /communities/:id/quizzes/:qid/submissions/:sid/grade
-```
-
-## 7. Regras de acesso e segurança
-
-- Aluno nunca recebe `correct` das opções antes da regra `show_feedback`.
-- Referência a workflow/variável na resposta só é aceita se pertencer ao próprio aluno (`level >= READ` e `owner`).
-- A leitura concedida ao professor é derivada da submissão (sem copiar dados) e some se a submissão for apagada.
-- Todos os endpoints reutilizam `guard()` da comunidade (404 para privada/não-membro, 403 papel insuficiente).
-
-## 8. Plano de entrega
-
-1. `community_apps` + registry de abas (sem mudar o comportamento atual).
-2. Quizzes só com múltipla escolha/descritiva + correção.
-3. Questão `workflow`/`dataset` com cópia de X e leitura do trabalho do aluno.
-4. Periodicidade, matriz de correção, notas exportáveis (CSV).
+## 5. Próximos sub-apps
+Novos módulos entram como nova entrada na aba Apps (card de criação + lista) e rotas `/communities/:id/<app>`; o controle de
+papéis (`guard`) e o acesso derivado de submissões acima servem de modelo. Previsto: *estudo dirigido*, notas exportáveis (CSV),
+recorrência de exercícios periódicos.
