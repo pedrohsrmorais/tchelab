@@ -169,3 +169,45 @@ Tudo em disco local no volume `storage_data` (`tmp`, `communities`, `avatars`, `
 `models`, `outputs` quase sem uso); dados numéricos dos datasets em JSON no MySQL; execução move o tensor
 navegador → API → Redis → worker (teto de 10 MB); o worker não monta o volume; nada é limpo; não há cota nem medição de
 processamento.
+
+## 8. Fase 3 detalhada — dados fora do MySQL, busca rápida, modelos lendo do bucket
+
+Objetivo: **listar/buscar rápido** (o MySQL guarda só o que se consulta), **os modelos continuam funcionando** (os scripts
+recebem os mesmos `numpy` de hoje) e o **volume pesado vai para o bucket**.
+
+### 8.1 Modelo de dados
+
+| Onde | O que guarda |
+|---|---|
+| MySQL `datasets` | linha **pequena**: nome, tipo, `dimensions`, `n_samples/n_variables`, cabeçalhos, comprimentos de onda, estatísticas por coluna, **prévia** (até 50 linhas × 50 colunas) e a chave do payload. É o que as listagens e a busca leem. |
+| Bucket `datasets/<uuid>/data.npy` | a matriz/tensor inteiro, `float64`, ordem C (formato `.npy`: o `numpy` lê direto, sem converter). Sidecar `datasets/<uuid>/extra.json` para rótulos de linha, colunas extras e classes. |
+| Bucket `runs/<execução>/<nó>/<porta>.npy` | cada saída de array de um nó. Saídas não-array pequenas (< 64 KB: métricas, escalares) ficam inline no manifesto; maiores viram `.json` no bucket. |
+| MySQL `execution_nodes` | `input_data`/`output_data` passam a ser **manifestos** (`{porta: {key, shape, dtype, bytes}}` ou valor inline pequeno), nunca a matriz. `jobs.result` guarda só o manifesto. |
+
+### 8.2 Passos (cada um entregável e testado; leitura aceita o formato antigo até a migração)
+
+1. **Formato e serviço** — leitor/gravador `.npy` em Node (cabeçalho v1, float64/float32/int), `datasetStore.service`
+   (gravar, ler inteiro, ler fatia de linhas, montar resumo e prévia). Teste de ida e volta Node ⇄ Python.
+2. **Datasets novos já nascem enxutos** — importação CSV, colar tensor, copiar, "salvar saída como dataset" (cópia dentro do
+   bucket, sem passar por JSON). Novos endpoints `GET /datasets/:id/data` (stream; `?rows=a-b`, `?format=json|npy`) e prévia
+   leve. A cota passa a contar linha pequena + bytes do `.npy`. **Frontend**: Workspace (hoje carrega `with_metadata` de até 200
+   datasets), detalhe, heatmap/visualização, pré-visualização de comunidade e editor de workflow passam a usar resumo/prévia e
+   buscam o payload só quando precisam (com redução de pontos no servidor para gráficos).
+3. **Dispatch por referência** — o navegador deixa de baixar o tensor e reenviá-lo: manda só `{dataset: uuid}`; o backend
+   confere o acesso e monta `{"$ref": chave, shape, dtype}`. O **worker lê e grava no bucket com credencial própria**
+   (usuário MinIO/IAM restrito aos prefixos `datasets/` e `runs/`; leitura nos dois, escrita só em `runs/`), entrega `ndarray` aos
+   scripts (já usam `np.asarray`, então nenhum script muda) e devolve um manifesto no lugar de `outputs`. O encadeamento
+   (SNV → PCA) passa a ser por chave de objeto. O backend confere o tamanho real (`stat`) antes de registrar a saída na cota
+   (> máximo do plano → apaga o objeto e falha o nó). Excluir execução apaga o prefixo `runs/<execução>/`.
+4. **Migração e limpeza** — `scripts/migrate_tensors_to_bucket.js` (idempotente, `--dry-run`, confere ida e volta antes de
+   esvaziar a coluna) para datasets e execuções existentes; remove os caminhos antigos e o teto de 10 MB de JSON (o limite
+   efetivo passa a ser o máximo por arquivo do plano); recalcula a cota.
+5. **Provas** — e2e: ida e volta, dispatch por referência com o worker de verdade (PLS e cadeia SNV → PCA), cota de saídas,
+   exclusão apagando o bucket, dado legado ainda legível; **medição** do tempo de listagem (200 datasets) e do tamanho do corpo
+   do `dispatch` antes/depois; docs e checklist de produção (credencial do worker, rede worker ↔ MinIO).
+
+### 8.3 Riscos e como os cobrimos
+- *Scripts que esperam listas*: o worker já converte tudo com `np.asarray`; a suíte `worker_api/tests` roda com entradas `ndarray` e o e2e roda o PLS real.
+- *Objeto no bucket sem linha no banco (ou o contrário)*: grava-se primeiro o objeto, depois a linha; falha no meio libera a reserva e apaga o objeto. Órfãos residuais entram na reconciliação da fase 4.
+- *Implantação*: leitura dos dois formatos até a migração rodar; só depois removemos o caminho legado.
+- *Memória do worker*: carregar `.npy` é mais leve que `JSON → listas`; a medição por job (CPU/pico de memória) é a fase 6.
