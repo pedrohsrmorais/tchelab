@@ -28,7 +28,7 @@ workflow, variável (dataset), projeto, link, texto, tópico** (cada atalho abre
 |---|---|
 | PDF, imagem | inline no modal (botão "Abrir em nova aba") |
 | PPT/PPTX/DOC/XLS… | PDF convertido pelo LibreOffice, inline; original disponível para baixar |
-| Variável (dataset) | tabela com as primeiras linhas/colunas e dimensões (multiway: dimensões + aviso) |
+| Variável (dataset) | tabela com as primeiras linhas/colunas e dimensões; multiway (3D+): fatia navegável — seletores escolhem o índice das vias iniciais e a tabela mostra as duas últimas |
 | Workflow | diagrama somente leitura (nós e conexões), sem abrir o editor |
 | Anexos e respostas de quiz | mesmos modais de pré-visualização |
 
@@ -49,7 +49,8 @@ Ciclo: `draft` → `open` (publicado) → `closed`. Opções: prazo (`due_at`; d
 | `GET /:qid/submissions`, `GET /:qid/submissions/:sid`, `PUT …/:sid/grade`, `POST …/:sid/reopen` | moderator+ |
 
 Regras:
-- Publicar exige ao menos uma pergunta. Com entregas feitas, as perguntas ficam bloqueadas (409): devolva as entregas ou crie outro quiz.
+- Publicar exige ao menos uma pergunta.
+- **Editar perguntas com entregas é permitido**, mas exige confirmação: sem `confirm: true` o `PUT /:qid/questions` responde `409 HAS_SUBMISSIONS` (com o nº de entregas). Com a confirmação, `regradeQuiz` descarta respostas que não servem mais (alternativa removida, tipo diferente), recalcula as notas automáticas de todas as tentativas, mantém as notas manuais (limitadas ao novo máximo) e volta a entrega para `submitted` se surgir pergunta manual sem nota.
 - O aluno **nunca recebe o gabarito** (V/F, alternativas corretas, resposta-modelo) antes da regra `show_results`.
 - Correção: `tf`/`choice` automática (múltipla escolha com várias corretas é tudo-ou-nada); `text`/`dataset`/`workflow`
   manual (nota até o máximo da pergunta + comentário). A entrega vira `graded` quando todas as manuais têm nota; um quiz só
@@ -68,6 +69,14 @@ Regras:
 O professor posta o multiway X, cria uma pergunta do tipo *workflow* com X (e, se quiser, um workflow-modelo) como anexos →
 publica → o aluno copia X, monta/executa o workflow no editor e seleciona o resultado na pergunta → entrega → o professor
 abre a entrega, pré-visualiza ou **abre o workflow do aluno (somente leitura)** e atribui a nota.
+
+### Tentativas configuráveis
+
+Em *Configurações* o professor define, por quiz:
+- **Tentativas por aluno** (`max_attempts`): `1` (padrão, uma só entrega), `2…50`, ou `0` = ilimitadas.
+- **Nota que vale** (`grade_policy`): `highest` (maior nota, padrão), `latest` (última) ou `first` (primeira) — a "nota oficial" considera só tentativas já corrigidas.
+
+Fluxo do aluno: `POST /:qid/start` devolve a tentativa atual (cria a #1 se não houver); depois de entregar, `POST /:qid/start { "new_attempt": true }` abre a próxima (em branco), desde que o quiz aceite respostas e ainda haja tentativas (senão `409 NO_ATTEMPTS_LEFT`). `GET /:qid` traz `attempts` (histórico), `attempts_used`, `attempts_left` (`null` = ilimitadas), `can_retry`, `official_score`/`official_attempt`. Reduzir o limite depois não apaga tentativas já feitas; só impede novas. Cada tentativa é uma linha em `quiz_submissions` (`attempt`, único por `quiz_id,user_id,attempt`); o professor vê todas, com o selo "vale" na oficial, e corrige cada uma separadamente. `submission_count` e "X de N alunos entregaram" contam **alunos**, não tentativas.
 
 ## 5. Próximos sub-apps
 Novos módulos entram como nova entrada na aba Apps (card de criação + lista) e rotas `/communities/:id/<app>`; o controle de

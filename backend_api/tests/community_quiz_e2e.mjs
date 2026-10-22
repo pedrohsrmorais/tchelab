@@ -171,13 +171,89 @@ const main = async () => {
 
   console.log('\n# Reabrir, fechar e remover');
   r = await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qz}/questions`, { questions: [{ kind: 'text', prompt: 'x' }] });
-  is('não edita perguntas com entregas', r, 409);
+  is('editar perguntas com entregas exige confirmação', r, 409);
+  check('… com código HAS_SUBMISSIONS', r.error?.code === 'HAS_SUBMISSIONS' || r.status === 409);
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qz}`);
+  check('padrão: 1 tentativa, sem nova tentativa', r.data.max_attempts === 1 && r.data.can_retry === false && r.data.attempts_used === 1 && r.data.attempts_left === 0, JSON.stringify([r.data.max_attempts, r.data.can_retry, r.data.attempts_used, r.data.attempts_left]));
+  r = await call(aluno.token, 'POST', `/communities/${cid}/quizzes/${qz}/start`, { new_attempt: true });
+  is('1 tentativa: nova tentativa recusada', r, 409);
   r = await call(prof.token, 'POST', `/communities/${cid}/quizzes/${qz}/submissions/${sid}/reopen`); is('devolve a entrega', r, 200);
   r = await call(prof.token, 'GET', `/workflows/${wfAluno}`); is('reaberta: professor volta a não ler o trabalho', r, 404);
   r = await ans(0, { value: false }); is('aluno edita de novo', r, 200);
   r = await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qz}`, { status: 'closed' }); is('fecha o quiz', r, 200);
   r = await ans(0, { value: true }); is('quiz fechado não recebe respostas', r, 409);
   r = await call(aluno.token, 'POST', `/communities/${cid}/quizzes/${qz}/submit`); is('quiz fechado não recebe entrega', r, 409);
+
+  console.log('\n# Tentativas configuráveis');
+  r = await call(prof.token, 'POST', `/communities/${cid}/quizzes`, { title: 'Treino', max_attempts: -1 }); is('max_attempts negativo rejeitado', r, 422);
+  r = await call(prof.token, 'POST', `/communities/${cid}/quizzes`, { title: 'Treino', max_attempts: 999 }); is('max_attempts acima do limite rejeitado', r, 422);
+  r = await call(prof.token, 'POST', `/communities/${cid}/quizzes`, { title: 'Treino', max_attempts: 2, grade_policy: 'xyz' }); is('grade_policy inválida rejeitada', r, 422);
+  r = await call(prof.token, 'POST', `/communities/${cid}/quizzes`, { title: 'Treino', max_attempts: 2, grade_policy: 'highest' }); is('cria quiz com 2 tentativas', r, 201);
+  const qza = r.data.uuid;
+  check('quiz devolve max_attempts/grade_policy', r.data.max_attempts === 2 && r.data.grade_policy === 'highest');
+  await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qza}/questions`, { questions: [
+    { kind: 'tf', prompt: 'Tucker3 tem 3 modos.', points: 2, config: { answer: true } },
+    { kind: 'choice', prompt: 'Qual é PARAFAC?', points: 3, config: { multiple: false, options: [{ id: 'a', text: 'CP', correct: true }, { id: 'b', text: 'PCA' }] } },
+  ] });
+  await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qza}`, { status: 'open' });
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qza}`); const qqza = r.data.questions;
+  const put = (i, body) => call(aluno.token, 'PUT', `/communities/${cid}/quizzes/${qza}/answers/${qqza[i].uuid}`, body);
+  const sendA = () => call(aluno.token, 'POST', `/communities/${cid}/quizzes/${qza}/submit`);
+  const startA = (b) => call(aluno.token, 'POST', `/communities/${cid}/quizzes/${qza}/start`, b);
+  await put(0, { value: true }); await put(1, { value: ['b'] });
+  r = await sendA(); check('tentativa 1 → nota 2', r.data.status === 'graded' && r.data.score === 2, JSON.stringify(r.data));
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qza}`);
+  check('pode tentar de novo (1 restante)', r.data.can_retry === true && r.data.attempts_left === 1 && r.data.attempts_used === 1);
+  r = await startA();
+  check('start sem new_attempt devolve a tentativa já entregue', r.data.attempt === 1 && r.data.status === 'graded');
+  r = await startA({ new_attempt: true }); check('nova tentativa → #2 em andamento', r.status === 200 && r.data.attempt === 2 && r.data.status === 'in_progress', JSON.stringify(r.data));
+  r = await startA({ new_attempt: true }); check('repetir new_attempt não cria outra (continua a #2)', r.data.attempt === 2);
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qza}`);
+  check('tentativa atual vazia, histórico com 2', r.data.my_submission.attempt === 2 && r.data.my_submission.answers.length === 0 && r.data.attempts.length === 2);
+  check('nota oficial = melhor (2) enquanto a #2 não entrega', r.data.official_score === 2 && r.data.official_attempt === 1);
+  await put(0, { value: true }); await put(1, { value: ['a'] });
+  r = await sendA(); check('tentativa 2 → nota 5', r.data.score === 5, JSON.stringify(r.data));
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qza}`);
+  check('melhor nota: oficial 5 (#2), sem tentativas restantes', r.data.official_score === 5 && r.data.official_attempt === 2 && r.data.can_retry === false && r.data.attempts_left === 0);
+  r = await startA({ new_attempt: true }); is('esgotou as tentativas', r, 409);
+  r = await call(prof.token, 'GET', `/communities/${cid}/quizzes/${qza}/submissions`);
+  check('professor vê as 2 tentativas, só a melhor conta', r.data.submissions.length === 2 && r.data.submissions.filter((x) => x.counted).length === 1 && r.data.submissions.find((x) => x.counted).attempt === 2, JSON.stringify(r.data.submissions.map((x) => [x.attempt, x.counted])));
+  check('1 aluno entregou (student_count)', r.data.student_count === 1);
+  r = await call(prof.token, 'GET', `/communities/${cid}/content`);
+  check('lista de conteúdo: submission_count conta alunos, não tentativas', (r.data.general.quizzes || []).concat(r.data.sections.flatMap((x) => x.quizzes || [])).find((x) => x.uuid === qza)?.submission_count === 1);
+
+  // políticas
+  r = await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qza}`, { grade_policy: 'first' }); is('troca política → primeira', r, 200);
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qza}`); check('política "primeira": oficial = #1 (2)', r.data.official_score === 2 && r.data.official_attempt === 1);
+  r = await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qza}`, { grade_policy: 'latest' });
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qza}`); check('política "última": oficial = #2 (5)', r.data.official_attempt === 2);
+  r = await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qza}`, { max_attempts: 0 }); is('tentativas ilimitadas (0)', r, 200);
+  r = await call(aluno.token, 'GET', `/communities/${cid}/quizzes/${qza}`); check('ilimitadas: can_retry e attempts_left=null', r.data.can_retry === true && r.data.attempts_left === null);
+  r = await startA({ new_attempt: true }); check('abre a tentativa #3', r.data.attempt === 3);
+  r = await call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qza}`, { max_attempts: 1 }); is('reduz limite abaixo do que já usou', r, 200);
+  await put(0, { value: false }); r = await sendA(); check('tentativa #3 em andamento ainda pode ser entregue', r.status === 200 && r.data.score === 0, JSON.stringify(r.data));
+  r = await startA({ new_attempt: true }); is('limite 1 já estourado: nova tentativa recusada', r, 409);
+  r = await call(outro.token, 'POST', `/communities/${cid}/quizzes/${qza}/start`, {}); check('não-membro não inicia', [403, 404].includes(r.status));
+
+  console.log('\n# Editar perguntas com entregas (recorrige)');
+  r = await call(prof.token, 'GET', `/communities/${cid}/quizzes/${qza}`); const qSrc = r.data.questions;
+  const edit = (qs2, confirm) => call(prof.token, 'PUT', `/communities/${cid}/quizzes/${qza}/questions`, { questions: qs2, ...(confirm ? { confirm: true } : {}) });
+  const keep = (x, over = {}) => ({ uuid: x.uuid, kind: x.kind, prompt: x.prompt, points: x.points, config: x.config, ...over });
+  r = await edit([keep(qSrc[0], { config: { answer: false } }), keep(qSrc[1])]); is('sem confirm → 409', r, 409);
+  check('… informa quantas entregas', r.error?.details?.submissions === 3 || r.status === 409);
+  r = await edit([keep(qSrc[0], { config: { answer: false } }), keep(qSrc[1])], true); is('com confirm → salva', r, 200);
+  r = await call(prof.token, 'GET', `/communities/${cid}/quizzes/${qza}/submissions`);
+  const bySub = Object.fromEntries(r.data.submissions.map((x) => [x.attempt, x.score]));
+  check('recorrigido: #1 (V,b)=0, #2 (V,a)=3, #3 (F,—)=2', bySub[1] === 0 && bySub[2] === 3 && bySub[3] === 2, JSON.stringify(bySub));
+  r = await edit([keep(qSrc[0], { config: { answer: false } }), keep(qSrc[1], { config: { multiple: false, options: [{ id: 'a', text: 'CP' }, { id: 'c', text: 'Tucker', correct: true }] } })], true);
+  is('alternativa removida/alterada com confirm', r, 200);
+  r = await call(prof.token, 'GET', `/communities/${cid}/quizzes/${qza}/submissions`);
+  const by2 = Object.fromEntries(r.data.submissions.map((x) => [x.attempt, x.score]));
+  check('resposta "b" (removida) descartada; #2 (a) errada: #1=0, #2=0, #3=2', by2[1] === 0 && by2[2] === 0 && by2[3] === 2, JSON.stringify(by2));
+  r = await edit([keep(qSrc[0], { kind: 'text', config: {} })], true); is('muda tipo de pergunta com confirm', r, 200);
+  r = await call(prof.token, 'GET', `/communities/${cid}/quizzes/${qza}/submissions`);
+  check('com pergunta manual nova, entregas voltam a "submitted"', r.data.submissions.every((x) => x.status === 'submitted'), JSON.stringify(r.data.submissions.map((x) => x.status)));
+  r = await call(prof.token, 'DELETE', `/communities/${cid}/quizzes/${qza}`); is('exclui quiz de tentativas', r, 204);
 
   // quiz só com perguntas automáticas é corrigido na hora
   r = await call(prof.token, 'POST', `/communities/${cid}/quizzes`, { title: 'Relâmpago' }); const qz2 = r.data.uuid;

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitBranch, Database } from 'lucide-react';
@@ -61,6 +61,52 @@ function WorkflowPreview({ uuid }) {
   );
 }
 
+/** Tabela de um fatiamento (as duas últimas vias) de um tensor aninhado; seletores escolhem os índices das vias iniciais. */
+function tensorShape(t) { const out = []; let cur = t; while (Array.isArray(cur)) { out.push(cur.length); cur = cur[0]; } return out; }
+
+function TensorSlice({ tensor, dims }) {
+  const { t } = useTranslation();
+  const lead = dims.slice(0, -2);
+  const [idx, setIdx] = useState(() => lead.map(() => 0));
+  let slice = tensor;
+  for (const i of idx) slice = Array.isArray(slice) ? slice[i] : undefined;
+  const rows = Array.isArray(slice) ? slice.slice(0, 12) : [];
+  const nCols = Math.min(12, dims[dims.length - 1]);
+  return (
+    <div className="space-y-2" data-testid="tensor-slice">
+      <div className="flex flex-wrap items-center gap-2 text-xs" style={muted}>
+        <span>{t('communities.previewSlice')}</span>
+        {lead.map((n, k) => (
+          <label key={k} className="flex items-center gap-1">
+            {t('communities.previewMode', { n: k + 1 })}
+            <select className="input-field !py-0.5 !px-1.5 !w-auto text-xs" value={idx[k]} onChange={e => setIdx(a => a.map((v, j) => (j === k ? Number(e.target.value) : v)))} aria-label={t('communities.previewMode', { n: k + 1 })}>
+              {Array.from({ length: n }, (_, i) => <option key={i} value={i}>{i + 1}</option>)}
+            </select>
+          </label>
+        ))}
+        <span>· {t('communities.previewMode', { n: lead.length + 1 })} × {t('communities.previewMode', { n: lead.length + 2 })}</span>
+      </div>
+      <div className="overflow-auto rounded-lg" style={{ maxHeight: '45vh', border: '1px solid var(--border)' }}>
+        <table className="w-full text-xs">
+          <thead><tr style={{ background: 'var(--bg-hover)' }}>
+            <th className="px-3 py-2 text-left" style={muted}>#</th>
+            {Array.from({ length: nCols }, (_, c) => <th key={c} className="px-3 py-2 text-left" style={{ color: 'var(--text-secondary)' }}>{c + 1}</th>)}
+          </tr></thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} style={{ borderTop: '1px solid var(--border)' }}>
+                <td className="px-3 py-1.5 font-mono" style={muted}>{ri + 1}</td>
+                {(Array.isArray(row) ? row : []).slice(0, 12).map((cell, ci) => <td key={ci} className="px-3 py-1.5 font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{cell == null ? '—' : Number(cell).toFixed(4)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {(dims[dims.length - 2] > 12 || dims[dims.length - 1] > 12) && <p className="text-xs" style={muted}>{t('communities.previewTruncated')}</p>}
+    </div>
+  );
+}
+
 function DatasetPreview({ uuid }) {
   const { t } = useTranslation();
   const { data, loading, error } = useApi(() => api.datasets.get(uuid), [uuid]);
@@ -71,13 +117,15 @@ function DatasetPreview({ uuid }) {
   const d = meta?.data;
   const cols = (d?.columns || []).slice(0, 12);
   const rows = (d?.matrix || []).slice(0, 12);
+  const tensor = d?.tensor;
+  const tdims = Array.isArray(tensor) ? tensorShape(tensor) : null;
   return (
     <div className="space-y-3">
       <p className="text-xs" style={muted}>
         {Array.isArray(dims) ? `${t('communities.previewDims')}: ${dims.join(' × ')}` : ''}
         {Array.isArray(dims) && dims.length > 2 ? ` · ${t('communities.previewMultiway')}` : ''}
       </p>
-      {cols.length > 0 && rows.length > 0 ? (
+      {tdims && tdims.length >= 3 ? <TensorSlice tensor={tensor} dims={tdims} /> : cols.length > 0 && rows.length > 0 ? (
         <div className="overflow-auto rounded-lg" style={{ maxHeight: '50vh', border: '1px solid var(--border)' }}>
           <table className="w-full text-xs">
             <thead><tr style={{ background: 'var(--bg-hover)' }}>

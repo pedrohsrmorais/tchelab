@@ -853,8 +853,8 @@ async function getContent(req, res) {
     const [quizzes] = await db.query(
       `SELECT q.uuid, q.section_id, q.title, q.description, q.status, q.due_at, q.show_results, q.position, q.created_at,
               (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.id) AS question_count,
-              (SELECT COUNT(*) FROM quiz_submissions WHERE quiz_id = q.id AND status <> 'in_progress') AS submission_count,
-              (SELECT status FROM quiz_submissions WHERE quiz_id = q.id AND user_id = ?) AS my_status
+              (SELECT COUNT(DISTINCT user_id) FROM quiz_submissions WHERE quiz_id = q.id AND status <> 'in_progress') AS submission_count,
+              (SELECT status FROM quiz_submissions WHERE quiz_id = q.id AND user_id = ? ORDER BY attempt DESC LIMIT 1) AS my_status
          FROM quizzes q WHERE q.community_id = ? ${canSeeHidden ? '' : "AND q.status <> 'draft'"}
         ORDER BY q.position, q.id`, [req.user.id, req.community.id],
     );

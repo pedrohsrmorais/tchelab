@@ -134,6 +134,8 @@ const TABLES = [
       \`status\` enum('draft','open','closed') ${COLLATE} NOT NULL DEFAULT 'draft',
       \`due_at\` datetime DEFAULT NULL,
       \`show_results\` enum('after_submit','after_close','never') ${COLLATE} NOT NULL DEFAULT 'after_submit',
+      \`max_attempts\` int NOT NULL DEFAULT 1,
+      \`grade_policy\` enum('highest','latest','first') ${COLLATE} NOT NULL DEFAULT 'highest',
       \`position\` int NOT NULL DEFAULT 0,
       \`created_by\` bigint unsigned DEFAULT NULL,
       \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -180,6 +182,7 @@ const TABLES = [
       \`uuid\` char(36) ${COLLATE} NOT NULL,
       \`quiz_id\` bigint unsigned NOT NULL,
       \`user_id\` bigint unsigned NOT NULL,
+      \`attempt\` int NOT NULL DEFAULT 1,
       \`status\` enum('in_progress','submitted','graded') ${COLLATE} NOT NULL DEFAULT 'in_progress',
       \`score\` decimal(7,2) DEFAULT NULL,
       \`feedback\` text ${COLLATE},
@@ -189,7 +192,7 @@ const TABLES = [
       \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (\`id\`),
       UNIQUE KEY \`uq_submission_uuid\` (\`uuid\`),
-      UNIQUE KEY \`uq_submission_user\` (\`quiz_id\`,\`user_id\`),
+      UNIQUE KEY \`uq_submission_attempt\` (\`quiz_id\`,\`user_id\`,\`attempt\`),
       CONSTRAINT \`fk_submission_quiz\` FOREIGN KEY (\`quiz_id\`) REFERENCES \`quizzes\` (\`id\`) ON DELETE CASCADE,
       CONSTRAINT \`fk_submission_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
@@ -274,6 +277,22 @@ async function migrate() {
     if (!(await hasTable(name))) {
       await db.query(ddl);
       console.log(`[migrate] tabela ${name} criada`);
+    }
+  }
+
+  // quizzes: tentativas configuráveis (0 = ilimitadas) e política de nota
+  await addColumn('quizzes', 'max_attempts', 'int NOT NULL DEFAULT 1');
+  await addColumn('quizzes', 'grade_policy', "enum('highest','latest','first') NOT NULL DEFAULT 'highest'");
+  await addColumn('quiz_submissions', 'attempt', 'int NOT NULL DEFAULT 1');
+  if (await hasTable('quiz_submissions')) {
+    const [idx] = await db.query(
+      `SELECT INDEX_NAME FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'quiz_submissions' AND INDEX_NAME = 'uq_submission_user'`,
+    );
+    if (idx.length) {
+      // o FK de quiz_id precisa de um índice próprio antes de largar o único antigo
+      await db.query('ALTER TABLE `quiz_submissions` ADD UNIQUE KEY `uq_submission_attempt` (`quiz_id`,`user_id`,`attempt`), DROP INDEX `uq_submission_user`');
+      console.log('[migrate] quiz_submissions: uma entrega por tentativa');
     }
   }
 }

@@ -37,6 +37,28 @@ const unwrapAnswer = (raw) => {
   return o && typeof o === 'object' && !Array.isArray(o) && 'v' in o ? o.v : null;
 };
 
+const POLICIES = ['highest', 'latest', 'first'];
+const MAX_ATTEMPTS_LIMIT = 50;
+
+/** Valida `max_attempts` (0 = ilimitadas). */
+function cleanAttempts(v) {
+  if (v === undefined) return { value: undefined };
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n > MAX_ATTEMPTS_LIMIT) return { error: `Use um número de 0 (ilimitadas) a ${MAX_ATTEMPTS_LIMIT}.` };
+  return { value: n };
+}
+
+/** Nota considerada entre as tentativas já corrigidas, conforme a política do quiz. */
+function officialOf(quiz, subs) {
+  const graded = subs.filter((x) => x.status === 'graded' && x.score != null).sort((a, b) => a.attempt - b.attempt);
+  if (!graded.length) return null;
+  if (quiz.grade_policy === 'first') return graded[0];
+  if (quiz.grade_policy === 'latest') return graded[graded.length - 1];
+  return graded.reduce((best, x) => (Number(x.score) > Number(best.score) ? x : best), graded[0]);
+}
+
+const attemptsLeft = (quiz, used) => (quiz.max_attempts === 0 ? Infinity : Math.max(0, quiz.max_attempts - used));
+
 async function quizRow(req) {
   const [rows] = await db.query('SELECT * FROM quizzes WHERE uuid = ? AND community_id = ?', [req.params.qid, req.community.id]);
   return rows[0] || null;
@@ -165,12 +187,13 @@ async function loadAnswers(subId) {
 }
 
 const subShape = (s) => ({
-  uuid: s.uuid, status: s.status, score: num(s.score), feedback: s.feedback, submitted_at: s.submitted_at, graded_at: s.graded_at,
+  uuid: s.uuid, attempt: s.attempt, status: s.status, score: num(s.score), feedback: s.feedback, submitted_at: s.submitted_at, graded_at: s.graded_at,
 });
 
 function quizShape(q, extra = {}) {
   return {
     uuid: q.uuid, title: q.title, description: q.description, status: q.status, due_at: q.due_at, show_results: q.show_results,
+    max_attempts: q.max_attempts, grade_policy: q.grade_policy,
     created_at: q.created_at, accepting: acceptsAnswers(q), ...extra,
   };
 }
@@ -184,18 +207,34 @@ async function listQuizzes(req, res) {
       `SELECT q.*, s.uuid AS section_uuid,
               (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = q.id) AS question_count,
               (SELECT COALESCE(SUM(points),0) FROM quiz_questions WHERE quiz_id = q.id) AS total_points,
-              (SELECT COUNT(*) FROM quiz_submissions WHERE quiz_id = q.id AND status <> 'in_progress') AS submission_count,
-              (SELECT status FROM quiz_submissions WHERE quiz_id = q.id AND user_id = ?) AS my_status,
-              (SELECT score FROM quiz_submissions WHERE quiz_id = q.id AND user_id = ?) AS my_score
+              (SELECT COUNT(DISTINCT user_id) FROM quiz_submissions WHERE quiz_id = q.id AND status <> 'in_progress') AS submission_count
          FROM quizzes q LEFT JOIN community_sections s ON s.id = q.section_id
         WHERE q.community_id = ? ${staff ? '' : "AND q.status <> 'draft'"}
-        ORDER BY q.position, q.id`, [req.user.id, req.user.id, req.community.id],
+        ORDER BY q.position, q.id`, [req.community.id],
     );
-    return R.ok(res, rows.map((q) => quizShape(q, {
-      section: q.section_uuid, question_count: q.question_count, total_points: num(q.total_points),
-      submission_count: staff ? q.submission_count : undefined, my_status: q.my_status || null, my_score: num(q.my_score),
-    })));
+    const mine = await mySubmissionsByQuiz(rows.map((r) => r.id), req.user.id);
+    return R.ok(res, rows.map((q) => {
+      const my = mine.get(q.id) || [];
+      const latest = my[my.length - 1];
+      const off = officialOf(q, my);
+      return quizShape(q, {
+        section: q.section_uuid, question_count: q.question_count, total_points: num(q.total_points),
+        submission_count: staff ? q.submission_count : undefined,
+        my_status: latest ? latest.status : null, my_score: off ? num(off.score) : null, my_attempts: my.length,
+      });
+    }));
   } catch (err) { return R.serverError(res, err); }
+}
+
+/** Entregas do usuário agrupadas por quiz (em ordem de tentativa). */
+async function mySubmissionsByQuiz(quizIds, userId) {
+  const map = new Map();
+  if (!quizIds.length) return map;
+  const [subs] = await db.query(
+    'SELECT quiz_id, attempt, status, score FROM quiz_submissions WHERE user_id = ? AND quiz_id IN (?) ORDER BY attempt', [userId, quizIds],
+  );
+  subs.forEach((x) => { if (!map.has(x.quiz_id)) map.set(x.quiz_id, []); map.get(x.quiz_id).push(x); });
+  return map;
 }
 
 // POST /communities/:id/quizzes
@@ -208,16 +247,20 @@ async function createQuiz(req, res) {
     const sec = await sectionId(req.community.id, b.section);
     if (sec.error) return R.notFound(res, 'Tópico');
     const show = SHOW.includes(b.show_results) ? b.show_results : 'after_submit';
+    const att = cleanAttempts(b.max_attempts);
+    if (att.error) return R.unprocessable(res, [{ field: 'max_attempts', message: att.error }]);
+    if (b.grade_policy !== undefined && !POLICIES.includes(b.grade_policy)) return R.unprocessable(res, [{ field: 'grade_policy', message: 'Inválido.' }]);
     let due = null;
     if (b.due_at) { due = new Date(b.due_at); if (Number.isNaN(due.getTime())) return R.unprocessable(res, [{ field: 'due_at', message: 'Data inválida.' }]); }
     const [[{ next }]] = await db.query('SELECT COALESCE(MAX(position), -1) + 1 AS next FROM quizzes WHERE community_id = ? AND section_id <=> ?', [req.community.id, sec.id]);
     const uuid = uuidv4();
     await db.query(
-      `INSERT INTO quizzes (uuid, community_id, section_id, title, description, status, due_at, show_results, position, created_by)
-       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
-      [uuid, req.community.id, sec.id, title, b.description ? String(b.description).slice(0, 10000) : null, due, show, next, req.user.id],
+      `INSERT INTO quizzes (uuid, community_id, section_id, title, description, status, due_at, show_results, max_attempts, grade_policy, position, created_by)
+       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?)`,
+      [uuid, req.community.id, sec.id, title, b.description ? String(b.description).slice(0, 10000) : null, due, show,
+        att.value === undefined ? 1 : att.value, b.grade_policy || 'highest', next, req.user.id],
     );
-    return R.created(res, { uuid, title, status: 'draft' });
+    return R.created(res, { uuid, title, status: 'draft', max_attempts: att.value === undefined ? 1 : att.value, grade_policy: b.grade_policy || 'highest' });
   } catch (err) { return R.serverError(res, err); }
 }
 
@@ -230,6 +273,9 @@ async function updateQuiz(req, res) {
     if (b.title !== undefined && !String(b.title).trim()) return R.unprocessable(res, [{ field: 'title', message: 'Obrigatório.' }]);
     if (b.status !== undefined && !STATUSES.includes(b.status)) return R.unprocessable(res, [{ field: 'status', message: 'Inválido.' }]);
     if (b.show_results !== undefined && !SHOW.includes(b.show_results)) return R.unprocessable(res, [{ field: 'show_results', message: 'Inválido.' }]);
+    const att = cleanAttempts(b.max_attempts);
+    if (att.error) return R.unprocessable(res, [{ field: 'max_attempts', message: att.error }]);
+    if (b.grade_policy !== undefined && !POLICIES.includes(b.grade_policy)) return R.unprocessable(res, [{ field: 'grade_policy', message: 'Inválido.' }]);
     let secId = q.section_id;
     if (b.section !== undefined) {
       const sec = await sectionId(req.community.id, b.section);
@@ -247,11 +293,12 @@ async function updateQuiz(req, res) {
       if (!n) return R.unprocessable(res, [{ field: 'status', message: 'Adicione ao menos uma pergunta antes de publicar.' }]);
     }
     await db.query(
-      'UPDATE quizzes SET title = ?, description = ?, status = ?, due_at = ?, show_results = ?, section_id = ? WHERE id = ?',
+      'UPDATE quizzes SET title = ?, description = ?, status = ?, due_at = ?, show_results = ?, max_attempts = ?, grade_policy = ?, section_id = ? WHERE id = ?',
       [
         b.title !== undefined ? String(b.title).trim().slice(0, 255) : q.title,
         b.description !== undefined ? (b.description ? String(b.description).slice(0, 10000) : null) : q.description,
-        status, due, b.show_results !== undefined ? b.show_results : q.show_results, secId, q.id,
+        status, due, b.show_results !== undefined ? b.show_results : q.show_results,
+        att.value === undefined ? q.max_attempts : att.value, b.grade_policy !== undefined ? b.grade_policy : q.grade_policy, secId, q.id,
       ],
     );
     return R.ok(res, { message: 'Quiz atualizado.' });
@@ -276,8 +323,10 @@ async function saveQuestions(req, res) {
     const list = req.body && req.body.questions;
     if (!Array.isArray(list)) return R.unprocessable(res, [{ field: 'questions', message: 'Informe a lista de perguntas.' }]);
     if (list.length > MAX_QUESTIONS) return R.unprocessable(res, [{ field: 'questions', message: `No máximo ${MAX_QUESTIONS} perguntas.` }]);
-    const [[{ n }]] = await db.query("SELECT COUNT(*) AS n FROM quiz_submissions WHERE quiz_id = ? AND status <> 'in_progress'", [q.id]);
-    if (n) return R.error(res, 409, 'CONFLICT', 'Este quiz já tem respostas entregues; não é possível alterar as perguntas. Duplique-o ou reabra as entregas.');
+    const [[{ n }]] = await db.query("SELECT COUNT(DISTINCT id) AS n FROM quiz_submissions WHERE quiz_id = ? AND status <> 'in_progress'", [q.id]);
+    if (n && !(req.body && req.body.confirm === true)) {
+      return R.error(res, 409, 'HAS_SUBMISSIONS', 'Este quiz já tem entregas. Ao alterar as perguntas, as notas automáticas serão recalculadas e respostas incompatíveis serão descartadas.', { submissions: n });
+    }
 
     const cleaned = [];
     for (let i = 0; i < list.length; i += 1) {
@@ -310,12 +359,9 @@ async function saveQuestions(req, res) {
     }
     const drop = existing.filter((e) => !keep.has(e.id)).map((e) => e.id);
     if (drop.length) await db.query('DELETE FROM quiz_questions WHERE id IN (?)', [drop]);
-    // respostas em andamento de perguntas que mudaram de tipo ficam inconsistentes: limpa-as
-    await db.query(
-      `DELETE a FROM quiz_answers a JOIN quiz_submissions s ON s.id = a.submission_id
-        WHERE s.quiz_id = ? AND s.status = 'in_progress'`, [q.id],
-    );
-    return R.ok(res, { message: 'Perguntas salvas.', count: cleaned.length });
+    // descarta respostas que não servem mais (tipo/alternativas mudaram) e recalcula as entregas já feitas
+    await regradeQuiz(q.id);
+    return R.ok(res, { message: 'Perguntas salvas.', count: cleaned.length, regraded: n });
   } catch (err) { return R.serverError(res, err); }
 }
 
@@ -337,8 +383,8 @@ async function getQuiz(req, res) {
       if (!(await ok(sec))) return R.notFound(res, 'Quiz');
     }
     const questions = await loadQuestions(q.id);
-    const [subs] = await db.query('SELECT * FROM quiz_submissions WHERE quiz_id = ? AND user_id = ?', [q.id, req.user.id]);
-    const sub = subs[0] || null;
+    const [subs] = await db.query('SELECT * FROM quiz_submissions WHERE quiz_id = ? AND user_id = ? ORDER BY attempt', [q.id, req.user.id]);
+    const sub = subs[subs.length - 1] || null; // tentativa atual
     const reveal = staff || revealsAnswers(q, sub);
     const out = quizShape(q, {
       questions: questions.map((x) => publicQuestion(x, reveal)),
@@ -346,10 +392,19 @@ async function getQuiz(req, res) {
       revealed: reveal,
     });
     if (staff) {
-      const [[{ n }]] = await db.query("SELECT COUNT(*) AS n FROM quiz_submissions WHERE quiz_id = ? AND status <> 'in_progress'", [q.id]);
+      const [[{ n }]] = await db.query("SELECT COUNT(DISTINCT user_id) AS n FROM quiz_submissions WHERE quiz_id = ? AND status <> 'in_progress'", [q.id]);
       out.has_submissions = n > 0;
+      out.submitters = n;
       if (q.section_id) { const [[sec]] = await db.query('SELECT uuid FROM community_sections WHERE id = ?', [q.section_id]); out.section = sec ? sec.uuid : null; } else out.section = null;
     }
+    const left = attemptsLeft(q, subs.length);
+    out.attempts = subs.map((x) => ({ uuid: x.uuid, attempt: x.attempt, status: x.status, score: x.status === 'graded' ? num(x.score) : null, submitted_at: x.submitted_at }));
+    out.attempts_used = subs.length;
+    out.attempts_left = left === Infinity ? null : left; // null = ilimitadas
+    out.can_retry = !!sub && sub.status !== 'in_progress' && acceptsAnswers(q) && left > 0;
+    const off = officialOf(q, subs);
+    out.official_score = off ? num(off.score) : null;
+    out.official_attempt = off ? off.attempt : null;
     if (sub) {
       const answers = await loadAnswers(sub.id);
       out.my_submission = {
@@ -369,24 +424,34 @@ async function getQuiz(req, res) {
 }
 
 // ─── aluno ──────────────────────────────────────────────────────────────────
-async function ensureSubmission(quiz, user) {
-  const [rows] = await db.query('SELECT * FROM quiz_submissions WHERE quiz_id = ? AND user_id = ?', [quiz.id, user.id]);
-  if (rows.length) return rows[0];
+async function latestSubmission(quizId, userId) {
+  const [rows] = await db.query('SELECT * FROM quiz_submissions WHERE quiz_id = ? AND user_id = ? ORDER BY attempt DESC LIMIT 1', [quizId, userId]);
+  return rows[0] || null;
+}
+
+async function createSubmission(quiz, user, attempt) {
   const uuid = uuidv4();
-  await db.query('INSERT INTO quiz_submissions (uuid, quiz_id, user_id) VALUES (?, ?, ?)', [uuid, quiz.id, user.id]);
+  await db.query('INSERT INTO quiz_submissions (uuid, quiz_id, user_id, attempt) VALUES (?, ?, ?, ?)', [uuid, quiz.id, user.id, attempt]);
   const [r] = await db.query('SELECT * FROM quiz_submissions WHERE uuid = ?', [uuid]);
   return r[0];
 }
 
-// POST /communities/:id/quizzes/:qid/start
+// POST /communities/:id/quizzes/:qid/start   { new_attempt?: true }
+// Começa (ou continua) a tentativa atual; `new_attempt` abre outra, se o professor permitir e ainda houver tentativas.
 async function startQuiz(req, res) {
   try {
     const q = await quizRow(req);
     if (!q || q.status === 'draft') return R.notFound(res, 'Quiz');
-    const existing = (await db.query('SELECT 1 FROM quiz_submissions WHERE quiz_id = ? AND user_id = ?', [q.id, req.user.id]))[0].length;
-    if (!existing && !acceptsAnswers(q)) return R.error(res, 409, 'QUIZ_CLOSED', 'Este quiz não está recebendo respostas.');
-    const sub = await ensureSubmission(q, req.user);
-    return R.ok(res, subShape(sub));
+    const latest = await latestSubmission(q.id, req.user.id);
+    if (!latest) {
+      if (!acceptsAnswers(q)) return R.error(res, 409, 'QUIZ_CLOSED', 'Este quiz não está recebendo respostas.');
+      return R.ok(res, subShape(await createSubmission(q, req.user, 1)));
+    }
+    if (latest.status === 'in_progress' || !(req.body && req.body.new_attempt)) return R.ok(res, subShape(latest));
+    if (!acceptsAnswers(q)) return R.error(res, 409, 'QUIZ_CLOSED', 'Este quiz não está recebendo respostas.');
+    const [[{ used }]] = await db.query('SELECT COUNT(*) AS used FROM quiz_submissions WHERE quiz_id = ? AND user_id = ?', [q.id, req.user.id]);
+    if (attemptsLeft(q, used) <= 0) return R.error(res, 409, 'NO_ATTEMPTS_LEFT', 'Você já usou todas as tentativas deste quiz.');
+    return R.ok(res, subShape(await createSubmission(q, req.user, latest.attempt + 1)));
   } catch (err) { return R.serverError(res, err); }
 }
 
@@ -430,7 +495,7 @@ async function saveAnswer(req, res) {
     if (!qq.length) return R.notFound(res, 'Pergunta');
     const sub = await ensureSubmissionFor(q, req);
     if (!sub) return R.error(res, 409, 'QUIZ_CLOSED', 'Este quiz não está recebendo respostas.');
-    if (sub.status !== 'in_progress') return R.error(res, 409, 'ALREADY_SUBMITTED', 'Você já entregou este quiz.');
+    if (sub.status !== 'in_progress') return R.error(res, 409, 'ALREADY_SUBMITTED', 'Você já entregou esta tentativa.');
     if (!acceptsAnswers(q)) return R.error(res, 409, 'QUIZ_CLOSED', 'Este quiz não está recebendo respostas.');
     const question = { ...qq[0], config: parseJson(qq[0].config, {}) || {} };
     const a = await cleanAnswer(question, req.body || {}, req.user);
@@ -445,10 +510,10 @@ async function saveAnswer(req, res) {
 }
 
 async function ensureSubmissionFor(quiz, req) {
-  const [rows] = await db.query('SELECT * FROM quiz_submissions WHERE quiz_id = ? AND user_id = ?', [quiz.id, req.user.id]);
-  if (rows.length) return rows[0];
+  const latest = await latestSubmission(quiz.id, req.user.id);
+  if (latest) return latest;
   if (!acceptsAnswers(quiz)) return null;
-  return ensureSubmission(quiz, req.user);
+  return createSubmission(quiz, req.user, 1);
 }
 
 function autoPoints(question, value) {
@@ -470,7 +535,7 @@ async function submitQuiz(req, res) {
     if (!q || q.status === 'draft') return R.notFound(res, 'Quiz');
     const sub = await ensureSubmissionFor(q, req);
     if (!sub) return R.error(res, 409, 'QUIZ_CLOSED', 'Este quiz não está recebendo respostas.');
-    if (sub.status !== 'in_progress') return R.error(res, 409, 'ALREADY_SUBMITTED', 'Você já entregou este quiz.');
+    if (sub.status !== 'in_progress') return R.error(res, 409, 'ALREADY_SUBMITTED', 'Você já entregou esta tentativa.');
     if (!acceptsAnswers(q)) return R.error(res, 409, 'QUIZ_CLOSED', 'Este quiz não está recebendo respostas.');
     const questions = await loadQuestions(q.id);
     const [answers] = await db.query('SELECT * FROM quiz_answers WHERE submission_id = ?', [sub.id]);
@@ -500,17 +565,22 @@ async function listSubmissions(req, res) {
     const q = await quizRow(req);
     if (!q) return R.notFound(res, 'Quiz');
     const [rows] = await db.query(
-      `SELECT s.uuid, s.status, s.score, s.submitted_at, s.graded_at, u.uuid AS user_uuid, u.name AS user_name, u.email AS user_email
+      `SELECT s.uuid, s.user_id, s.attempt, s.status, s.score, s.submitted_at, s.graded_at, u.uuid AS user_uuid, u.name AS user_name, u.email AS user_email
          FROM quiz_submissions s JOIN users u ON u.id = s.user_id
-        WHERE s.quiz_id = ? ORDER BY s.submitted_at IS NULL, s.submitted_at DESC, u.name`, [q.id],
+        WHERE s.quiz_id = ? ORDER BY u.name, s.user_id, s.attempt DESC`, [q.id],
     );
     const [[{ total }]] = await db.query('SELECT COALESCE(SUM(points),0) AS total FROM quiz_questions WHERE quiz_id = ?', [q.id]);
     const [[{ members }]] = await db.query("SELECT COUNT(*) AS members FROM community_members WHERE community_id = ? AND role = 'member'", [req.community.id]);
+    const byUser = new Map();
+    rows.forEach((r) => { if (!byUser.has(r.user_id)) byUser.set(r.user_id, []); byUser.get(r.user_id).push(r); });
+    const counted = new Set();
+    byUser.forEach((list) => { const off = officialOf(q, list); if (off) counted.add(off.uuid); });
+    const students = new Set(rows.filter((r) => r.status !== 'in_progress').map((r) => r.user_id)).size;
     return R.ok(res, {
-      total_points: num(total), member_count: members,
+      total_points: num(total), member_count: members, student_count: students, max_attempts: q.max_attempts, grade_policy: q.grade_policy,
       submissions: rows.map((r) => ({
-        uuid: r.uuid, status: r.status, score: num(r.score), submitted_at: r.submitted_at, graded_at: r.graded_at,
-        user: { uuid: r.user_uuid, name: r.user_name, email: r.user_email },
+        uuid: r.uuid, attempt: r.attempt, status: r.status, score: num(r.score), submitted_at: r.submitted_at, graded_at: r.graded_at,
+        counted: counted.has(r.uuid), user: { uuid: r.user_uuid, name: r.user_name, email: r.user_email },
       })),
     });
   } catch (err) { return R.serverError(res, err); }
@@ -590,6 +660,61 @@ async function reopenSubmission(req, res) {
     await db.query('UPDATE quiz_answers SET points = NULL, feedback = NULL WHERE submission_id = ?', [rows[0].id]);
     return R.ok(res, { message: 'Entrega devolvida ao aluno.' });
   } catch (err) { return R.serverError(res, err); }
+}
+
+// ─── recorreção ao editar perguntas de um quiz que já tem entregas ──────────
+/** A resposta continua válida para a pergunta (que pode ter mudado de tipo/alternativas)? */
+function sanitizeAnswer(question, row) {
+  const v = unwrapAnswer(row.value);
+  if (question.kind === 'tf') return typeof v === 'boolean' ? { value: v } : null;
+  if (question.kind === 'choice') {
+    if (!Array.isArray(v)) return null;
+    const valid = new Set((question.config.options || []).map((o) => o.id));
+    let ids = v.filter((x) => valid.has(x));
+    if (!question.config.multiple) ids = ids.slice(0, 1);
+    return ids.length ? { value: ids } : null;
+  }
+  if (question.kind === 'text') return typeof v === 'string' ? { value: v } : null;
+  return row.ref_type === question.kind ? { keep: true } : null;
+}
+
+async function regradeQuiz(quizId) {
+  const questions = await loadQuestions(quizId);
+  const byId = new Map(questions.map((x) => [x.id, x]));
+  const [subs] = await db.query('SELECT * FROM quiz_submissions WHERE quiz_id = ?', [quizId]);
+  for (const sub of subs) {
+    const [answers] = await db.query('SELECT * FROM quiz_answers WHERE submission_id = ?', [sub.id]);
+    for (const a of answers) {
+      const question = byId.get(a.question_id);
+      if (!question) continue;
+      const clean = sanitizeAnswer(question, a);
+      if (!clean) { await db.query('DELETE FROM quiz_answers WHERE id = ?', [a.id]); continue; }
+      if (clean.value !== undefined && JSON.stringify(clean.value) !== JSON.stringify(unwrapAnswer(a.value))) {
+        await db.query('UPDATE quiz_answers SET value = ? WHERE id = ?', [wrapAnswer(clean.value), a.id]);
+      }
+    }
+    if (sub.status === 'in_progress') continue;
+    const [fresh] = await db.query('SELECT * FROM quiz_answers WHERE submission_id = ?', [sub.id]);
+    let score = 0; let pending = 0;
+    for (const question of questions) {
+      const a = fresh.find((x) => x.question_id === question.id);
+      if (AUTO.includes(question.kind)) {
+        const pts = a ? autoPoints(question, unwrapAnswer(a.value)) : 0;
+        if (a) await db.query('UPDATE quiz_answers SET points = ? WHERE id = ?', [pts, a.id]);
+        score += pts;
+      } else if (a && a.points != null) {
+        const pts = Math.min(Number(a.points), question.points);
+        if (pts !== Number(a.points)) await db.query('UPDATE quiz_answers SET points = ? WHERE id = ?', [pts, a.id]);
+        score += pts;
+      } else pending += 1;
+    }
+    const status = pending ? 'submitted' : 'graded';
+    await db.query(
+      `UPDATE quiz_submissions SET score = ?, status = ?,
+              graded_at = CASE WHEN ? = 'graded' THEN COALESCE(graded_at, NOW()) ELSE NULL END WHERE id = ?`,
+      [score, status, status, sub.id],
+    );
+  }
 }
 
 module.exports = {
