@@ -4,6 +4,7 @@ const db = require('../config/db.config');
 const R = require('../utils/response');
 const quota = require('../services/quota.service');
 const storage = require('../services/storage');
+const usage = require('../services/usage.service');
 
 // GET /storage/usage — uso, limite e plano do usuário logado (+ o que mais ocupa espaço com ?details=1)
 async function myUsage(req, res) {
@@ -16,6 +17,28 @@ async function myUsage(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
+// GET /usage/compute — consumo de processamento do mês e histórico (6 meses) do usuário logado
+async function myCompute(req, res) {
+  try {
+    const [rows] = await db.query('SELECT * FROM usage_monthly WHERE user_id = ? ORDER BY month DESC LIMIT 6', [req.user.id]);
+    const cur = rows.find((r) => r.month === usage.monthKey());
+    const [[plan]] = await db.query(
+      `SELECT COALESCE(p.monthly_cpu_seconds, d.monthly_cpu_seconds) AS budget
+         FROM users u LEFT JOIN storage_plans p ON p.id = u.storage_plan_id
+         LEFT JOIN storage_plans d ON d.is_default = 1 WHERE u.id = ? LIMIT 1`, [req.user.id]);
+    const shape = (r) => ({
+      month: r.month, jobs: r.jobs, jobs_failed: r.jobs_failed, cpu_seconds: Number(r.cpu_seconds), wall_seconds: Number(r.wall_seconds),
+      gb_seconds_ram: Number(r.gb_seconds_ram), peak_rss_max_bytes: Number(r.peak_rss_max_bytes), storage_gb_hours: Number(r.storage_gb_hours),
+    });
+    return R.ok(res, {
+      month: usage.monthKey(),
+      current: cur ? shape(cur) : { month: usage.monthKey(), jobs: 0, jobs_failed: 0, cpu_seconds: 0, wall_seconds: 0, gb_seconds_ram: 0, peak_rss_max_bytes: 0, storage_gb_hours: 0 },
+      cpu_budget_seconds: plan && plan.budget != null ? Number(plan.budget) : null,
+      history: rows.map(shape),
+    });
+  } catch (err) { return R.serverError(res, err); }
+}
+
 const adminOnly = (req, res) => { if (req.user.role !== 'admin') { R.forbidden(res); return false; } return true; };
 
 // GET /admin/storage — visão do servidor: capacidade × cota alocada × uso real, e uso por usuário
@@ -25,9 +48,13 @@ async function adminOverview(req, res) {
     const [users] = await db.query(
       `SELECT u.uuid, u.name, u.email, u.storage_used_bytes AS used, u.storage_reserved_bytes AS reserved,
               COALESCE(u.storage_quota_bytes, p.quota_bytes, (SELECT quota_bytes FROM storage_plans WHERE is_default = 1 LIMIT 1), 0) AS quota,
-              u.storage_quota_bytes IS NOT NULL AS custom_quota, COALESCE(p.code, 'beta') AS plan
+              u.storage_quota_bytes IS NOT NULL AS custom_quota, COALESCE(p.code, 'beta') AS plan,
+              COALESCE(um.cpu_seconds, 0) AS cpu_seconds, COALESCE(um.jobs, 0) AS jobs, COALESCE(um.peak_rss_max_bytes, 0) AS peak_rss,
+              COALESCE(um.gb_seconds_ram, 0) AS gb_seconds_ram, COALESCE(um.storage_gb_hours, 0) AS storage_gb_hours
          FROM users u LEFT JOIN storage_plans p ON p.id = u.storage_plan_id
-        WHERE u.deleted_at IS NULL ORDER BY u.storage_used_bytes DESC`);
+         LEFT JOIN usage_monthly um ON um.user_id = u.id AND um.month = ?
+        WHERE u.deleted_at IS NULL ORDER BY u.storage_used_bytes DESC`, [usage.monthKey()]);
+    const prices = await usage.getPrices();
     const allocated = users.reduce((n, u) => n + Number(u.quota), 0);
     const used = users.reduce((n, u) => n + Number(u.used), 0);
     const cap = await storage.capacity();
@@ -43,6 +70,7 @@ async function adminOverview(req, res) {
         uuid: u.uuid, name: u.name, email: u.email, plan: u.plan, custom_quota: !!u.custom_quota,
         used: Number(u.used), reserved: Number(u.reserved), quota: Number(u.quota),
         percent: Number(u.quota) ? Math.round((Number(u.used) / Number(u.quota)) * 1000) / 10 : 100,
+        month: { jobs: Number(u.jobs), cpu_seconds: Number(u.cpu_seconds), peak_rss_bytes: Number(u.peak_rss), gb_seconds_ram: Number(u.gb_seconds_ram), cost: usage.costOf(u, prices) },
       })),
     });
   } catch (err) { return R.serverError(res, err); }
@@ -67,7 +95,7 @@ async function updatePlan(req, res) {
   try {
     if (!adminOnly(req, res)) return;
     const b = req.body || {}; const f = []; const v = [];
-    for (const k of ['quota_bytes', 'max_file_bytes', 'max_concurrent_jobs']) {
+    for (const k of ['quota_bytes', 'max_file_bytes', 'max_concurrent_jobs', 'monthly_cpu_seconds']) {
       if (b[k] !== undefined) {
         if (!posInt(b[k]) || Number(b[k]) < 1) return R.unprocessable(res, [{ field: k, message: 'Informe um inteiro positivo.' }]);
         f.push(`${k} = ?`); v.push(Number(b[k]));
@@ -105,4 +133,26 @@ async function updateUserQuota(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-module.exports = { myUsage, adminOverview, listPlans, updatePlan, updateUserQuota };
+// GET /admin/storage/costs?licenses=10 — calculadora: teto por plano × licenças e custo real do mês
+async function costs(req, res) {
+  try {
+    if (!adminOnly(req, res)) return;
+    const licenses = Math.min(100000, Math.max(1, parseInt(req.query.licenses, 10) || 10));
+    return R.ok(res, await usage.costReport({ licenses }));
+  } catch (err) { return R.serverError(res, err); }
+}
+
+// PUT /admin/storage/prices  { price_gb_month?, price_cpu_hour?, currency? }
+async function updatePrices(req, res) {
+  try {
+    if (!adminOnly(req, res)) return;
+    const b = req.body || {};
+    for (const k of ['price_gb_month', 'price_cpu_hour']) {
+      if (b[k] !== undefined && (!Number.isFinite(Number(b[k])) || Number(b[k]) < 0)) return R.unprocessable(res, [{ field: k, message: 'Informe um número maior ou igual a zero.' }]);
+    }
+    if (b.currency !== undefined && !/^[A-Za-z]{3}$/.test(String(b.currency))) return R.unprocessable(res, [{ field: 'currency', message: 'Use o código de 3 letras (ex.: BRL, USD).' }]);
+    return R.ok(res, await usage.setPrices(b));
+  } catch (err) { return R.serverError(res, err); }
+}
+
+module.exports = { myCompute, costs, updatePrices, myUsage, adminOverview, listPlans, updatePlan, updateUserQuota };

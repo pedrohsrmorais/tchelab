@@ -183,6 +183,7 @@ storage.init()
   .then(() => console.log(`[storage] driver ${storage.driver}`))
   .catch((err) => console.error('[storage] falha ao inicializar:', err.message))
   .then(() => require('./src/config/migrate').migrate())
+  .then(() => require('./src/services/usage.service').startStorageMeter())
   .catch((err) => console.error('[migrate] falhou:', err.message))
   .finally(() => {
     app.listen(PORT, () => {

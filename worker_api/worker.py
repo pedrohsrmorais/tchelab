@@ -41,6 +41,7 @@ from typing import Optional
 from config import Config
 from factory import ScriptFactory
 from jsonable import to_jsonable
+from metering import METER
 from redis_queue import dequeue_job, get_redis, publish_result
 from schemas import JobPayload, JobResult, JobStatus
 
@@ -57,6 +58,7 @@ logger = logging.getLogger("tchelab.worker")
 
 def process_job(payload: JobPayload) -> JobResult:
     t0 = time.perf_counter()
+    METER.start(payload.job_id)
     logger.info(
         "Iniciando job %s | slug=%s | execution=%s | node=%s",
         payload.job_id, payload.slug, payload.execution_id, payload.node_id,
@@ -70,6 +72,7 @@ def process_job(payload: JobPayload) -> JobResult:
         # que retorne ndarray cru (a maioria do catálogo), e o resultado
         # nunca chega ao backend (ver jsonable.py para o porquê).
         outputs = to_jsonable(outputs)
+        metrics = METER.finish(payload.job_id)
         duration_ms = (time.perf_counter() - t0) * 1000
         logger.info(
             "Job %s concluído em %.1f ms", payload.job_id, duration_ms
@@ -82,8 +85,10 @@ def process_job(payload: JobPayload) -> JobResult:
             status=JobStatus.SUCCESS,
             outputs=outputs,
             duration_ms=duration_ms,
+            metrics=metrics,
         )
     except Exception as exc:
+        metrics = METER.finish(payload.job_id)  # falha também consome CPU: entra na conta
         duration_ms = (time.perf_counter() - t0) * 1000
         logger.error(
             "Job %s falhou em %.1f ms: %s", payload.job_id, duration_ms, exc,
@@ -97,6 +102,7 @@ def process_job(payload: JobPayload) -> JobResult:
             status=JobStatus.FAILURE,
             error=str(exc),
             duration_ms=duration_ms,
+            metrics=metrics,
         )
 
 

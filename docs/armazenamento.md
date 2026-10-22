@@ -57,6 +57,30 @@
 - **Diálogo "Seu armazenamento está cheio"**: abre sozinho em qualquer 413 de cota (interceptor do axios) e já mostra o que excluir.
 - **Admin → Armazenamento**: cartões de capacidade/alocação/uso/sobrevenda, edição de planos e cota por usuário.
 
+## 3.1 Consumo de processamento e custo por usuário (22/10/2026)
+
+O worker mede **cada job** (`worker_api/metering.py`) e devolve em `JobResult.metrics`; o `resultConsumer` grava em `jobs`
+(`cpu_seconds`, `wall_ms`, `peak_rss_bytes`, `mem_bytes`, `input_bytes`, `output_bytes`), em `execution_nodes.metrics` e soma ao
+mês do usuário em `usage_monthly` (jobs, falhas, CPU, GB·s de RAM, pico de memória, bytes, **GB·hora de armazenamento**).
+
+- **CPU**: tempo de CPU do processo (inclui threads do NumPy/BLAS) repartido em partes iguais entre os jobs ativos a cada intervalo.
+  Com 1 job é exato; com N simultâneos a soma dos jobs bate com o gasto real do processo (testado).
+- **Memória**: `peak_rss_bytes` = pico do processo durante o job (para dimensionar o servidor); `mem_bytes` = quanto passou do RSS
+  ocioso, dividido pelos jobs simultâneos (estimativa; exata com `WORKER_CONCURRENCY=1`).
+- **Armazenamento ao longo do tempo**: a cada hora o backend credita `GB usados × horas` ao mês (`usage.service.js › tickStorage`;
+  cobre reinícios, máx. 48 h).
+- **Falha também conta** (consumiu CPU).
+- Endpoints: `GET /usage/compute` (usuário: mês atual + 6 meses, orçamento de CPU do plano), `GET /admin/storage` (consumo e custo do
+  mês por usuário), `GET /admin/storage/costs?licenses=N` (calculadora), `PUT /admin/storage/prices` e `PUT /admin/storage/plans/:code`
+  (agora aceita `monthly_cpu_seconds`).
+- **Fórmulas** (preços editáveis no painel; os iniciais são só exemplo: US$ 0,023/GB·mês e US$ 0,05/CPU-hora):
+  `armazenamento = GB médios × preço_GB_mês` (GB médios = GB·hora ÷ 730) · `processamento = CPU-horas × preço_CPU_hora`
+  (o preço da CPU-hora deve embutir a memória) · `teto por usuário = cota do plano × preço_GB_mês + orçamento de CPU do plano (h) × preço_CPU_hora`.
+  Para N licenças, `N × teto`. Orçamentos iniciais de CPU (placeholders editáveis): Beta 10 h/mês, Equipe 200 h/mês.
+- **Ainda não bloqueia**: o orçamento mensal de CPU é medido e exibido, mas não impede execuções (decisão de produto pendente: bloquear,
+  só avisar, ou cobrar excedente). Também falta o limite de jobs simultâneos por usuário (`max_concurrent_jobs` existe no plano, sem aplicação).
+- Testes: `worker_api/tests/test_metering.py` (7) e `backend_api/tests/usage_e2e.mjs` (30, com o worker real).
+
 ## 4. Subindo com MinIO (Docker)
 
 1. No `.env`: defina `S3_ACCESS_KEY` e `S3_SECRET_KEY` únicos (`openssl rand -hex 24`) e `S3_CAPACITY_BYTES` (o que você provisionou).
@@ -81,6 +105,6 @@
 
 - **Fase 3**: tensores ainda ficam no JSON do MySQL; `jobs.result` e `execution_nodes.input_data/output_data` duplicam JSON grande; o navegador ainda baixa o tensor e o reenvia no `dispatch`; o worker não lê o bucket; teto de 10 MB por requisição JSON.
 - **Fase 4**: datasets excluídos (soft delete) mantêm os metadados no MySQL até uma rotina de limpeza; usuário excluído (soft delete) não tem os dados apagados; sem lixeira nem reconciliação semanal.
-- **Fase 6**: medição de CPU/memória por usuário, limites de concorrência e calculadora de custo por licença.
+- **Fase 6 (restante)**: aplicar o orçamento de CPU e o limite de jobs simultâneos por usuário (a medição e a calculadora já existem, ver §3.1).
 - Antes de executar um workflow a plataforma ainda **não** confere espaço mínimo livre: se a saída não couber, o nó falha com `STORAGE_QUOTA_EXCEEDED` (sem gravar parcial).
 - A foto nova precisa de espaço antes de a antiga ser liberada (troca de avatar com cota quase cheia pode falhar; exclua a foto antiga primeiro).

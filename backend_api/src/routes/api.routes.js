@@ -364,6 +364,9 @@ router.get   ('/audit-logs',                                    authenticate, au
 router.get   ('/audit-logs/:id',                                authenticate, auditCtrl.getAuditLog);
 router.get   ('/audit-logs/resource/:type/:uuid',               authenticate, auditCtrl.getResourceAuditLogs);
 router.get   ('/storage/usage',                                 authenticate, storageCtrl.myUsage);
+router.get   ('/usage/compute',                                 authenticate, storageCtrl.myCompute);
+router.get   ('/admin/storage/costs',                           authenticate, storageCtrl.costs);
+router.put   ('/admin/storage/prices',                          authenticate, storageCtrl.updatePrices);
 router.get   ('/admin/storage',                                 authenticate, storageCtrl.adminOverview);
 router.get   ('/admin/storage/plans',                           authenticate, storageCtrl.listPlans);
 router.put   ('/admin/storage/plans/:code',                     authenticate, storageCtrl.updatePlan);

@@ -17,6 +17,9 @@ export const api = {
   // ── Armazenamento por usuário (cota) ──────────────────────────────────────
   storage: {
     usage:       (details)   => get('/storage/usage', details ? { details: 1, limit: 30 } : undefined),
+    compute:     ()          => get('/usage/compute'),
+    costs:       (licenses)  => get('/admin/storage/costs', { licenses }),
+    updatePrices: (d)        => put('/admin/storage/prices', d),
     adminOverview: ()        => get('/admin/storage'),
     plans:       ()          => get('/admin/storage/plans'),
     updatePlan:  (code, d)   => put(`/admin/storage/plans/${code}`, d),

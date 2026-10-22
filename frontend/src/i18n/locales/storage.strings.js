@@ -93,4 +93,58 @@ export default {
   'storage.admin.customMb': ['Cota própria em MB (vazio = segue o plano)', 'Custom quota in MB (empty = follow plan)', 'Cuota propia en MB (vacío = sigue el plan)'],
   'storage.admin.edit': ['Editar cota', 'Edit quota', 'Editar cuota'],
   'storage.admin.userSaved': ['Cota do usuário atualizada.', 'User quota updated.', 'Cuota del usuario actualizada.'],
+
+  // ── Processamento (perfil) ────────────────────────────────────────────────
+  'storage.compute.title': ['Processamento deste mês', 'Processing this month', 'Procesamiento de este mes'],
+  'storage.compute.hint': [
+    'Tempo de CPU gasto pelas suas execuções. Quando o plano tem orçamento mensal, ele aparece como limite.',
+    'CPU time used by your runs. When your plan has a monthly budget, it shows as the limit.',
+    'Tiempo de CPU usado por tus ejecuciones. Si tu plan tiene presupuesto mensual, aparece como límite.',
+  ],
+  'storage.compute.ofBudget': ['de {{budget}} no plano', 'of {{budget}} in your plan', 'de {{budget}} en tu plan'],
+  'storage.compute.summary': [
+    '{{jobs}} execuções ({{failed}} com falha) · pico de memória {{mem}}',
+    '{{jobs}} runs ({{failed}} failed) · peak memory {{mem}}',
+    '{{jobs}} ejecuciones ({{failed}} con error) · pico de memoria {{mem}}',
+  ],
+
+  // ── Admin: consumo e custo ────────────────────────────────────────────────
+  'storage.admin.cpuHours': ['CPU/mês (h)', 'CPU/month (h)', 'CPU/mes (h)'],
+  'storage.admin.monthUsage': ['Processamento no mês', 'Processing this month', 'Procesamiento del mes'],
+  'storage.admin.jobsN_one': ['{{count}} job', '{{count}} job', '{{count}} job'],
+  'storage.admin.jobsN_other': ['{{count}} jobs', '{{count}} jobs', '{{count}} jobs'],
+  'storage.admin.peakMem': ['pico de memória', 'peak memory', 'pico de memoria'],
+  'storage.admin.calcTitle': ['Custo e licença', 'Cost and license', 'Costo y licencia'],
+  'storage.admin.calcHint': [
+    'Teto = tudo que o plano promete (cota cheia + orçamento de CPU gasto). Real = o que foi medido neste mês. O preço da CPU-hora já deve embutir a memória.',
+    'Ceiling = everything the plan promises (full quota + CPU budget spent). Actual = what was measured this month. The CPU-hour price should already include memory.',
+    'Techo = todo lo que promete el plan (cuota llena + presupuesto de CPU gastado). Real = lo medido este mes. El precio de la hora de CPU ya debe incluir la memoria.',
+  ],
+  'storage.admin.pricesDefault': [
+    'Preços ainda são valores de exemplo — informe o custo real do seu servidor/armazenamento.',
+    'Prices are still sample values — enter the real cost of your server/storage.',
+    'Los precios aún son valores de ejemplo: indica el costo real de tu servidor/almacenamiento.',
+  ],
+  'storage.admin.priceGb': ['Preço do GB/mês', 'Price per GB/month', 'Precio por GB/mes'],
+  'storage.admin.priceCpu': ['Preço da CPU-hora', 'Price per CPU-hour', 'Precio por hora de CPU'],
+  'storage.admin.currency': ['Moeda', 'Currency', 'Moneda'],
+  'storage.admin.pricesSaved': ['Preços atualizados.', 'Prices updated.', 'Precios actualizados.'],
+  'storage.admin.licenses': ['Nº de licenças (usuários)', 'Number of licenses (users)', 'N.º de licencias (usuarios)'],
+  'storage.admin.ceilingUser': ['Teto por usuário/mês', 'Ceiling per user/month', 'Techo por usuario/mes'],
+  'storage.admin.storageCost': ['Armazenamento', 'Storage', 'Almacenamiento'],
+  'storage.admin.computeCost': ['Processamento', 'Processing', 'Procesamiento'],
+  'storage.admin.ceilingLicenses': ['Teto para {{count}} licenças/mês', 'Ceiling for {{count}} licenses/month', 'Techo para {{count}} licencias/mes'],
+  'storage.admin.ceilingNote': [
+    'O teto só vale como limite se o orçamento de CPU do plano for aplicado; hoje ele é medido e informado, ainda não bloqueia execuções.',
+    'The ceiling only works as a limit if the plan’s CPU budget is enforced; today it is measured and reported but does not block runs yet.',
+    'El techo solo funciona como límite si se aplica el presupuesto de CPU del plan; hoy se mide e informa, pero aún no bloquea ejecuciones.',
+  ],
+  'storage.admin.realMonth': ['Custo real do mês', 'Actual cost this month', 'Costo real del mes'],
+  'storage.admin.activeUsers': ['usuários ativos', 'active users', 'usuarios activos'],
+  'storage.admin.realPerUser': ['Média por usuário ativo', 'Average per active user', 'Promedio por usuario activo'],
+  'storage.admin.realPerUserHint': ['Custo real ÷ usuários com uso no mês', 'Actual cost ÷ users with usage this month', 'Costo real ÷ usuarios con uso en el mes'],
+  'storage.admin.projection': ['Projeção do mês', 'Month projection', 'Proyección del mes'],
+  'storage.admin.projectionHint': ['Ritmo atual até o fim do mês', 'Current pace until month end', 'Ritmo actual hasta fin de mes'],
+  'storage.admin.ramMonth': ['Memória consumida', 'Memory used', 'Memoria consumida'],
+  'storage.admin.ramHint': ['Soma de GB × segundos dos jobs', 'Sum of GB × seconds of jobs', 'Suma de GB × segundos de los jobs'],
 };

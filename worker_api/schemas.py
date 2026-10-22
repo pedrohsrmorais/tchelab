@@ -42,4 +42,6 @@ class JobResult(BaseModel):
     outputs: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
     duration_ms: float | None = None
+    # consumo medido pelo worker (ver metering.py): cpu_seconds, wall_ms, peak_rss_bytes, mem_bytes, concurrent_max
+    metrics: dict[str, Any] = Field(default_factory=dict)
     finished_at: datetime = Field(default_factory=datetime.utcnow)

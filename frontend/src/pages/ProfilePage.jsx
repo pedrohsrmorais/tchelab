@@ -16,6 +16,7 @@ import { COVERS, COVER_KEYS, coverBackground } from '../config/profileCovers';
 import { parseApiError } from '../utils/errors';
 
 import StorageBreakdown from '../components/storage/StorageBreakdown';
+import ComputeUsage from '../components/storage/ComputeUsage';
 
 const TABS = ['profile', 'preferences', 'security', 'storage'];
 
@@ -353,6 +354,7 @@ export default function ProfilePage() {
           </h2>
           <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>{t('storage.intro')}</p>
           <StorageBreakdown />
+          <ComputeUsage />
         </div>
       )}
 

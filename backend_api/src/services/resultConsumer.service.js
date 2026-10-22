@@ -45,6 +45,7 @@ const db = require('../config/db.config');
 const redis = require('../config/redis.config');
 const quota = require('./quota.service');
 const { advanceExecution } = require('./executionPipeline.service');
+const usage = require('./usage.service');
 
 const RESULT_CHANNEL = process.env.RESULT_CHANNEL || 'tchelab_resultados';
 // Tem que ser compatível com worker_api/config.py (mesma env var nos dois
@@ -149,7 +150,7 @@ async function handleResultMessage(raw) {
     }
 
     const [enRows] = await db.query(
-      `SELECT en.id FROM execution_nodes en
+      `SELECT en.id, LENGTH(en.input_data) AS in_len FROM execution_nodes en
        JOIN workflow_nodes wn ON wn.id = en.workflow_node_id
        WHERE en.execution_id = ? AND wn.node_key = ?`,
       [executionId, nodeKey],
@@ -169,6 +170,19 @@ async function handleResultMessage(raw) {
         enRows[0].id,
       ],
     );
+    // Consumo medido pelo worker (CPU, memória): grava no job/nó e soma ao mês do usuário. Nunca derruba o resultado.
+    try {
+      const m = result.metrics && typeof result.metrics === 'object' ? result.metrics : {};
+      const inBytes = Number(enRows[0].in_len) || 0;
+      await db.query(
+        'UPDATE jobs SET cpu_seconds = ?, wall_ms = ?, peak_rss_bytes = ?, mem_bytes = ?, input_bytes = ?, output_bytes = ? WHERE uuid = ?',
+        [m.cpu_seconds ?? null, m.wall_ms != null ? Math.round(m.wall_ms) : (duration_ms != null ? Math.round(duration_ms) : null),
+          m.peak_rss_bytes ?? null, m.mem_bytes ?? null, inBytes, outputBytes, jobUuid],
+      );
+      if (Object.keys(m).length) await db.query('UPDATE execution_nodes SET metrics = ? WHERE id = ?', [JSON.stringify(m), enRows[0].id]);
+      await usage.record(exRows[0].user_id, m.wall_ms != null ? m : { ...m, wall_ms: duration_ms }, { failed: !isSuccess, inputBytes: inBytes, outputBytes });
+    } catch (me) { console.error('[ResultConsumer] medição de consumo:', me.message); }
+
     if (outputReserved && nodeStatus === 'completed') {
       await quota.commit(exRows[0].user_id, outputReserved, { kind: 'execution_output', refType: 'execution', refId: executionId, size: outputBytes });
     } else if (outputReserved) await quota.release(exRows[0].user_id, outputReserved);

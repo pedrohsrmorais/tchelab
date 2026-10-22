@@ -40,6 +40,29 @@ async function addColumn(table, column, ddl) {
 }
 
 const TABLES = [
+  // ── Consumo (processamento/memória medidos pelo worker + armazenamento ao longo do tempo), agregado por mês ─────────
+  ['usage_monthly', `
+    CREATE TABLE IF NOT EXISTS \`usage_monthly\` (
+      \`user_id\` bigint unsigned NOT NULL,
+      \`month\` char(7) ${COLLATE} NOT NULL,
+      \`jobs\` int unsigned NOT NULL DEFAULT 0,
+      \`jobs_failed\` int unsigned NOT NULL DEFAULT 0,
+      \`cpu_seconds\` decimal(16,3) NOT NULL DEFAULT 0,
+      \`wall_seconds\` decimal(16,3) NOT NULL DEFAULT 0,
+      \`gb_seconds_ram\` decimal(20,3) NOT NULL DEFAULT 0,
+      \`peak_rss_max_bytes\` bigint unsigned NOT NULL DEFAULT 0,
+      \`input_bytes\` bigint unsigned NOT NULL DEFAULT 0,
+      \`output_bytes\` bigint unsigned NOT NULL DEFAULT 0,
+      \`storage_gb_hours\` decimal(16,4) NOT NULL DEFAULT 0,
+      \`updated_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`user_id\`, \`month\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+  ['usage_meta', `
+    CREATE TABLE IF NOT EXISTS \`usage_meta\` (
+      \`k\` varchar(60) ${COLLATE} NOT NULL,
+      \`v\` varchar(255) ${COLLATE} NOT NULL,
+      PRIMARY KEY (\`k\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
   // ── Armazenamento: planos, objetos e trilha de auditoria da cota por usuário ─────────
   ['storage_plans', `
     CREATE TABLE IF NOT EXISTS \`storage_plans\` (
@@ -553,6 +576,19 @@ async function migrate() {
     await db.query(
       `UPDATE users SET storage_plan_id = (SELECT id FROM storage_plans WHERE is_default = 1 LIMIT 1) WHERE storage_plan_id IS NULL`,
     );
+  }
+
+  // consumo medido por job (worker → resultConsumer)
+  await addColumn('jobs', 'cpu_seconds', 'decimal(12,3) DEFAULT NULL');
+  await addColumn('jobs', 'wall_ms', 'bigint unsigned DEFAULT NULL');
+  await addColumn('jobs', 'peak_rss_bytes', 'bigint unsigned DEFAULT NULL');
+  await addColumn('jobs', 'mem_bytes', 'bigint unsigned DEFAULT NULL');
+  await addColumn('jobs', 'input_bytes', 'bigint unsigned DEFAULT NULL');
+  await addColumn('jobs', 'output_bytes', 'bigint unsigned DEFAULT NULL');
+  if (await hasTable('storage_plans')) {
+    // orçamento mensal de CPU por plano: valores iniciais (editáveis no painel); alimenta o teto da calculadora de custo
+    await db.query("UPDATE storage_plans SET monthly_cpu_seconds = 10 * 3600 WHERE code = 'beta' AND monthly_cpu_seconds IS NULL");
+    await db.query("UPDATE storage_plans SET monthly_cpu_seconds = 200 * 3600 WHERE code = 'staff' AND monthly_cpu_seconds IS NULL");
   }
 
   // quizzes: tentativas configuráveis (0 = ilimitadas) e política de nota
