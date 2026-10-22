@@ -27,6 +27,7 @@ import { useApi } from '../hooks/useApi';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import MultiDimModal from '../components/datasets/MultiDimModal';
 import TechniqueModal from '../components/ui/TechniqueModal';
+import FamilyIcon from '../components/ui/FamilyIcon';
 import Modal from '../components/ui/Modal';
 import {
   FAMILIES, getFamilyConfig, getFamiliesList, isValidConnection, getPorts, parseSchema, ARRAY_TYPES,
@@ -285,8 +286,8 @@ function DatasetNode({ id, data, selected }) {
 // ────────────────────────────────────────────────────────────────────────────────
 function TechniqueNode({ id, data, selected }) {
   const ro = useContext(ReadOnlyCtx);
-  const { t } = useTranslation();
-  const familyCfg = getFamilyConfig(data.family);
+  const { t, i18n } = useTranslation();
+  const familyCfg = getFamilyConfig(data.family, i18n.language);
   const color  = familyCfg?.color  || '#64748b';
   const bg     = familyCfg?.bg     || 'rgba(100,116,139,0.1)';
   const border = familyCfg?.border || 'rgba(100,116,139,0.3)';
@@ -320,11 +321,7 @@ function TechniqueNode({ id, data, selected }) {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <div style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: color, flexShrink: 0,
-          boxShadow: `0 0 6px ${color}`,
-        }} />
+        <FamilyIcon family={familyCfg?.slug || data.family} color={color} size={16} bare weight="fill" />
         <span style={{ flex: 1, fontSize: '0.65rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {familyCfg?.labelStr || data.family}
         </span>
@@ -467,10 +464,7 @@ function TechniqueCard({ tech, onAdd, onInfo, lang }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <div style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: familyCfg?.color || '#64748b', flexShrink: 0,
-            }} />
+            <FamilyIcon family={familyCfg?.slug || tech.family} color={familyCfg?.color || '#64748b'} size={13} bare weight="fill" />
             <span style={{ fontSize: '0.62rem', fontWeight: 700, color: familyCfg?.color || 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {familyCfg?.labelStr || tech.family}
             </span>
@@ -1031,7 +1025,7 @@ export default function WorkflowEditorPage() {
   const { data: edgesRaw, refetch: refetchEdges } = useApi(() => api.workflows.edges(id), [id]);
 
   const { data: techsRaw, loading: techsLoading } = useApi(() =>
-    api.techniques.list({ limit: 500, is_custom: false }), []
+    api.techniques.list({ limit: 500, is_custom: false, lang }), [lang]
   );
   const techniques = (techsRaw?.data ?? techsRaw ?? []);
 
@@ -1955,7 +1949,10 @@ export default function WorkflowEditorPage() {
                       cursor: 'pointer', transition: 'all 0.14s', whiteSpace: 'nowrap',
                     }}
                   >
-                    {fam.labelStr}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <FamilyIcon family={fam.slug} color={selectedFamily === fam.slug ? fam.color : 'currentColor'} size={12} bare />
+                      {fam.labelStr}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -1979,7 +1976,7 @@ export default function WorkflowEditorPage() {
                     onMouseEnter={e => { e.currentTarget.style.background = group.bg; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                   >
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: group.color, flexShrink: 0 }} />
+                    <FamilyIcon family={group.slug} color={group.color} bg={group.bg} size={22} />
                     <span style={{ flex: 1, fontSize: '0.72rem', fontWeight: 700, color: group.color, textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       {group.labelStr}
                     </span>

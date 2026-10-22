@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  FlaskConical, FolderOpen, Database, Users, Cpu, BookOpen,
+  FlaskConical, FolderOpen, Database, Users,
   Activity, TrendingUp, Clock, Zap, ArrowRight, CheckCircle2
 } from 'lucide-react';
+import { NAV_ICONS } from '../config/icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
 import { useApi } from '../hooks/useApi';
@@ -22,12 +23,12 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? t('dashboard.greetingMorning') : hour < 18 ? t('dashboard.greetingAfternoon') : t('dashboard.greetingEvening');
 
   const quickLinks = [
-    { to: '/projects', icon: FolderOpen, label: t('nav.projects'), color: 'brand', desc: t('dashboard.descProjects') },
-    { to: '/datasets', icon: Database, label: t('nav.datasets'), color: 'green', desc: t('dashboard.descDatasets') },
-    { to: '/workflows', icon: Cpu, label: t('nav.workflows'), color: 'purple', desc: t('dashboard.descWorkflows') },
-    { to: '/communities', icon: Users, label: t('nav.communities'), color: 'amber', desc: t('dashboard.descCommunities') },
-    { to: '/articles', icon: BookOpen, label: t('nav.articles'), color: 'red', desc: t('dashboard.descArticles') },
-    ...(isPlus() ? [{ to: '/ai', icon: Zap, label: t('nav.ai'), color: 'blue', desc: t('dashboard.descAI'), plus: true }] : []),
+    { to: '/projects', icon: NAV_ICONS.projects, label: t('nav.projects'), color: 'brand', desc: t('dashboard.descProjects') },
+    { to: '/datasets', icon: NAV_ICONS.datasets, label: t('nav.datasets'), color: 'green', desc: t('dashboard.descDatasets') },
+    { to: '/workflows', icon: NAV_ICONS.workflows, label: t('nav.workflows'), color: 'purple', desc: t('dashboard.descWorkflows') },
+    { to: '/communities', icon: NAV_ICONS.communities, label: t('nav.communities'), color: 'amber', desc: t('dashboard.descCommunities') },
+    { to: '/articles', icon: NAV_ICONS.articles, label: t('nav.articles'), color: 'red', desc: t('dashboard.descArticles') },
+    ...(isPlus() ? [{ to: '/ai', icon: NAV_ICONS.ai, label: t('nav.ai'), color: 'blue', desc: t('dashboard.descAI'), plus: true }] : []),
   ];
 
   return (
@@ -77,7 +78,7 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-${color === 'brand' ? 'blue' : color}-500/20`}>
-                    <Icon className={`w-5 h-5 text-${color === 'brand' ? 'blue' : color}-400`} />
+                    <Icon size={22} weight="duotone" className={`text-${color === 'brand' ? 'blue' : color}-400`} aria-hidden />
                   </div>
                   {plus && <span className="badge badge-plus text-xs">PLUS</span>}
                 </div>

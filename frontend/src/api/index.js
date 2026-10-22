@@ -288,7 +288,7 @@ export const api = {
   techniques: {
     list:            (p)       => get('/techniques', p),
     categories:      ()        => get('/techniques/categories'),
-    get:             (id)      => get(`/techniques/${id}`),
+    get:             (id, p)   => get(`/techniques/${id}`, p),
     compatibilities: (id)      => get(`/techniques/${id}/compatibilities`),
     create:          (d)       => post('/techniques', d),
     update:          (id, d)   => put(`/techniques/${id}`, d),

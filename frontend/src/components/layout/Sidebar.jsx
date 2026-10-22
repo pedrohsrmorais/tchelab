@@ -6,28 +6,28 @@ import { setLanguage } from '../../i18n/preferences';
 import Avatar from '../ui/Avatar';
 import { useTheme, THEMES } from '../../context/ThemeContext';
 import { useAuthStore } from '../../store/auth';
-import {
-  LayoutDashboard, FolderKanban, Database, GitBranch, Beaker,
-  BookOpen, Users, Cpu, Zap, Sparkles, ShieldCheck, Library,
-  LogOut, ChevronRight, Sun, Moon, Monitor, Globe, ChevronDown,
-  Table2,
-} from 'lucide-react';
+import { LogOut, ChevronRight, Sun, Moon, Monitor, Globe, ChevronDown } from 'lucide-react';
+import { NAV_ICONS } from '../../config/icons';
 
 // ── Sections ──────────────────────────────────────────────────────────────────
-const NAV_MAIN = [
-  { to: '/',           icon: LayoutDashboard, key: 'dashboard'  },
-  { to: '/projects',   icon: FolderKanban,   key: 'projects'   },
-  { to: '/datasets',   icon: Database,        key: 'datasets'   },
-  { to: '/workspace',  icon: Table2,          key: 'workspace'  },
-  { to: '/workflows',  icon: GitBranch,       key: 'workflows'  },
-  { to: '/catalogo',   icon: Library,         key: 'catalog'    },
-  { to: '/articles',   icon: BookOpen,        key: 'articles'   },
-  { to: '/communities',icon: Users,           key: 'communities'},
-  { to: '/models',     icon: Cpu,             key: 'models'     },
-  { to: '/jobs',       icon: Zap,             key: 'jobs'       },
+// Agrupados por intenção (dados → análise → colaboração), com rótulo de seção (NN/g: agrupar e rotular
+// ajuda a escanear). O Dashboard fica solto no topo. Ícones Phosphor: duotone no item ativo, regular nos demais.
+const NAV_GROUPS = [
+  { key: null, items: [{ to: '/', key: 'dashboard' }] },
+  { key: 'nav.groupData', items: [
+    { to: '/projects', key: 'projects' }, { to: '/datasets', key: 'datasets' }, { to: '/workspace', key: 'workspace' },
+  ] },
+  { key: 'nav.groupAnalysis', items: [
+    { to: '/workflows', key: 'workflows' }, { to: '/catalogo', key: 'catalog' }, { to: '/models', key: 'models' }, { to: '/jobs', key: 'jobs' },
+  ] },
+  { key: 'nav.groupCollab', items: [
+    { to: '/articles', key: 'articles' }, { to: '/communities', key: 'communities' },
+  ] },
 ];
 
 const LANGS = LANGUAGES;
+
+const sectionLabel = { margin: '0.875rem 0.5rem 0.25rem', fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' };
 
 const THEME_ICONS = { dark: Moon, light: Sun, classic: Monitor };
 
@@ -119,20 +119,29 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
 
       {/* ── Nav ────────────────────────────────────────────────────────────── */}
       <nav style={{ flex: 1, padding: '0.375rem 0.5rem', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-        {NAV_MAIN.map(item => (
-          <NavItem key={item.to} {...item} label={t(`nav.${item.key}`)} collapsed={collapsed} />
+        {NAV_GROUPS.map((g) => (
+          <div key={g.key || 'top'} role="group" aria-label={g.key ? t(g.key) : undefined}>
+            {g.key && (collapsed
+              ? <div style={{ height: 1, background: 'var(--border)', margin: '0.5rem 0.75rem' }} />
+              : <p style={sectionLabel}>{t(g.key)}</p>)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {g.items.map(item => (
+                <NavItem key={item.to} to={item.to} icon={NAV_ICONS[item.key]} label={t(`nav.${item.key}`)} collapsed={collapsed} />
+              ))}
+            </div>
+          </div>
         ))}
 
         {/* AI section */}
         {(isPlus() || true) && (
           <>
             {!collapsed && (
-              <p style={{ margin: '0.875rem 0.5rem 0.25rem', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>
+              <p style={sectionLabel}>
                 {t('nav.ia')}
               </p>
             )}
             {collapsed && <div style={{ height: 8 }} />}
-            <NavItem to="/ai" icon={Sparkles} label={t('nav.ai')} collapsed={collapsed} accent />
+            <NavItem to="/ai" icon={NAV_ICONS.ai} label={t('nav.ai')} collapsed={collapsed} accent />
           </>
         )}
 
@@ -140,11 +149,11 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
         {isAdmin() && (
           <>
             {!collapsed && (
-              <p style={{ margin: '0.875rem 0.5rem 0.25rem', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>
+              <p style={sectionLabel}>
                 ADMIN
               </p>
             )}
-            <NavItem to="/admin" icon={ShieldCheck} label={t('nav.admin')} collapsed={collapsed} />
+            <NavItem to="/admin" icon={NAV_ICONS.admin} label={t('nav.admin')} collapsed={collapsed} />
           </>
         )}
       </nav>
@@ -377,7 +386,7 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
 // ── NavItem ───────────────────────────────────────────────────────────────────
 function NavItem({ to, icon: Icon, label, collapsed, accent }) {
   return (
-    <NavLink to={to} style={{ textDecoration: 'none' }}>
+    <NavLink to={to} style={{ textDecoration: 'none' }} title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined}>
       {({ isActive }) => (
         <div
           style={{
@@ -421,7 +430,7 @@ function NavItem({ to, icon: Icon, label, collapsed, accent }) {
             }} />
           )}
 
-          <Icon size={16} style={{ flexShrink: 0 }} />
+          <Icon size={18} weight={isActive ? 'duotone' : 'regular'} style={{ flexShrink: 0 }} aria-hidden />
 
           {!collapsed && (
             <span

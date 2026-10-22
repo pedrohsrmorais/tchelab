@@ -104,7 +104,8 @@ function ParamField({ name, spec, value, onChange }) {
 }
 
 export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = String(i18n.language || 'pt').slice(0, 2);
   const ndim = useMemo(() => {
     const dims = parseJsonField(dataset?.dimensions, null);
     return Array.isArray(dims) ? dims.length : null;
@@ -113,8 +114,8 @@ export default function QuickOperationModal({ dataset, onClose, onCompleted }) {
   // Catálogo completo de técnicas "utility" (as que operam sobre dados já
   // importados — exclui as de categoria "input"/importação).
   const { data: techRaw, loading: loadingTech } = useApi(
-    () => api.techniques.list({ category: 'utility', per_page: 200 }),
-    [],
+    () => api.techniques.list({ category: 'utility', per_page: 200, lang }),
+    [lang],
   );
   const allTechniques = useMemo(() => techRaw?.data ?? (Array.isArray(techRaw) ? techRaw : []), [techRaw]);
 

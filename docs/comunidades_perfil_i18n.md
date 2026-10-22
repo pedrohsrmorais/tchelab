@@ -1,7 +1,7 @@
 # Idiomas (pt/en/es), perfil, comunidades e projetos compartilhados
 
 > Complementa `diagnostico_idioma_usuario_comunidades.md` (o diagnóstico/proposta) com o que foi **implementado**.
-> Testes: `backend_api/tests/access_e2e.mjs` (132 checagens de acesso), `backend_api/tests/catalog_i18n_check.js`
+> Testes: `backend_api/tests/access_e2e.mjs` (132 checagens de acesso), `backend_api/tests/catalog_i18n_check.mjs`
 > (cobertura da tradução do catálogo), `frontend`: `npm run i18n:check` (paridade de chaves e `{{placeholders}}`).
 
 ## 1. Idioma e tema por usuário
@@ -78,10 +78,10 @@ O banco guarda o texto em **pt** (idioma-fonte). A tradução fica em arquivos l
 - `utils/catalogI18n.js` aplica a tradução na resposta de `GET /techniques` e `GET /techniques/:id`. O idioma vem de
   `?lang=` (prioridade) ou `Accept-Language`; qualquer outro valor devolve pt. **Fallback por campo**: o que não tiver
   tradução continua em pt — nada quebra.
-- Cobertura atual: **94 técnicas ativas × (en, es)** — nome, descrição, "como funciona", dicas, nota histórica e a
+- Cobertura atual: **217 técnicas nativas (94 ativas + 123 em desenvolvimento) × (en, es)** — nome, descrição, "como funciona", dicas, nota histórica e a
   descrição de cada porta de entrada/saída e parâmetro. Nomes técnicos (siglas, `PLS`, `SNV`…) não são traduzidos.
 - Famílias: rótulos em `frontend/src/config/techniqueRegistry.js` (`FAMILIES[...].label.{pt,en,es}`).
-- Ao incluir/alterar uma técnica no banco, atualize os dois JSON e rode `node tests/catalog_i18n_check.js`
+- Ao incluir/alterar uma técnica no banco, atualize os dois JSON e rode `node tests/catalog_i18n_check.mjs`
   (falha se faltar tradução, sobrar chave órfã ou o código entre crases divergir).
 
 ## 7. A aula completa na comunidade (professor)

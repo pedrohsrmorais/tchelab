@@ -11,6 +11,18 @@
   },
   "usage_tips": "Useful for computing the absolute error (|y_pred - y_true|), normalizing residuals and building metrics such as MAE."
  },
+ "array_reshape": {
+  "description": "Reshapes an array to a specified shape."
+ },
+ "array_transpose": {
+  "description": "Transposes the axes of an N-way array."
+ },
+ "array_unfold": {
+  "description": "Unfolds a tensor into a matrix along one mode."
+ },
+ "atld": {
+  "description": "Alternating Trilinear Decomposition."
+ },
  "autoencoder": {
   "description": "Autoencoder for representation learning and anomaly detection.",
   "historical_note": "The idea of networks that learn to compress and reconstruct their own input goes back to the 1980s; the variational version (probabilistic generation, not just compression) was formalized by Kingma and Welling in 2013.",
@@ -33,6 +45,9 @@
    "variant": "Autoencoder type."
   },
   "usage_tips": "Useful for non-linear dimensionality reduction — use `latent` as the input of another model — and to get a sense of how compressible the data are. In this version the reconstruction error is a single value (mean over the samples), not one per sample; to identify individual anomalous samples, apply `outlier_detection` to `latent`."
+ },
+ "automated_preprocessing": {
+  "description": "Automatically selects the best preprocessing sequence by RMSECV."
  },
  "autoscaling": {
   "description": "Centers and scales by the standard deviation (UV scaling).",
@@ -89,6 +104,21 @@
   },
   "usage_tips": "Necessary whenever the instrument or the sample introduces background drift (common in Raman, for example) — without correcting it, the baseline can dominate the variance captured by a PCA, masking the real chemical information."
  },
+ "batch_pca": {
+  "description": "MPCA — batch analysis by unfolding a 3D tensor."
+ },
+ "blls": {
+  "description": "Bilinear Least Squares — first-order bilinear calibration."
+ },
+ "bootstrap": {
+  "description": "Bootstrap .632 for error estimation."
+ },
+ "boruta": {
+  "description": "Variable selection with the Boruta method (shadow features)."
+ },
+ "cars": {
+  "description": "Competitive Adaptive Reweighted Sampling."
+ },
  "ceil": {
   "description": "Smallest integer ≥ each element. Equivalent to MATLAB's ceil().",
   "how_it_works": "Returns the smallest integer greater than or equal to each element (always rounds up, toward +∞). ceil(-1.5) = -1.",
@@ -116,6 +146,12 @@
   },
   "usage_tips": "A mathematical prerequisite of classical PCA (PCA without centering mixes the direction of greatest variance with the position of the mean, distorting the components) — most PCA implementations already do this internally, but it is good to know what is running underneath."
  },
+ "cls": {
+  "description": "X = C × Sᵀ. Solves for concentrations given the pure spectra S."
+ },
+ "cluster_analysis": {
+  "description": "Hierarchical clustering or k-means."
+ },
  "cnn_1d": {
   "description": "1D Convolutional Neural Network for spectra.",
   "historical_note": "Convolutional networks go back to the work of Yann LeCun and collaborators in the late 1980s (handwritten digit recognition); their application to 1D signals and spectra is much more recent.",
@@ -140,6 +176,9 @@
   },
   "usage_tips": "More suitable than MLP when there are many spectral points and local patterns matter more than exact position — but it requires a considerably larger training set to avoid overfitting. Try PLS/PCR first as a baseline."
  },
+ "cnn_2d": {
+  "description": "2D CNN for hyperspectral images or 2D maps."
+ },
  "concatenacao": {
   "description": "Concatenates datasets along a specified axis.",
   "how_it_works": "Concatenates two arrays (A and B) along an existing axis (`axis`) — unlike `stack`, which creates a new axis. Example: merge two datasets that share the same variables into one by stacking the samples.",
@@ -154,6 +193,9 @@
    "axis": "Axis along which to concatenate the arrays."
   },
   "usage_tips": "A and B must have the same number of dimensions and the same size on every axis except the concatenation axis. With axis=0 you join samples (same variables); with axis=1 you join variables (same samples)."
+ },
+ "core_consistency": {
+  "description": "Core consistency diagnostic to choose the number of components."
  },
  "corr": {
   "description": "Pearson coefficients between columns. Equivalent to MATLAB's corr().",
@@ -170,6 +212,9 @@
   },
   "usage_tips": "Essential for understanding collinearity between variables before modeling. In spectroscopy, neighboring wavelengths usually have a correlation close to 1. Viewing it as a heat map helps identify groups of redundant variables."
  },
+ "correlation_analysis": {
+  "description": "Correlation matrix and heatmap."
+ },
  "cov": {
   "description": "Covariance matrix between columns. Equivalent to MATLAB's cov().",
   "how_it_works": "Computes the covariance matrix between all variables (columns) of X. Unlike correlation, it preserves the original magnitudes — element (i,i) is the variance of variable i, and (i,j) is the covariance between i and j.",
@@ -181,6 +226,9 @@
    "result": "Covariance matrix (variables × variables)."
   },
   "usage_tips": "Used internally by PCA and LDA. Checking the covariance matrix before PCA helps understand which variables dominate the analysis. With ddof=1 (the statistical default), dividing by N-1 gives an unbiased estimate of the population covariance."
+ },
+ "cp_decomp": {
+  "description": "Generic Canonical Polyadic Decomposition."
  },
  "cross_validation": {
   "description": "Cross-validation.",
@@ -234,6 +282,27 @@
   },
   "usage_tips": "Divide by cumsum[-1] to normalize and obtain the empirical CDF. Also useful for integrating spectra."
  },
+ "cusum_chart": {
+  "description": "CUSUM chart to detect accumulated deviations (univariate)."
+ },
+ "data_export_report": {
+  "description": "Exports results to CSV/JSON and generates an HTML report."
+ },
+ "dataset_info": {
+  "description": "Returns metadata, shape and basic statistics of a dataset."
+ },
+ "dataset_split": {
+  "description": "Splits a dataset into training, test and validation sets."
+ },
+ "dataset_upload": {
+  "description": "Loads a data file (CSV, Excel, MAT, HDF5) and creates a dataset."
+ },
+ "dd_simca": {
+  "description": "Data-driven SIMCA with a statistical boundary from the F distribution (Mahalanobis + orthogonal)."
+ },
+ "descriptive_statistics": {
+  "description": "Mean, standard deviation, CV, kurtosis and skewness per variable."
+ },
  "determinante": {
   "description": "Computes det(A). Requires a square A.",
   "historical_note": "Determinants arose independently with Seki Takakazu and Gottfried Leibniz in the late 17th century, linked to solving linear systems; the term 'determinant' in the current sense dates from the early 19th century (Gauss and Cauchy).",
@@ -246,6 +315,9 @@
    "det": "Determinant of the matrix (scalar)."
   },
   "usage_tips": "Only for square matrices. A determinant very close to zero indicates a nearly singular matrix — the inverse will be numerically unstable and it is worth using `pseudo_inversa`."
+ },
+ "detrend": {
+  "description": "Removes the linear or constant trend from the spectra."
  },
  "diff": {
   "description": "Difference between consecutive elements. Equivalent to MATLAB's diff().",
@@ -299,6 +371,9 @@
   },
   "usage_tips": "Division by zero produces inf/NaN — check B beforehand. Useful for spectral ratios, such as sample ÷ reference to obtain transmittance."
  },
+ "domain_adaptation_pca": {
+  "description": "Domain alignment via Procrustes rotation in PCA."
+ },
  "ds": {
   "description": "Direct Standardization.",
   "historical_note": "Proposed in Bruce Kowalski's group in the early 1990s, as one of the first formal methods of calibration transfer between instruments.",
@@ -327,6 +402,18 @@
    "eigenvectors": "Corresponding eigenvectors, one per column."
   },
   "usage_tips": "Prefer `eig` when you need both results: the decomposition is done only once. Only accepts a square matrix. The eigenvalues come split into real and imaginary parts."
+ },
+ "eilers_smoothing": {
+  "description": "Smoothing with Eilers' penalized spline (Whittaker smoother)."
+ },
+ "elastic_net": {
+  "description": "Mixed L1+L2 regularization."
+ },
+ "emsc": {
+  "description": "Extended Multiplicative Scatter Correction."
+ },
+ "ewma": {
+  "description": "Exponentially Weighted Moving Average — univariate and multivariate."
  },
  "exp": {
   "description": "Element-wise e^x. Equivalent to MATLAB's exp().",
@@ -373,6 +460,9 @@
   },
   "usage_tips": "Multiply the sample_spacing parameter by the actual sampling step (e.g. 1/sampling_rate) to get frequencies in Hz. High magnitudes at low frequencies usually indicate baseline drift; at high frequencies, noise."
  },
+ "fine_tuning_pls": {
+  "description": "Fine-tuning of a PLS model with samples from the new instrument."
+ },
  "floor": {
   "description": "Largest integer ≤ each element. Equivalent to MATLAB's floor().",
   "how_it_works": "Returns the largest integer less than or equal to each element (always rounds down, toward -∞). floor(-1.5) = -2.",
@@ -415,6 +505,18 @@
   },
   "usage_tips": "The connected input is available in the expression under the port name (by default, `X`) and only functions from the allow-list can be used: sqrt, log, log10, exp, abs, mean, std, min, max, sum, transpose, reshape and norm — for example, `sqrt(X) + 2*X`. Any other call, attribute or forbidden name is rejected during validation, for security. Other variables connected to the block are also available by their port name."
  },
+ "fourier_analysis": {
+  "description": "Fourier analysis (FFT) with low-pass/high-pass filtering."
+ },
+ "ga_pls": {
+  "description": "Genetic Algorithm for variable selection in PLS."
+ },
+ "gpr": {
+  "description": "Gaussian Process Regression."
+ },
+ "gram": {
+  "description": "Generalized Rank Annihilation Method."
+ },
  "hca": {
   "description": "Hierarchical clustering analysis with linkage and dendrogram.",
   "historical_note": "The most widely used linkage method (Ward, 1963) minimizes the increase in within-cluster variance at each merge — it is the most suitable when the expected clusters are reasonably spherical and of similar size.",
@@ -433,6 +535,24 @@
   },
   "usage_tips": "Choose `method` (default 'ward') and `metric` (default 'euclidean'; Ward requires Euclidean distance and enforces it automatically). It does not require defining the number of clusters beforehand: you decide by looking at where to cut the dendrogram. Data on very different scales should go through autoscaling first, otherwise the variable with the largest scale dominates the distance. The outputs provide the linkage matrix (SciPy format) and ready-made dendrogram coordinates."
  },
+ "high_level_fusion": {
+  "description": "High-level fusion — combines the predictions of independent models."
+ },
+ "hooi": {
+  "description": "Higher-Order Orthogonal Iteration (optimized Tucker)."
+ },
+ "hyperspectral_classification": {
+  "description": "Pixel-wise classification (SVM or RF) of hyperspectral images."
+ },
+ "hyperspectral_pca": {
+  "description": "PCA on a hyperspectral image (2D or 3D input)."
+ },
+ "hyperspectral_unmixing": {
+  "description": "Spectral unmixing via VCA, N-FINDR or FCLSU."
+ },
+ "ils": {
+  "description": "Models y = X × b directly. Requires n_samples > n_variables."
+ },
  "importacao": {
   "description": "Data input for the workflow.",
   "how_it_works": "Reads an external data file (CSV, Excel, NumPy, HDF5, Zarr) and returns a dataset ready to use in the workflow — it is typically the first node of any pipeline.",
@@ -450,6 +570,9 @@
    "sample_axis": "Sample axis in the imported array."
   },
   "usage_tips": "Give the path in the `file_path` parameter; with `format=auto` the format is detected from the extension (CSV, XLSX, NPY, NPZ, HDF5 or Zarr). In files with several datasets (NPZ, HDF5, Zarr) the first one is read. In CSV/XLSX the first row is treated as a header and the remaining columns must be numeric. `sample_axis` tells which axis represents the samples."
+ },
+ "interpolation": {
+  "description": "Resamples the spectra onto a common axis by interpolation."
  },
  "inversa": {
   "description": "Computes A⁻¹. Requires a square A.",
@@ -485,6 +608,12 @@
   },
   "usage_tips": "A good first variable-selection step when you want an interpretable answer ('this spectral range is the one that matters') instead of a scattered subset of points, as VIP or CARS give. The intervals are fixed and consecutive, so choose `n_intervals` so that each window has enough points for the number of components used."
  },
+ "ipls_var": {
+  "description": "Interval PLS for selecting spectral regions."
+ },
+ "iterative_imputation": {
+  "description": "MICE — Multiple Imputation by Chained Equations."
+ },
  "kennard_stone": {
   "description": "Splits the samples into calibration (training), test and, optionally, validation sets by iteratively selecting the sample farthest (Euclidean distance) from those already chosen — it maximizes coverage of the multivariate variability instead of a random split. Deterministic: the same input always produces the same split.",
   "historical_note": "Proposed by R.W. Kennard and L.A. Stone in 1969 as an experimental design method (\"Computer Aided Design of Experiments\"); today it is the standard method in chemometrics for splitting data into training/test/validation before a multivariate calibration.",
@@ -510,6 +639,12 @@
   },
   "usage_tips": "The training size is set by `n_train` (number) or `train_size` (fraction; default 0.7) and the optional validation size by `n_validation`/`validation_size`; what is left becomes the test set. The `validation` port only exists when validation is requested. Apply it BEFORE preprocessing steps that learn parameters from the data (autoscaling, MSC) to avoid information leaking from test to training. Since the method is deterministic, the same input always generates the same split."
  },
+ "kernel_fusion": {
+  "description": "Kernel fusion (MKL-style) for multi-block SVM."
+ },
+ "kmeans": {
+  "description": "K-Means clustering."
+ },
  "knn": {
   "description": "K-Nearest Neighbors.",
   "historical_note": "The nearest-neighbor method was proposed by Evelyn Fix and Joseph Hodges in 1951 and theoretically analyzed by Thomas Cover and Peter Hart in 1967.",
@@ -528,6 +663,15 @@
    "weights": "Weight of the neighbors: uniform or by inverse distance."
   },
   "usage_tips": "Simple and free of assumptions about the shape of the boundary between classes, but it suffers in high dimension (many spectral variables) if dimensionality is not reduced first (e.g. use the scores of a PCA instead of the raw spectrum). Sensitive to scale — normalize first."
+ },
+ "knn_imputation": {
+  "description": "Imputation by K nearest neighbors."
+ },
+ "lasso": {
+  "description": "Least Absolute Shrinkage and Selection Operator (L1)."
+ },
+ "lasso_selection": {
+  "description": "Selection by L1 regularization with cross-validation of lambda."
  },
  "lda": {
   "description": "Linear Discriminant Analysis.",
@@ -567,6 +711,9 @@
    "threshold_leverage": "Leverage threshold above which the sample is considered highly influential. Leave blank for the automatic threshold (2p/n)."
   },
   "usage_tips": "It complements Outlier Detection: there the focus is the sample's distance to the overall distribution; here it is how much each sample weighs in the fit. Since the hat matrix is computed directly on the variables of X, with spectra (many more variables than samples) all leverages tend to 1 and stop discriminating — in that case apply the block to the scores of a PCA (few components)."
+ },
+ "lime_explanation": {
+  "description": "LIME — local linear approximation around individual samples."
  },
  "limpeza": {
   "description": "Removes samples or variables with NaN, Inf or zero variance.",
@@ -615,6 +762,18 @@
    "base": "Base of the logarithm."
   },
   "usage_tips": "All input values must be positive. In spectroscopy, the log10 transformation converts transmittance into absorbance (log10(1/T)). Often combined with SNV or MSC before PLS modeling."
+ },
+ "logistic_regression": {
+  "description": "Logistic regression (binary or multiclass)."
+ },
+ "low_level_fusion": {
+  "description": "Low-level fusion — concatenation of data blocks."
+ },
+ "lstm": {
+  "description": "Long Short-Term Memory."
+ },
+ "matrix_completion": {
+  "description": "Matrix completion by iterative SVD."
  },
  "max": {
   "description": "Maximum value along an axis.",
@@ -694,6 +853,12 @@
   },
   "usage_tips": "Use it at the end of a battery of tests (e.g. comparing PLS with 3, 5 and 10 components) instead of comparing numbers scattered by hand. By default all numeric metrics are aggregated; use `metrics` to choose which ones. Sorting is ascending: with `sort_by` on an error (RMSE), the best experiment comes first."
  },
+ "mid_level_fusion": {
+  "description": "Mid-level fusion — PCA per block + concatenation of scores."
+ },
+ "mie_emsc": {
+  "description": "Mie physical scattering correction for FTIR of cells and tissues."
+ },
  "min": {
   "description": "Minimum value along an axis.",
   "how_it_works": "Returns the minimum value of an array, along the specified axis.",
@@ -729,6 +894,12 @@
   },
   "usage_tips": "It needs many more training samples than PLS/PCR to generalize well, and is more prone to overfitting — consider PLS first as a baseline and only move up to MLP if the relationship between X and y is clearly non-linear."
  },
+ "mlp_classification": {
+  "description": "Multilayer Perceptron for classification."
+ },
+ "mlp_regression": {
+  "description": "Multilayer Perceptron for regression."
+ },
  "mod": {
   "description": "Remainder of dividing X by divisor. Equivalent to MATLAB's mod().",
   "how_it_works": "Computes the remainder of dividing X by divisor, with a result that has the same sign as the divisor (MATLAB behavior). Unlike Python's % operator, which gives a result with the same sign as the dividend.",
@@ -760,6 +931,9 @@
   },
   "usage_tips": "An alternative to SNV with an almost always equivalent result — the difference is that MSC depends on a reference spectrum (computed from the training set itself), so that reference has to be stored to apply it to new data later."
  },
+ "mspc": {
+  "description": "Multivariate Statistical Process Control (Hotelling's T² + Q/SPE)."
+ },
  "multiplicacao_elementwise": {
   "description": "Multiplication A × B, element by element.",
   "how_it_works": "Multiplies A by B element by element (Hadamard product — different from the matrix product). The shapes must be equal or compatible by broadcasting.",
@@ -772,6 +946,9 @@
    "result": "Result of A ⊙ B, element by element."
   },
   "usage_tips": "Do not confuse it with `produto_matricial`. Useful for applying a mask (0/1) or a per-variable weight vector, zeroing out or highlighting regions of the spectrum."
+ },
+ "multiway_one_class": {
+  "description": "One-class SVM on an unfolded tensor with PCA pre-reduction."
  },
  "multiway_pls_da": {
   "description": "PLS-DA on unfolded multiway data.",
@@ -810,6 +987,24 @@
   },
   "usage_tips": "Use it when X has 3 or more modes (e.g. samples × excitation × emission in fluorescence). The returned scores and loadings refer to the unfolded tensor, so per-mode interpretation is not available. Compare with `u_pls`, which adds per-column normalization before the PLS."
  },
+ "n_pls_da": {
+  "description": "N-PLS-DA for discrimination of multiway data."
+ },
+ "n_way_pcr": {
+  "description": "PCR on unfolded multiway data."
+ },
+ "naive_bayes": {
+  "description": "Gaussian Naive Bayes classifier."
+ },
+ "nbet_correction": {
+  "description": "NBET correction for fluorescence data."
+ },
+ "noise_estimation": {
+  "description": "Noise estimation by derivative or SWSC."
+ },
+ "nonlinear_regression": {
+  "description": "Support Vector Regression."
+ },
  "norma": {
   "description": "Computes the norm of the array.",
   "how_it_works": "Computes the norm (magnitude) of a vector or matrix, according to the chosen type (L1, L2/Euclidean, infinity, Frobenius).",
@@ -824,6 +1019,28 @@
    "ord": "Order of the norm (numpy.linalg.norm): null=default, \"fro\", 1, 2, etc."
   },
   "usage_tips": "Without parameters: Frobenius norm (matrices) or L2 (vectors) of the whole array, returned as a scalar. `ord` chooses other types (1, 2, infinity…) and `axis` computes the norm per row/column, returning a vector. Dividing each spectrum by its norm is a simple form of vector normalization."
+ },
+ "normalizacao": {
+  "description": "Data normalization."
+ },
+ "oc_rf": {
+  "description": "One-class Random Forest with synthetic pseudo-negatives."
+ },
+ "oc_simca": {
+  "description": "One-class SIMCA: models only the target class."
+ },
+ "ols": {
+  "description": "Multiple Linear Regression."
+ },
+ "one_class_svm": {
+  "description": "Novelty detection with a one-class SVM (sklearn)."
+ },
+ "ordem_superior_generica": {
+  "description": "Calibration by generic PARAFAC for a tensor of any order >= 3.",
+  "name": "Generic Higher-Order Calibration"
+ },
+ "osc": {
+  "description": "Orthogonal Signal Correction."
  },
  "outlier_detection": {
   "description": "Outlier detection by leverage, Mahalanobis distance or Hotelling T².",
@@ -842,6 +1059,13 @@
    "method": "Outlier detection method."
   },
   "usage_tips": "Run it right after PCA exploration and before training any supervised model: samples with gross measurement error or contamination distort the model if they enter training. In this version 'hotelling' and 'mahalanobis' use the same calculation. With few samples relative to variables the covariance matrix becomes ill-conditioned — in that case apply the detection to the scores of a PCA."
+ },
+ "outlier_detection_utility": {
+  "description": "Outlier detection by Mahalanobis, Grubbs or IQR."
+ },
+ "outros_scalings": {
+  "description": "VAST, level and range scaling.",
+  "name": "Other Scalings (VAST/level/range)"
  },
  "parafac": {
   "description": "Parallel Factor Analysis for multiway data.",
@@ -867,6 +1091,25 @@
   },
   "usage_tips": "It is the reference technique for decomposing fluorescence EEM data (excitation-emission matrix) into pure chemical components, without prior calibration — the uniqueness of the solution is what makes this possible. `rank` is the number of components: test several values and compare `fit`. The core consistency diagnostic is not yet computed in this version."
  },
+ "parafac2": {
+  "description": "PARAFAC2 for data whose profile varies in one mode."
+ },
+ "parafac_aumentado": {
+  "description": "PARAFAC on an augmented tensor with non-negativity constraints.",
+  "name": "Augmented PARAFAC"
+ },
+ "parafac_regression": {
+  "description": "Regression on PARAFAC scores."
+ },
+ "parafac_simca": {
+  "description": "SIMCA applied to PARAFAC scores, per class."
+ },
+ "pareto": {
+  "description": "Scales by the square root of the standard deviation."
+ },
+ "partial_dependence": {
+  "description": "Partial Dependence Plot — marginal effect of variables on the RF model."
+ },
  "pca": {
   "description": "Principal Component Analysis.",
   "historical_note": "Proposed by Karl Pearson in 1901 as a geometric fit of lines and planes to data, and formalized in statistical terms by Harold Hotelling in 1933. It is the most widely used technique in chemometrics for exploring multivariate data before any modeling.",
@@ -886,6 +1129,15 @@
    "scale": "Scale each variable by its standard deviation before decomposing (autoscaling)."
   },
   "usage_tips": "It is almost always the first step of any exploratory analysis: use it to see groupings, trends and outliers before moving on to a supervised model. Many other techniques in the catalog (SIMCA, Leverage/Influence, MCR-ALS) depend on running a PCA first."
+ },
+ "pca_control_chart": {
+  "description": "Control chart on PCA scores (±3σ per component)."
+ },
+ "pca_imputation": {
+  "description": "Imputation via NIPALS with missing data."
+ },
+ "pca_multiway": {
+  "description": "PCA on multiway data via Tucker with R=1 per mode."
  },
  "pcr": {
   "description": "Principal Component Regression.",
@@ -925,6 +1177,18 @@
    "window": "Size of the window around each variable used in the local standardization."
   },
   "usage_tips": "It is generally the default choice over plain DS, especially when the difference between instruments is not uniform across the whole spectrum. X_primary and X_secondary must have the same shape (the same samples and variables), and it needs somewhat more transfer samples to calibrate each window well."
+ },
+ "peak_alignment": {
+  "description": "Peak alignment by cross-correlation."
+ },
+ "peak_detection": {
+  "description": "Spectral peak detection via scipy find_peaks."
+ },
+ "permutation_importance": {
+  "description": "Permutation importance via RF or PLS."
+ },
+ "permutation_test": {
+  "description": "Permutation test (y-scrambling) to check for chance correlation."
  },
  "pls": {
   "description": "Partial Least Squares regression.",
@@ -991,6 +1255,12 @@
   },
   "usage_tips": "Useful when you only have reliable samples of ONE class (e.g. you only have the \"good\" product, with no labeled examples of every way of being \"bad\"). In that scenario it is more suitable than PLS-DA, which needs examples of all classes."
  },
+ "pqn": {
+  "description": "Normalizes by the median of the variable-by-variable quotients."
+ },
+ "prediction": {
+  "description": "Applies a trained model to new samples."
+ },
  "produto_matricial": {
   "description": "Matrix multiplication A @ B.",
   "how_it_works": "Multiplies two matrices (A·B), respecting the dimension compatibility rule (columns of A = rows of B).",
@@ -1016,6 +1286,13 @@
    "A_pinv": "Pseudo-inverse of A."
   },
   "usage_tips": "Use it instead of the inverse when the matrix is singular, ill-conditioned or non-square. Example: least-squares regression coefficients, b = pinv(X)·y."
+ },
+ "qda": {
+  "description": "Quadratic Discriminant Analysis."
+ },
+ "quarta_ordem": {
+  "description": "4th-order calibration via PARAFAC on a 5-way tensor.",
+  "name": "4th-Order Calibration"
  },
  "random_forest": {
   "description": "Random Forest.",
@@ -1050,6 +1327,9 @@
   },
   "usage_tips": "The numerical rank depends on the tolerance `tol`: very small values count noise as information. It gives a ceiling on the number of useful PCA/PLS components — there are never more non-zero components than the rank of X."
  },
+ "rayleigh_masking": {
+  "description": "Masks the Rayleigh and Raman regions in EEM matrices."
+ },
  "reshape": {
   "description": "Changes the shape of the array without changing the order of the elements.",
   "how_it_works": "Reorganizes the data of an array into a new shape, keeping the same total number of elements — e.g. turning a 100-point vector into a 10×10 matrix.",
@@ -1063,6 +1343,12 @@
    "new_shape": "New shape, e.g. [6,5]. The product of the dimensions must equal that of the original array."
   },
   "usage_tips": "The product of the dimensions of `new_shape` must equal the total number of elements; the order of the elements (row by row) is preserved, only the shape changes."
+ },
+ "rf_importance": {
+  "description": "Variable importance from Random Forest."
+ },
+ "ridge": {
+  "description": "Ridge regression (L2 regularization)."
  },
  "rnn": {
   "description": "Recurrent Neural Network.",
@@ -1087,6 +1373,9 @@
    "units": "Number of units per recurrent layer — the length of the list is the number of hidden layers (e.g. [64, 32] = 2 layers)."
   },
   "usage_tips": "Less common than CNN-1D for pure spectral data (which have no strong notion of \"temporal order\"), but it may be worthwhile if the data have a real temporal component (e.g. process monitoring over time)."
+ },
+ "robust_scaling": {
+  "description": "Centers by the median and scales by the IQR (insensitive to outliers)."
  },
  "round": {
   "description": "Rounds elements to N decimal places. Equivalent to MATLAB's round().",
@@ -1120,6 +1409,9 @@
    "window_length": "Window size — must be odd and greater than polyorder."
   },
   "usage_tips": "Derivatives (1st or 2nd) remove baseline effects and peak overlap — widely used before PLS in NIR. A larger window smooths more but can also distort narrow peaks; start with a small window and increase it only if needed."
+ },
+ "segunda_ordem": {
+  "description": "Second-order calibration, estimating constituents without prior separation."
  },
  "selecao_amostras": {
   "description": "Selects a subset of samples by index or boolean mask.",
@@ -1157,6 +1449,9 @@
   },
   "usage_tips": "Widely used to crop a spectral region of interest before modeling (e.g. range [200, 800]). The `selected_indices` output records which positions were kept — useful for applying the same selection to new data."
  },
+ "sensitivity_analysis": {
+  "description": "Local (gradient) or global (Morris screening) sensitivity analysis."
+ },
  "sign": {
   "description": "Sign of each element: -1, 0 or +1. Equivalent to MATLAB's sign().",
   "how_it_works": "Returns the sign of each element: -1 for negatives, 0 for zero, +1 for positives. It separates magnitude from sign — it can be combined with abs() to rebuild the original value.",
@@ -1190,6 +1485,9 @@
   },
   "usage_tips": "It is the right choice when you want to know not only 'which class' but also whether the sample belongs to any known class at all. `n_components` applies to all class models (it is automatically reduced if a class has few samples). Classes with few samples produce unstable models — check `thresholds` and `distances`."
  },
+ "sipls": {
+  "description": "Synergy interval PLS — combinations of intervals."
+ },
  "slice": {
   "description": "Selects part of one or more axes by range.",
   "how_it_works": "Selects a part (sub-region) of one or more axes of an array, by index interval — e.g. cropping just a range of wavelengths.",
@@ -1205,6 +1503,9 @@
   },
   "usage_tips": "`ranges` defines, per axis, the crop [start, end, step]. Example: {\"1\": [100, 400]} keeps the variables at positions 100 to 399 and leaves the other axes intact. Indices start at 0 and the end is not included."
  },
+ "smoothing": {
+  "description": "Smoothing by moving average, median or Gaussian filter."
+ },
  "snv": {
   "description": "Standard Normal Variate.",
   "historical_note": "Proposed by R.J. Barnes, M.S. Dhanoa and Susan Lister in 1989, specifically to correct scattering effects in NIR spectra of solid/powdered samples.",
@@ -1219,6 +1520,9 @@
    "spectral_axis": "Spectral axis (along which each sample is normalized)."
   },
   "usage_tips": "Almost always the first preprocessing applied to NIR spectra of solids, before any modeling. Equivalent in effect to MSC in most cases — the two are rarely used together."
+ },
+ "socofus": {
+  "description": "Sequential Orthogonalized PLS for sequential fusion."
  },
  "soma": {
   "description": "Addition A + B, element by element (B can be another dataset or a literal scalar/array).",
@@ -1248,6 +1552,30 @@
    "axis": "Sorting axis. -1=last axis."
   },
   "usage_tips": "Use it to sort spectra by wavelength, samples by concentration, or scores by magnitude. The output indices let you reorder other variables in the same order."
+ },
+ "spa": {
+  "description": "Successive Projections Algorithm."
+ },
+ "spectral_angle_mapper": {
+  "description": "SAM — classification by spectral angle."
+ },
+ "spectral_calibration_transfer": {
+  "description": "Generic spectral calibration transfer (SLOPE/BIAS)."
+ },
+ "spectral_cropping": {
+  "description": "Crops a spectral interval."
+ },
+ "spectral_database_search": {
+  "description": "Spectral similarity search (cosine or SAM)."
+ },
+ "spectral_interpolation": {
+  "description": "Interpolation of missing regions (linear, cubic or PCHIP)."
+ },
+ "spectrum_decomposition": {
+  "description": "Spectral decomposition by NMF, ICA or PCA."
+ },
+ "spectrum_simulator": {
+  "description": "Generates synthetic spectra with Gaussian peaks and controlled noise."
  },
  "split": {
   "description": "Splits an array into parts along an axis.",
@@ -1381,6 +1709,27 @@
   },
   "usage_tips": "It tends to perform well even with few samples and many variables (a common scenario in spectroscopy), but it is sensitive to data scale — always normalize/autoscale before training."
  },
+ "tensor_knn": {
+  "description": "KNN on an unfolded tensor."
+ },
+ "tensor_nmf": {
+  "description": "Non-negative Tensor Factorization."
+ },
+ "tensor_random_forest": {
+  "description": "Random Forest on an unfolded tensor."
+ },
+ "tensor_regression": {
+  "description": "Tensor regression with the weight coefficient in CP format."
+ },
+ "tensor_svd": {
+  "description": "Higher-Order SVD for exploratory analysis of tensors."
+ },
+ "tensor_svm": {
+  "description": "SVM on an unfolded tensor."
+ },
+ "terceira_ordem": {
+  "description": "Third-order calibration for fourth-order analytical data."
+ },
  "trace": {
   "description": "Sum of the main-diagonal elements. Requires a square A.",
   "how_it_works": "Computes the trace of a square matrix — the sum of the main-diagonal elements.",
@@ -1469,6 +1818,18 @@
   },
   "usage_tips": "Use it instead of PARAFAC when there is no reason to expect exact trilinearity in the data, or when you want to explore how many components each mode really needs independently."
  },
+ "tucker_lda": {
+  "description": "LDA on Tucker scores."
+ },
+ "tucker_pls": {
+  "description": "PLS combined with Tucker decomposition."
+ },
+ "tucker_regression": {
+  "description": "Regression via Tucker decomposition: scores → linear regression."
+ },
+ "u_pca": {
+  "description": "PCA on an unfolded tensor (multiway exploratory analysis)."
+ },
  "u_pls": {
   "description": "PLS on unfolded multiway data (unfold + PLS).",
   "how_it_works": "Unfolds the input tensor into a 2D matrix (samples × all other flattened modes), normalizes each column (mean 0, standard deviation 1) and runs an ordinary PLS on it — simpler than a true N-PLS, but it loses the separation between the original modes.",
@@ -1516,6 +1877,12 @@
   },
   "usage_tips": "Use unique(y) to check which classes exist and how many samples each has before training a classification model. Class imbalance may call for balancing strategies."
  },
+ "unit_converter": {
+  "description": "Converts between spectral units: nm, cm⁻¹, eV, THz, µm."
+ },
+ "uve": {
+  "description": "Uninformative Variable Elimination."
+ },
  "var": {
   "description": "Variance along an axis. Equivalent to MATLAB's var().",
   "how_it_works": "Computes the dispersion of the data around the mean — the mean of the squared deviations. With ddof=0 (default) it is the population variance; with ddof=1 it is the sample variance (division by N-1).",
@@ -1552,5 +1919,11 @@
    "threshold": "VIP threshold above which the variable is considered important (default: 1.0)."
   },
   "usage_tips": "It receives X and y directly — there is no need to run a PLS beforehand, the block trains its own. Use `selected_indices` to crop X (with `selecao_variaveis`) and retrain the PLS with fewer variables. To avoid information leakage, compute the VIP using only the training set."
+ },
+ "vip_interpretation": {
+  "description": "PLS VIP scores with analysis of the most important regions."
+ },
+ "wavelet_transform": {
+  "description": "Discrete wavelet decomposition for smoothing, decomposition or feature extraction."
  }
 }

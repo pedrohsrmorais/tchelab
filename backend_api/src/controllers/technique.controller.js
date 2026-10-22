@@ -37,7 +37,7 @@ async function listTechniques(req, res) {
       // `active` entra aqui pra página de Catálogo (que sempre passa
       // include_inactive=true) mostrar o badge "ativo"/"em desenvolvimento"
       // sem precisar de um GET /techniques/:id por linha.
-      `SELECT id, uuid, slug, name, category, family, description, min_order, max_order,
+      `SELECT id, uuid, slug, name, category, subcategory, family, description, min_order, max_order,
               requires_sample_axis, input_schema, output_schema, parameter_schema, tags,
               is_beta, is_custom, active, how_it_works, usage_tips, historical_note
        FROM techniques WHERE ${where} ORDER BY category, family, name LIMIT ? OFFSET ?`,

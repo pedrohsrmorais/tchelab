@@ -1,170 +1,197 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Library, Search, ArrowRight, CheckCircle2, Hammer, Info } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Search, X, LayoutGrid, List as ListIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Books } from '@phosphor-icons/react';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
-import { getFamiliesList, getFamilyConfig } from '../config/techniqueRegistry';
+import { getFamiliesList } from '../config/techniqueRegistry';
+import { sectionOf, SECTION_ORDER, subcategoryKey } from '../config/techniqueSections';
+import { SECTION_ICONS } from '../config/icons';
 import EmptyState from '../components/ui/EmptyState';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import TechniqueModal from '../components/ui/TechniqueModal';
+import FamilyIcon from '../components/ui/FamilyIcon';
+import FamilyFacets from '../components/catalog/FamilyFacets';
+import { TechniqueCard, TechniqueRow } from '../components/catalog/TechniqueCard';
+import { searchBlob, norm } from '../components/catalog/catalogUtils';
+import '../components/catalog/catalog.css';
 
-// Busca tudo (ativas + "em desenvolvimento") — o Catálogo é a documentação
-// completa, diferente do editor de workflow (que só lista active=1).
-// limit=200 cobre as ~198 técnicas (teto definido em utils/response.js).
-const fetchAll = () => api.techniques.list({ include_inactive: 'true', limit: 200 });
-
-function StatusBadge({ active }) {
-  const { t } = useTranslation();
-  return active ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
-      <CheckCircle2 className="w-3 h-3" /> {t('catalog.active')}
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
-      <Hammer className="w-3 h-3" /> {t('catalog.inDevelopment')}
-    </span>
-  );
+// O Catálogo é a documentação completa (ativas + "em desenvolvimento"), diferente do editor de
+// workflow, que só lista as ativas. A API limita cada página a 200 linhas, então busca todas.
+async function fetchAll(lang) {
+  const first = await api.techniques.list({ include_inactive: 'true', limit: 200, page: 1, lang });
+  const body = first.data ?? {};
+  let rows = body.data ?? [];
+  const pages = body.meta?.total_pages ?? 1;
+  for (let p = 2; p <= pages; p += 1) {
+    const next = await api.techniques.list({ include_inactive: 'true', limit: 200, page: p, lang });
+    rows = rows.concat(next.data?.data ?? []);
+  }
+  return { data: { data: rows } };
 }
 
-function TechniqueCard({ tech, onInfo }) {
-  const { t } = useTranslation();
-  const fam = getFamilyConfig(tech.family);
-  return (
-    <div
-      className="card p-5 flex flex-col gap-3 group"
-      style={{ borderLeft: `3px solid ${fam?.color || '#64748b'}`, position: 'relative' }}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="font-semibold text-white leading-snug">{tech.name}</h3>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={(e) => { e.preventDefault(); onInfo(tech); }}
-            title={t('catalog.viewDetails')}
-            className="btn-ghost"
-            style={{ padding: '3px 5px', color: 'var(--text-muted)' }}
-          >
-            <Info className="w-4 h-4" />
-          </button>
-          <Link
-            to={`/catalogo/${tech.uuid}`}
-            className="btn-ghost"
-            style={{ padding: '3px 5px', color: 'var(--text-muted)' }}
-            title={t('catalog.fullPage')}
-          >
-            <ArrowRight className="w-4 h-4 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
-          </Link>
-        </div>
-      </div>
-      <p className="text-sm text-slate-400 line-clamp-2">{tech.description || t('catalog.noDescription')}</p>
-      <div className="flex items-center justify-between mt-auto pt-1">
-        <span className="text-xs" style={{ color: fam?.color || '#94a3b8' }}>{fam?.labelStr || tech.family}</span>
-        <StatusBadge active={!!tech.active} />
-      </div>
-    </div>
-  );
-}
+const readPref = (k, d) => { try { return localStorage.getItem(`tchelab_cat_${k}`) || d; } catch { return d; } };
+const writePref = (k, v) => { try { localStorage.setItem(`tchelab_cat_${k}`, v); } catch { /* storage indisponível */ } };
 
 export default function CatalogPage() {
-  const { t } = useTranslation();
-  const { data, loading } = useApi(fetchAll, []);
+  const { t, i18n } = useTranslation();
+  const lang = String(i18n.language || 'pt').slice(0, 2);
+  // refaz a busca quando o idioma muda: a API devolve os textos já traduzidos
+  const { data, loading } = useApi(() => fetchAll(lang), [lang]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all | active | dev
-  const [familyFilter, setFamilyFilter] = useState('all');
+  const [status, setStatus] = useState('all'); // all | active | dev
+  const [family, setFamily] = useState('all');
+  const [sort, setSort] = useState(() => readPref('sort', 'pipeline')); // pipeline | name
+  const [view, setView] = useState(() => readPref('view', 'grid')); // grid | list
+  const [collapsed, setCollapsed] = useState({});
   const [modalTech, setModalTech] = useState(null);
+  const searchRef = useRef(null);
 
-  const all = useMemo(() => data?.data ?? data ?? [], [data]);
-  const families = useMemo(() => getFamiliesList(), []);
+  // atalho "/" foca a busca (como em GitHub, Notion, etc.), sem atrapalhar quem já está digitando
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return;
+      e.preventDefault(); searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return all.filter((t) => {
-      if (t.is_custom) return false; // catálogo documenta as técnicas nativas, não as customizadas de cada usuário
-      if (statusFilter === 'active' && !t.active) return false;
-      if (statusFilter === 'dev' && t.active) return false;
-      if (familyFilter !== 'all' && t.family !== familyFilter) return false;
-      if (q && !(t.name?.toLowerCase().includes(q) || t.slug?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q))) return false;
-      return true;
+  const all = useMemo(() => (data?.data ?? data ?? []).filter((x) => !x.is_custom), [data]);
+  const families = useMemo(() => getFamiliesList(lang), [lang]);
+  const blobs = useMemo(() => new Map(all.map((x) => [x.uuid, searchBlob(x, subcategoryKey(x) ? t(subcategoryKey(x)) : '')])), [all, t]);
+
+  const q = norm(search.trim());
+  const textOk = useCallback((x) => !q || blobs.get(x.uuid)?.includes(q), [q, blobs]);
+  const statusOk = (x) => status === 'all' || (status === 'active' ? !!x.active : !x.active);
+
+  // cada faceta é contada com os OUTROS filtros aplicados (o usuário vê o efeito antes de clicar)
+  const familyCounts = useMemo(() => {
+    const c = {};
+    for (const x of all) if (textOk(x) && statusOk(x)) c[x.family] = (c[x.family] || 0) + 1;
+    return c;
+  }, [all, textOk, status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const statusCounts = useMemo(() => {
+    const c = { all: 0, active: 0, dev: 0 };
+    for (const x of all) if (textOk(x) && (family === 'all' || x.family === family)) { c.all += 1; c[x.active ? 'active' : 'dev'] += 1; }
+    return c;
+  }, [all, textOk, family]);
+
+  const filtered = useMemo(() => all.filter((x) => textOk(x) && statusOk(x) && (family === 'all' || x.family === family)),
+    [all, textOk, status, family]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const byName = (a, b) => a.name.localeCompare(b.name, lang);
+  const groups = useMemo(() => {
+    if (sort === 'name') return [{ key: 'all', family: null, items: [...filtered].sort(byName) }];
+    const g = new Map();
+    for (const x of filtered) { if (!g.has(x.family)) g.set(x.family, []); g.get(x.family).push(x); }
+    return families.filter((f) => g.has(f.slug)).map((f) => ({ key: f.slug, family: f, items: g.get(f.slug).sort(byName) }));
+  }, [filtered, families, sort, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeCount = all.filter((x) => x.active).length;
+  const devCount = all.length - activeCount;
+  const filtersOn = !!q || status !== 'all' || family !== 'all';
+  const clearAll = () => { setSearch(''); setStatus('all'); setFamily('all'); };
+  const toggle = (k) => setCollapsed((c) => ({ ...c, [k]: !c[k] }));
+
+  const renderItems = (items) => (view === 'list'
+    ? <div className="cat-list">{items.map((x) => <TechniqueRow key={x.uuid} tech={x} query={search} onOpen={setModalTech} />)}</div>
+    : <div className="cat-grid">{items.map((x) => <TechniqueCard key={x.uuid} tech={x} query={search} onOpen={setModalTech} />)}</div>);
+
+  const renderGroupBody = (grp) => {
+    // família grande (ex.: Dados & I/O) ganha subseções
+    const sections = grp.family && grp.items.some((x) => sectionOf(x));
+    if (!sections) return renderItems(grp.items);
+    return SECTION_ORDER.map((s) => {
+      const items = grp.items.filter((x) => sectionOf(x) === s);
+      if (!items.length) return null;
+      const Icon = SECTION_ICONS[s];
+      return (
+        <div key={s}>
+          <h3 className="cat-subhead">{Icon && <Icon size={14} weight="duotone" aria-hidden />}{t(`catalog.section.${s}`)} <span style={{ fontWeight: 400 }}>· {items.length}</span></h3>
+          {renderItems(items)}
+        </div>
+      );
     });
-  }, [all, search, statusFilter, familyFilter]);
-
-  const grouped = useMemo(() => {
-    const g = {};
-    for (const t of filtered) {
-      (g[t.family] ??= []).push(t);
-    }
-    return g;
-  }, [filtered]);
-
-  const activeCount = all.filter((t) => !t.is_custom && t.active).length;
-  const devCount = all.filter((t) => !t.is_custom && !t.active).length;
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5" data-testid="catalog-page">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Library className="w-6 h-6 text-blue-400" /> {t('catalog.title')}
+          <h1 className="text-2xl font-bold flex items-center gap-2.5" style={{ color: 'var(--text-primary)' }}>
+            <Books size={28} weight="duotone" style={{ color: 'var(--text-accent)' }} aria-hidden /> {t('catalog.title')}
           </h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {t('catalog.subtitle', { active: activeCount, dev: devCount })}
-          </p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{t('catalog.subtitle', { active: activeCount, dev: devCount })}</p>
         </div>
-      </div>
+      </header>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            className="input-field pl-10"
-            placeholder={t('catalog.searchPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="cat-toolbar" role="search">
+        <div className="cat-search">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} aria-hidden />
+          <input ref={searchRef} className="input-field" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('catalog.searchPlaceholder')}
+            aria-label={t('catalog.searchPlaceholder')} data-testid="catalog-search" />
+          {search
+            ? <button type="button" className="cat-clear btn-ghost" style={{ padding: 4 }} onClick={() => { setSearch(''); searchRef.current?.focus(); }} aria-label={t('catalog.clearSearch')}><X className="w-4 h-4" /></button>
+            : <span className="cat-kbd" aria-hidden title={t('catalog.searchHint')}>/</span>}
         </div>
-        <select className="input-field sm:w-52" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="all">{t('catalog.statusAll')}</option>
-          <option value="active">{t('catalog.statusActiveOnly')}</option>
-          <option value="dev">{t('catalog.statusDevOnly')}</option>
-        </select>
-        <select className="input-field sm:w-64" value={familyFilter} onChange={(e) => setFamilyFilter(e.target.value)}>
-          <option value="all">{t('workflows.allFamilies')}</option>
-          {families.map((f) => (
-            <option key={f.slug} value={f.slug}>{f.labelStr}</option>
+        <div className="cat-seg" role="group" aria-label={t('catalog.statusTabs')} data-testid="status-tabs">
+          {[['all', t('catalog.tabAll')], ['active', t('catalog.tabActive')], ['dev', t('catalog.tabDev')]].map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)} data-testid={`status-${k}`}>{label} <span className="cat-n">{statusCounts[k]}</span></button>
           ))}
+        </div>
+        <label className="sr-only" htmlFor="cat-sort">{t('catalog.sort')}</label>
+        <select id="cat-sort" className="input-field" style={{ width: 'auto' }} value={sort} onChange={(e) => { setSort(e.target.value); writePref('sort', e.target.value); }} data-testid="catalog-sort">
+          <option value="pipeline">{t('catalog.sort')}: {t('catalog.sortPipeline')}</option>
+          <option value="name">{t('catalog.sort')}: {t('catalog.sortName')}</option>
         </select>
+        <div className="cat-seg icons" role="group" aria-label={t('catalog.view')}>
+          <button type="button" aria-pressed={view === 'grid'} onClick={() => { setView('grid'); writePref('view', 'grid'); }} title={t('catalog.viewGrid')} aria-label={t('catalog.viewGrid')} data-testid="view-grid"><LayoutGrid className="w-4 h-4" /></button>
+          <button type="button" aria-pressed={view === 'list'} onClick={() => { setView('list'); writePref('view', 'list'); }} title={t('catalog.viewList')} aria-label={t('catalog.viewList')} data-testid="view-list"><ListIcon className="w-4 h-4" /></button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array(9).fill(0).map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={Library} title={t('catalog.emptyTitle')} description={t('catalog.emptyDesc')} />
-      ) : (
-        <div className="space-y-8">
-          {families
-            .filter((f) => grouped[f.slug]?.length)
-            .map((f) => (
-              <div key={f.slug}>
-                <h2 className="text-sm font-semibold uppercase tracking-wide mb-3" style={{ color: f.color }}>
-                  {f.labelStr} <span className="text-slate-500 font-normal">({grouped[f.slug].length})</span>
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {grouped[f.slug]
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((t) => <TechniqueCard key={t.uuid} tech={t} onInfo={setModalTech} />)}
-                </div>
-              </div>
-            ))}
-        </div>
-      )}
+      <div className="cat-layout">
+        <FamilyFacets families={families} counts={familyCounts} total={Object.values(familyCounts).reduce((a, b) => a + b, 0)} value={family} onChange={setFamily} />
 
-      <TechniqueModal
-        open={!!modalTech}
-        onClose={() => setModalTech(null)}
-        technique={modalTech}
-      />
+        <div className="min-w-0 space-y-6">
+          {!loading && (
+            <div className="flex flex-wrap items-center gap-3 text-sm" style={{ color: 'var(--text-secondary)' }} aria-live="polite" data-testid="catalog-summary">
+              <span>{t('catalog.showing', { shown: filtered.length, total: all.length })}</span>
+              {filtersOn && <button type="button" className="btn-ghost text-sm" onClick={clearAll} data-testid="clear-filters">{t('catalog.clearFilters')}</button>}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="cat-grid">{Array(9).fill(0).map((_, i) => <SkeletonCard key={i} />)}</div>
+          ) : filtered.length === 0 ? (
+            <EmptyState icon={Books} title={t('catalog.emptyTitle')} description={t('catalog.emptyDesc')}
+              action={filtersOn ? <button type="button" className="btn-primary" onClick={clearAll}>{t('catalog.clearFilters')}</button> : null} />
+          ) : (
+            groups.map((grp) => {
+              if (!grp.family) return <div key={grp.key}>{renderItems(grp.items)}</div>;
+              const open = !collapsed[grp.key];
+              const Chev = open ? ChevronDown : ChevronRight;
+              return (
+                <section key={grp.key} aria-labelledby={`fam-${grp.key}`} data-testid={`family-section-${grp.key}`}>
+                  <button type="button" className="cat-section-head" onClick={() => toggle(grp.key)} aria-expanded={open}
+                    title={t(open ? 'catalog.collapseSection' : 'catalog.expandSection', { name: grp.family.labelStr })}>
+                    <FamilyIcon family={grp.family.slug} color={grp.family.color} bg={grp.family.bg} size={30} />
+                    <h2 id={`fam-${grp.key}`}>{grp.family.labelStr}</h2>
+                    <span className="cat-count">{t('catalog.techCount', { count: grp.items.length })}</span>
+                    <Chev className="w-4 h-4 ml-auto" style={{ color: 'var(--text-muted)' }} aria-hidden />
+                  </button>
+                  {open && <div className="mt-3">{renderGroupBody(grp)}</div>}
+                </section>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <TechniqueModal open={!!modalTech} onClose={() => setModalTech(null)} technique={modalTech} />
     </div>
   );
 }

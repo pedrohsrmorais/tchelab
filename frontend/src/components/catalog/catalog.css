@@ -1,0 +1,88 @@
+/* Catálogo de técnicas — cartões, lista, facetas e abas. Só usa tokens do tema (dark / light / classic). */
+.cat-layout { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1024px) { .cat-layout { grid-template-columns: 15.5rem minmax(0, 1fr); gap: 1.75rem; } }
+
+/* ── Barra de ferramentas ── */
+.cat-toolbar { display: flex; flex-wrap: wrap; gap: 0.625rem; align-items: center; }
+.cat-search { position: relative; flex: 1 1 18rem; min-width: 0; }
+.cat-search input { padding-left: 2.5rem; padding-right: 4.5rem; }
+.cat-search .cat-kbd { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); font: 600 0.68rem var(--font-mono, monospace); color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0.05rem 0.4rem; pointer-events: none; }
+.cat-search .cat-clear { position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); }
+.cat-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--bg-card); }
+.cat-seg button { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.8rem; font-size: 0.8rem; font-weight: 500; color: var(--text-secondary); background: transparent; border: 0; cursor: pointer; white-space: nowrap; }
+.cat-seg button + button { border-left: 1px solid var(--border); }
+.cat-seg button:hover { background: var(--bg-hover); color: var(--text-primary); }
+.cat-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.cat-seg .cat-n { font-size: 0.7rem; opacity: 0.85; font-variant-numeric: tabular-nums; }
+.cat-seg.icons button { padding: 0.5rem 0.65rem; }
+
+/* ── Facetas (famílias) ── */
+.cat-facets { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.35rem; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+@media (min-width: 1024px) {
+  .cat-facets { flex-direction: column; overflow: visible; padding-bottom: 0; gap: 0.1rem; position: sticky; top: 1rem; align-self: start; max-height: calc(100vh - 2rem); overflow-y: auto; }
+}
+.cat-facets-title { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding: 0 0.5rem 0.4rem; display: none; }
+@media (min-width: 1024px) { .cat-facets-title { display: block; } }
+.cat-facet { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.65rem; border-radius: var(--radius); border: 1px solid transparent; background: transparent; color: var(--text-secondary); font-size: 0.82rem; cursor: pointer; text-align: left; white-space: nowrap; flex-shrink: 0; transition: background 0.12s, color 0.12s; }
+@media (max-width: 1023px) { .cat-facet { border-color: var(--border); background: var(--bg-card); padding: 0.4rem 0.7rem; } }
+.cat-facet:hover { background: var(--bg-hover); color: var(--text-primary); }
+.cat-facet[aria-pressed="true"] { background: var(--fam-bg, var(--bg-hover)); color: var(--text-primary); border-color: var(--fam-border, var(--border-strong)); font-weight: 600; }
+.cat-facet .cat-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cat-facet .cat-n { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.cat-facet.is-empty { opacity: 0.45; }
+
+/* ── Seções ── */
+.cat-section-head { display: flex; align-items: center; gap: 0.6rem; width: 100%; background: transparent; border: 0; padding: 0.25rem 0; cursor: pointer; text-align: left; color: var(--text-primary); }
+.cat-section-head h2 { font-size: 0.95rem; font-weight: 700; margin: 0; }
+.cat-section-head .cat-count { font-size: 0.78rem; color: var(--text-muted); font-weight: 400; }
+.cat-subhead { display: flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 1rem 0 0.5rem; }
+
+/* ── Cartão ── */
+.cat-grid { display: grid; gap: 0.875rem; grid-template-columns: repeat(auto-fill, minmax(min(17.5rem, 100%), 1fr)); }
+.cat-card { position: relative; display: flex; flex-direction: column; gap: 0.6rem; padding: 0.95rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s; }
+.cat-card:hover { border-color: var(--fam, var(--border-active)); box-shadow: var(--shadow); transform: translateY(-1px); }
+.cat-card:focus-within { border-color: var(--fam, var(--border-active)); box-shadow: 0 0 0 2px var(--fam-ring, rgba(37,99,235,.25)); }
+.cat-card.is-dev { background: transparent; border-style: dashed; }
+.cat-card .cat-head { display: flex; gap: 0.7rem; align-items: flex-start; }
+.cat-card .cat-title { font-size: 0.92rem; font-weight: 650; color: var(--text-primary); line-height: 1.25; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; overflow-wrap: anywhere; }
+.cat-card .cat-title::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.cat-card .cat-title:focus-visible { outline: none; }
+.cat-card .cat-kind { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.1rem; }
+.cat-card .cat-desc { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
+.cat-card .cat-foot { margin-top: auto; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.cat-open { position: relative; z-index: 1; margin-left: auto; flex-shrink: 0; color: var(--text-muted); padding: 0.3rem; min-width: 32px; min-height: 32px; align-items: center; justify-content: center; border-radius: var(--radius-sm); display: inline-flex; }
+.cat-open:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* Chips de tipo de dado e status */
+.cat-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.5rem; font-size: 0.7rem; font-weight: 600; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--text-secondary); background: transparent; white-space: nowrap; }
+.cat-chip.dev { color: #92400e; border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.12); }
+[data-theme="dark"] .cat-chip.dev { color: #fcd34d; }
+.cat-chip.ok { color: #065f46; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.1); }
+[data-theme="dark"] .cat-chip.ok { color: #6ee7b7; }
+.cat-flow { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.7rem; color: var(--text-muted); }
+
+/* ── Lista ── */
+.cat-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); overflow: hidden; }
+.cat-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; padding: 0.6rem 0.85rem; border-top: 1px solid var(--border); }
+.cat-row:first-child { border-top: 0; }
+.cat-row:hover, .cat-row:focus-within { background: var(--bg-hover); }
+.cat-row .cat-title { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.cat-row .cat-title::after { content: ''; position: absolute; inset: 0; }
+.cat-row .cat-desc { font-size: 0.78rem; color: var(--text-secondary); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-row .cat-meta { display: none; align-items: center; gap: 0.4rem; }
+@media (min-width: 768px) { .cat-row .cat-meta { display: flex; } }
+
+mark.cat-mark { background: rgba(250, 204, 21, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* ── Detalhe: cabeçalho e abas ── */
+.cat-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.cat-tabs button { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.85rem; font-size: 0.82rem; font-weight: 500; color: var(--text-secondary); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; margin-bottom: -1px; }
+.cat-tabs button:hover { color: var(--text-primary); }
+.cat-tabs button[aria-selected="true"] { color: var(--text-accent); border-bottom-color: var(--accent); font-weight: 600; }
+.cat-tabs .cat-n { font-size: 0.7rem; background: var(--bg-hover); border-radius: var(--radius-pill); padding: 0 0.4rem; color: var(--text-secondary); }
+.cat-prose { font-size: 0.88rem; line-height: 1.65; color: var(--text-secondary); white-space: pre-line; overflow-wrap: anywhere; }
+.cat-block { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; }
+.cat-block h3 { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.5rem; }
+.cat-port { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.55rem 0.75rem; }
+.cat-code { font-family: var(--font-mono, monospace); font-size: 0.74rem; font-weight: 700; padding: 0.05rem 0.4rem; border-radius: var(--radius-sm); }
+@media (prefers-reduced-motion: reduce) { .cat-card, .cat-facet { transition: none; } .cat-card:hover { transform: none; } }

@@ -8,9 +8,11 @@ import EmptyState from '../components/ui/EmptyState';
 import { TechniqueDetails } from '../components/ui/TechniqueModal';
 
 export default function CatalogDetailPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
-  const { data, loading } = useApi(() => api.techniques.get(id), [id]);
+  const lang = String(i18n.language || 'pt').slice(0, 2);
+  // refaz a busca ao trocar de idioma: a API devolve os textos já traduzidos
+  const { data, loading } = useApi(() => api.techniques.get(id, { lang }), [id, lang]);
   const tech = data?.data ?? data ?? null;
 
   if (loading) {
@@ -21,8 +23,8 @@ export default function CatalogDetailPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <Link to="/catalogo" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+    <div className="space-y-4 max-w-3xl" data-testid="catalog-detail">
+      <Link to="/catalogo" className="btn-ghost inline-flex items-center gap-1.5 text-sm" style={{ textDecoration: 'none' }}>
         <ArrowLeft className="w-4 h-4" /> {t('catalog.backToCatalog')}
       </Link>
       <TechniqueDetails technique={tech} showFullLink={false} />

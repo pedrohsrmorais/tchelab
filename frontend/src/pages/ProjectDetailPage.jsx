@@ -443,9 +443,10 @@ function AddWorkflowModal({ open, onClose, linked, onAdd, onCreate, busy }) {
 }
 
 function AddTechniqueModal({ open, onClose, linked, onAdd, busy }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = String(i18n.language || 'pt').slice(0, 2);
   const [q, setQ] = useState('');
-  const { data } = useApi(() => (open ? api.techniques.list({ limit: 200 }) : null), [open]);
+  const { data } = useApi(() => (open ? api.techniques.list({ limit: 200, lang }) : null), [open, lang]);
   const available = (Array.isArray(data) ? data : [])
     .filter(x => !linked.find(l => l.uuid === x.uuid))
     .filter(x => !q || x.name?.toLowerCase().includes(q.toLowerCase()) || x.slug?.toLowerCase().includes(q.toLowerCase()))
