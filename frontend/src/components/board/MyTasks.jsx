@@ -70,7 +70,7 @@ export default function MyTasks({ cid }) {
   const sections = [['overdue', 'var(--danger)'], ['today', 'var(--warning)'], ['week', 'var(--accent)'], ['later', 'var(--text-secondary)'], ['none', 'var(--text-muted)']];
   const Row = ({ x }) => (
     <li className="card px-3 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="task-row">
-      <span className="w-1.5 self-stretch rounded-full" style={{ background: x.group.color }} aria-hidden />
+      <span className="board-stripe w-1.5 self-stretch rounded-full" style={{ background: x.group.color }} aria-hidden />
       <Link to={`/communities/${cid}/boards/${x.board.uuid}?item=${x.uuid}`} className="min-w-0 flex-1 basis-48 hover:underline">
         <span className="board-seq">#{x.seq}</span> <span className="text-sm font-medium break-words" style={{ color: 'var(--text-primary)', textDecoration: x.done ? 'line-through' : 'none' }}>{x.title}</span>
         <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>{x.board.title} · {x.group.title}</span>
@@ -89,7 +89,7 @@ export default function MyTasks({ cid }) {
       ))}
       {groups.done.length > 0 && (
         <section>
-          <button type="button" className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-muted)' }} onClick={() => setShowDone((s) => !s)} aria-expanded={showDone}>{t('board.tasks.done')} <span className="text-xs font-normal">{groups.done.length}</span> <span className="text-xs underline font-normal">{showDone ? t('board.hide') : t('board.show')}</span></button>
+          <button type="button" className="tap-link text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-muted)' }} onClick={() => setShowDone((s) => !s)} aria-expanded={showDone}>{t('board.tasks.done')} <span className="text-xs font-normal">{groups.done.length}</span> <span className="text-xs underline font-normal">{showDone ? t('board.hide') : t('board.show')}</span></button>
           {showDone && <ul className="space-y-2 mt-2">{groups.done.map((x) => <Row key={x.uuid} x={x} />)}</ul>}
         </section>
       )}

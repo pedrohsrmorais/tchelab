@@ -54,3 +54,18 @@
   .board-scroll { max-height: calc(100dvh - 12rem); }
   .board-hover-show { opacity: 1; }
 }
+
+/* Texto na cor do grupo: no tema escuro usa a cor pura; nos claros escurece para manter contraste ≥ 4,5:1. */
+.board-gc { color: var(--gc); }
+[data-theme="light"] .board-gc, [data-theme="classic"] .board-gc { color: color-mix(in srgb, var(--gc) 55%, #000); }
+
+/* Telas de toque: caixas de seleção e menus de coluna com área de toque confortável. */
+@media (pointer: coarse), (max-width: 640px) {
+  [data-testid="board-table"] input[type="checkbox"] { width: 18px; height: 18px; }
+  [data-testid="board-table"] [data-testid="col-menu"], [data-testid="board-table"] [data-testid="group-menu"] { padding: 0.4rem; }
+}
+
+/* Tema Classic (estilo MATLAB): barras, chips e botões de status com cantos quase retos. */
+[data-theme="classic"] .board-progress, [data-theme="classic"] .board-progress > *,
+[data-theme="classic"] .board-stripe, [data-theme="classic"] .board-chip,
+[data-theme="classic"] .board-status, [data-theme="classic"] .board-status-form { border-radius: var(--radius-sm) !important; }

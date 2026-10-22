@@ -17,7 +17,7 @@
 
   --text-primary:   #f1f5f9;
   --text-secondary: #94a3b8;
-  --text-muted:     rgba(255,255,255,0.35);
+  --text-muted:     rgba(255,255,255,0.5);
   --text-accent:    #60a5fa;
 
   --accent:         #2563eb;
@@ -62,7 +62,7 @@
 
   --text-primary:   #0f172a;
   --text-secondary: #475569;
-  --text-muted:     #94a3b8;
+  --text-muted:     #5f6f86;
   --text-accent:    #1d4ed8;
 
   --accent:         #2563eb;
@@ -102,7 +102,7 @@
 
   --text-primary:   #1a1a1a;
   --text-secondary: #4d4d4d;
-  --text-muted:     #6b6b6b;
+  --text-muted:     #5c5c5c;
   --text-accent:    #0a5fa8;
 
   --accent:         #0a5fa8;
@@ -240,6 +240,23 @@ html[data-theme="classic"] { font-size: 14px; }
 [data-theme="classic"] .login-root [class*="text-blue-400/"] { color: var(--text-secondary) !important; }
 [data-theme="classic"] .login-logo { box-shadow: none !important; }
 [data-theme="classic"] .login-logo .text-white { color: #ffffff !important; }
+
+/* Login no tema Claro: página clara (o desenho original é escuro e o tema Claro inverte
+   `text-white`/`text-blue-*`, o que deixava título e rótulos ilegíveis sobre o fundo navy). */
+[data-theme="light"] .login-root { background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 45%, #f8fafc 100%) !important; }
+[data-theme="light"] .login-deco { opacity: .45; }
+[data-theme="light"] .login-card { background: rgba(255,255,255,.94) !important; border: 1px solid #cbd5e1 !important; box-shadow: 0 20px 40px rgba(30,41,59,.12) !important; }
+[data-theme="light"] .login-tabs { background: #e2e8f0 !important; }
+[data-theme="light"] .login-tab:not(.is-active), [data-theme="light"] .login-lang-btn:not(.is-active) { color: #475569 !important; }
+[data-theme="light"] .login-lang { background: rgba(255,255,255,.9) !important; border-color: #cbd5e1 !important; }
+[data-theme="light"] .login-root [class*="text-blue-400/"] { color: var(--text-secondary) !important; }
+[data-theme="light"] .login-logo .text-white { color: #ffffff !important; }
+
+/* Login no Classic: seletor de idioma e abas legíveis sobre fundo claro, sem brilho azul. */
+[data-theme="classic"] .login-lang { background: #ffffff !important; border: 1px solid var(--border-strong) !important; backdrop-filter: none !important; }
+[data-theme="classic"] .login-lang-btn:not(.is-active), [data-theme="classic"] .login-tab:not(.is-active) { color: var(--text-primary) !important; }
+[data-theme="classic"] .login-tabs { background: #e6e6e6 !important; }
+[data-theme="classic"] .login-tab.is-active { box-shadow: none !important; }
 
 /* Minimapa e controles do React Flow */
 [data-theme="classic"] .react-flow__minimap, [data-theme="light"] .react-flow__minimap { background: #ffffff !important; border: 1px solid var(--border-strong); }
@@ -640,7 +657,7 @@ html[data-theme="classic"] { font-size: 14px; }
 
 /* ─── Light mode badge fix ─────────────────────────────────────────────────── */
 [data-theme="light"] .badge-blue   { background: rgba(59,130,246,0.12);  color: #1d4ed8; }
-[data-theme="light"] .badge-green  { background: rgba(16,185,129,0.12);  color: #059669; }
+[data-theme="light"] .badge-green  { background: rgba(16,185,129,0.12);  color: #047857; }
 [data-theme="light"] .badge-amber  { background: rgba(245,158,11,0.12);  color: #b45309; }
 [data-theme="light"] .badge-red    { background: rgba(239,68,68,0.12);   color: #b91c1c; }
 [data-theme="light"] .badge-purple { background: rgba(168,85,247,0.12);  color: #7c3aed; }
@@ -655,3 +672,11 @@ html[data-theme="classic"] { font-size: 14px; }
 [data-theme="classic"] .badge-amber  { background: rgba(184,134,11,0.1);  color: #8a6508; }
 [data-theme="classic"] .badge-red    { background: rgba(176,0,32,0.1);    color: #b00020; }
 [data-theme="classic"] .badge-purple { background: rgba(124,58,237,0.1);  color: #6d28d9; }
+
+/* Alvos de toque: links de navegação (migalhas, "voltar") com pelo menos 32 px de altura em telas pequenas. */
+@media (max-width: 640px), (pointer: coarse) {
+  nav[aria-label="breadcrumb"] a, .tap-link { display: inline-flex; align-items: center; min-height: 32px; }
+}
+
+/* Tema escuro: `text-slate-500` (#64748b) dá só 3,4:1 sobre o fundo navy; clareia para ≥ 4,5:1. */
+[data-theme="dark"] .text-slate-500 { color: #8493a8 !important; }

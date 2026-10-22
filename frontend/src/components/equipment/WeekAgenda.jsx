@@ -44,7 +44,7 @@ export default function WeekAgenda({ cid, eq, refreshKey, onPickFree }) {
               <tr>
                 <th className="sticky left-0 top-0 z-20 px-2 py-1" style={{ background: 'var(--bg-elevated)' }} />
                 {days.map(d => (
-                  <th key={d} className="sticky top-0 z-10 px-2 py-1.5 font-medium capitalize" style={{ background: 'var(--bg-elevated)', color: d === today ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                  <th key={d} className="sticky top-0 z-10 px-2 py-1.5 font-medium capitalize" style={{ background: 'var(--bg-elevated)', color: d === today ? 'var(--text-accent)' : 'var(--text-secondary)' }}>
                     {dayLabel(d)}
                   </th>
                 ))}

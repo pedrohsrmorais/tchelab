@@ -114,7 +114,7 @@ export default function CommunityDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/communities" className="inline-flex items-center gap-2 text-sm mb-4 hover:underline" style={muted}>
+        <Link to="/communities" className="tap-link inline-flex items-center gap-2 text-sm mb-4 hover:underline" style={muted}>
           <ArrowLeft className="w-4 h-4" /> {t('communities.backToCommunities')}
         </Link>
         <div className="card overflow-hidden">
@@ -133,7 +133,7 @@ export default function CommunityDetailPage() {
               <div className="flex flex-wrap items-center gap-4 text-xs mt-3" style={muted}>
                 <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {t('communities.memberCount', { count: c.member_count })}</span>
                 <span className="flex items-center gap-1"><FolderOpen className="w-3 h-3" /> {t('communities.projectCount', { count: c.project_count })}</span>
-                <Link to={`/users/${c.owner_uuid}`} className="flex items-center gap-1.5 hover:underline">
+                <Link to={`/users/${c.owner_uuid}`} className="tap-link flex items-center gap-1.5 hover:underline">
                   <Avatar name={c.owner_name} src={c.owner_avatar_url} size={18} /> {t('communities.createdBy', { name: c.owner_name })}
                 </Link>
               </div>

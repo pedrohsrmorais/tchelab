@@ -142,14 +142,14 @@ export default function BoardTable({
                 <span className="board-group-bar" style={{ background: g.color }} />
                 <span className="flex items-center gap-2 min-w-0" style={{ position: 'sticky', left: 8 }}>
                   <button type="button" className="p-0.5 rounded" onClick={() => onToggleCollapse(g.uuid)} aria-label={collapsed ? t('board.expand') : t('board.collapse')} aria-expanded={!collapsed}>
-                    {collapsed ? <ChevronRight className="w-4 h-4" style={{ color: g.color }} /> : <ChevronDown className="w-4 h-4" style={{ color: g.color }} />}
+                    {collapsed ? <ChevronRight className="w-4 h-4 board-gc" style={{ '--gc': g.color }} /> : <ChevronDown className="w-4 h-4 board-gc" style={{ '--gc': g.color }} />}
                   </button>
                   {renaming === g.uuid ? (
                     <input autoFocus className="board-input" style={{ width: 220 }} defaultValue={g.title} maxLength={150} aria-label={t('board.groupName')}
                       onBlur={(e) => { setRenaming(null); if (e.target.value.trim() && e.target.value.trim() !== g.title) onGroup('save', g, e.target.value.trim()); }}
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setRenaming(null); }} />
                   ) : (
-                    <button type="button" className="truncate text-left" style={{ color: g.color, fontSize: '0.95rem' }} onDoubleClick={() => staff && setRenaming(g.uuid)} title={staff ? t('board.doubleClickRename') : g.title}>{g.title}</button>
+                    <button type="button" className="truncate text-left board-gc" style={{ '--gc': g.color, fontSize: '0.95rem' }} onDoubleClick={() => staff && setRenaming(g.uuid)} title={staff ? t('board.doubleClickRename') : g.title}>{g.title}</button>
                   )}
                   <span className="text-xs font-normal whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{t('board.itemsCount', { count: list.length === total ? total : `${list.length}/${total}` })}</span>
                   <StatusBar items={allItems.filter((i) => i.group === g.uuid)} col={statusCol} />

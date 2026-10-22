@@ -2,12 +2,15 @@ import { currentLocale } from '../../i18n';
 
 export const PALETTE = ['#00c875', '#9cd326', '#cab641', '#ffcb00', '#fdab3d', '#ff642e', '#e2445c', '#ff158a', '#ff5ac4', '#a25ddc', '#784bd1', '#7f5347', '#579bfc', '#66ccff', '#037f4c', '#4eccc6', '#c4c4c4', '#808080', '#333333', '#bb3354'];
 
-/** Cor do texto legível sobre um fundo hexadecimal. */
+/** Cor do texto legível sobre um fundo hexadecimal: escolhe preto ou branco pelo maior contraste (WCAG). */
 export function ink(hex) {
   const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
   if (!m) return '#fff';
-  const n = parseInt(m[1], 16); const r = (n >> 16) & 255; const g = (n >> 8) & 255; const b = n & 255;
-  return (0.299 * r + 0.587 * g + 0.114 * b) > 165 ? '#1f2937' : '#fff';
+  const n = parseInt(m[1], 16);
+  const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  // contraste com branco = 1.05 / (L + .05); com preto-azulado (#1f2937, L≈.022) = (L + .05) / .072
+  return 1.05 / (L + 0.05) >= (L + 0.05) / 0.072 ? '#fff' : '#1f2937';
 }
 
 export const arr = (x) => (Array.isArray(x) ? x : []);

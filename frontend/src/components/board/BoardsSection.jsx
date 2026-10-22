@@ -42,7 +42,7 @@ export function BoardCreateModal({ open, onClose, cid }) {
           <div className="grid gap-2 sm:grid-cols-2">
             {TEMPLATES.map(([k, Icon]) => (
               <button key={k} type="button" onClick={() => setTemplate(k)} aria-pressed={template === k} data-template={k}
-                className="flex items-start gap-3 p-3 rounded-xl text-left border" style={{ borderColor: template === k ? 'var(--accent)' : 'var(--border)', background: template === k ? 'var(--bg-hover)' : 'transparent' }}>
+                className="flex items-start gap-3 p-3 rounded-xl text-left border" style={{ borderColor: template === k ? 'var(--accent)' : 'var(--border)', boxShadow: template === k ? '0 0 0 1px var(--accent)' : 'none', background: template === k ? 'var(--bg-hover)' : 'transparent' }}>
                 <Icon className="w-5 h-5 mt-0.5 flex-shrink-0 text-sky-400" />
                 <span><span className="block text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t(`board.template.${k}`)}</span><span className="block text-xs" style={{ color: 'var(--text-muted)' }}>{t(`board.templateDesc.${k}`)}</span></span>
               </button>

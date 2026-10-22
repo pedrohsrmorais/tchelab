@@ -41,7 +41,7 @@ export function Toolbar({ columns, members, me, filters, setFilters, view, setVi
       <span className="flex-1" />
       <div className="flex rounded-lg overflow-hidden border" role="group" aria-label={t('board.view')} style={{ borderColor: 'var(--border)' }}>
         {[['table', Table2, t('board.viewTable')], ['kanban', Kanban, t('board.viewKanban')]].map(([k, Icon, label]) => (
-          <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)} className="board-tool" data-testid={`view-${k}`} style={{ borderRadius: 0, background: view === k ? 'var(--accent)' : 'transparent', color: view === k ? '#fff' : undefined }}><Icon className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{label}</span></button>
+          <button key={k} type="button" aria-pressed={view === k} aria-label={label} title={label} onClick={() => setView(k)} className="board-tool" data-testid={`view-${k}`} style={{ borderRadius: 0, background: view === k ? 'var(--accent)' : 'transparent', color: view === k ? '#fff' : undefined }}><Icon className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{label}</span></button>
         ))}
       </div>
       {structure && <button type="button" className="board-tool" onClick={onSettings} data-testid="board-settings"><span className="sr-only">{t('board.settings')}</span>⚙<span className="hidden sm:inline">{t('board.settings')}</span></button>}

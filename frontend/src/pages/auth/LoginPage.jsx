@@ -156,7 +156,7 @@ export default function LoginPage() {
       <div
         role="group"
         aria-label={t('common.language')}
-        className="absolute z-20 flex gap-1 p-1 rounded-xl"
+        className="login-lang absolute z-20 flex gap-1 p-1 rounded-xl"
         style={{ top: 16, right: 16, background: 'rgba(15,23,42,0.75)', border: '1px solid rgba(59,130,246,0.25)', backdropFilter: 'blur(12px)' }}
       >
         {LANGUAGES.map(l => {
@@ -168,7 +168,7 @@ export default function LoginPage() {
               onClick={() => setLanguage(l.code)}
               aria-pressed={active}
               title={l.label}
-              className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
+              className={`login-lang-btn px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${active ? 'is-active' : ''}`}
               style={{ background: active ? 'linear-gradient(135deg,#1d4ed8,#2563eb)' : 'transparent', color: active ? '#fff' : '#94a3b8' }}
             >
               {l.code.toUpperCase()}
@@ -212,12 +212,12 @@ export default function LoginPage() {
           }}
         >
           {/* Tabs */}
-          <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'rgba(30, 41, 59, 0.8)' }}>
+          <div className="login-tabs flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'rgba(30, 41, 59, 0.8)' }}>
             {['login', 'register'].map(tabKey => (
               <button
                 key={tabKey}
                 onClick={() => setTab(tabKey)}
-                className="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200"
+                className={`login-tab flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${tab === tabKey ? 'is-active' : ''}`}
                 style={{
                   background: tab === tabKey ? 'linear-gradient(135deg, #1d4ed8, #2563eb)' : 'transparent',
                   color: tab === tabKey ? '#fff' : '#94a3b8',

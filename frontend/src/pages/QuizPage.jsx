@@ -205,7 +205,7 @@ function Builder({ cid, quiz, reload }) {
 
   const save = async () => {
     const withSubs = !!quiz.has_submissions;
-    if (withSubs && !window.confirm(t('quiz.editConfirm', { n: quiz.submitters || 0 }))) return;
+    if (withSubs && !window.confirm(t('quiz.editConfirm', { count: quiz.submitters || 0 }))) return;
     setSaving(true);
     try {
       await api.quizzes.saveQuestions(cid, quiz.uuid, questions.map(q => ({
@@ -219,7 +219,7 @@ function Builder({ cid, quiz, reload }) {
   const total = questions.reduce((s, q) => s + (Number(q.points) || 0), 0);
   return (
     <div className="space-y-4">
-      {quiz.has_submissions && <div className="card p-4 text-sm" style={lbl} role="status" data-testid="edit-warning">{t('quiz.editWarning', { n: quiz.submitters || 0 })}</div>}
+      {quiz.has_submissions && <div className="card p-4 text-sm" style={lbl} role="status" data-testid="edit-warning">{t('quiz.editWarning', { count: quiz.submitters || 0 })}</div>}
       {!questions.length && <EmptyState icon={ClipboardList} title={t('quiz.noQuestionsTitle')} description={t('quiz.noQuestionsDesc')} />}
       {questions.map((q, i) => (
         <QuestionEditor key={q.key} q={q} idx={i} total={questions.length} locked={locked} wfList={wfList} dsList={dsList}
@@ -278,7 +278,7 @@ function GradePanel({ cid, quiz, sid, onClose, reloadList }) {
         answers: arr(sub.questions).filter(q => !['tf', 'choice'].includes(q.kind)).map(q => ({ question: q.uuid, points: grades[q.uuid]?.points === '' ? null : Number(grades[q.uuid]?.points), feedback: grades[q.uuid]?.feedback })),
       });
       const d = res.data?.data ?? res.data;
-      toast.success(d.status === 'graded' ? t('quiz.gradedOk', { score: fmtNum(d.score) }) : t('quiz.gradePartial', { n: d.pending }));
+      toast.success(d.status === 'graded' ? t('quiz.gradedOk', { score: fmtNum(d.score) }) : t('quiz.gradePartial', { count: d.pending }));
       await refetch(); await reloadList();
     } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setSaving(false); }
   };
@@ -417,7 +417,7 @@ function StudentView({ cid, quiz, reload }) {
 
   const submit = async () => {
     const unanswered = arr(quiz.questions).filter(q => { const a = answers[q.uuid]; if (!a) return true; if (q.kind === 'workflow' || q.kind === 'dataset') return !a.ref; if (q.kind === 'choice') return !arr(a.value).length; if (q.kind === 'text') return !a.value; return a.value == null; }).length;
-    if (!window.confirm(unanswered ? t('quiz.submitConfirmUnanswered', { n: unanswered }) : t('quiz.submitConfirm'))) return;
+    if (!window.confirm(unanswered ? t('quiz.submitConfirmUnanswered', { count: unanswered }) : t('quiz.submitConfirm'))) return;
     setSubmitting(true);
     try {
       Object.values(timers.current).forEach(clearTimeout);

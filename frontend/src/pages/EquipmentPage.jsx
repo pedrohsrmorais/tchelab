@@ -126,7 +126,7 @@ export default function EquipmentPage() {
           </div>
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-start gap-3">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-[14rem]">
                 <h1 className="text-xl font-bold flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-primary)' }}>
                   {eq.name}
                   {eq.status !== 'active' && <span className="badge badge-amber">{t(`equipment.status.${eq.status}`)}</span>}
