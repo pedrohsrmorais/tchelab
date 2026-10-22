@@ -5,6 +5,13 @@
 > Prefixo base: `/api/v1`
 > Autenticação: Bearer Token (JWT) em todas as rotas exceto `/auth/*`
 
+> **Atualização (idiomas, perfil, comunidades e projetos compartilhados):** rotas de comunidades com papéis
+> (`owner > admin > moderator > member`), convites (`/communities/:id/invites`, `/communities/join`,
+> `/communities/invite/:code`), conteúdo estilo Moodle (`/communities/:id/content|sections|items`), vínculo de projetos com
+> acesso `read|edit`, `/projects/:id/techniques`, upload de avatar (`/users/:id/avatar`), `?with_metadata=1` em
+> `/datasets` e `/projects/:id/datasets`, e tradução do catálogo via `?lang=`/`Accept-Language` em `/techniques`
+> estão descritas em [comunidades_perfil_i18n.md](comunidades_perfil_i18n.md).
+
 ---
 
 ## Nota sobre Services

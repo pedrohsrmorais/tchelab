@@ -122,3 +122,15 @@ parula, cores MATLAB nos gráficos e nas famílias. Capturas: `classic_workspace
 | `f17_light_catalog.png`, `f17_english.png` | Tema Claro e inglês |
 | `f20_b_blocked_toast.png` | Bloqueio por entrada obrigatória sem fonte |
 | `f21_result.png`, `f22_skipped_panel.png` | Encadeamento SNV → PCA e propagação de falha |
+
+## Testes automatizados de acesso, comunidades e catálogo
+
+| Teste | Como rodar | O que cobre |
+|-------|-----------|-------------|
+| `backend_api/tests/access_e2e.mjs` | `node tests/access_e2e.mjs [http://localhost:3003]` (backend no ar) | 132 checagens: papéis de comunidade, convites (limite/expiração), banimento, vínculo de projeto `read`/`edit`, visibilidade de projetos públicos/privados, herança para workflows/datasets, arquivos da comunidade |
+| `backend_api/tests/catalog_i18n_check.js` | `node tests/catalog_i18n_check.js` (usa `DB_*`) | Cobertura da tradução en/es das 94 técnicas ativas (texto, portas, parâmetros), chaves órfãs e código entre crases |
+| `frontend`: `npm run i18n:check` | na pasta `frontend` | Paridade de chaves e `{{placeholders}}` entre pt/en/es |
+
+Verificações manuais em navegador (Playwright): fluxo professor → comunidade → tópico/PDF → vínculo de projeto com acesso de
+edição → convite → aluno entra por `/join/CÓDIGO` e edita; troca para leitura e o editor abre somente-leitura; Workspace
+por projeto; idioma/tema persistidos entre dispositivos; Catálogo em pt/en/es.
