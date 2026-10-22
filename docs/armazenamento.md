@@ -87,7 +87,10 @@ mês do usuário em `usage_monthly` (jobs, falhas, CPU, GB·s de RAM, pico de me
 2. `docker compose up -d` — o serviço `minio` sobe com o volume `minio_data`; o backend cria o bucket e a regra de lifecycle de `tmp/` ao iniciar (`storage.init`, com novas tentativas).
 3. O console do MinIO (porta 9001) **não é publicado**; use túnel SSH.
 4. **Dados antigos**: `docker compose exec backend node scripts/storage_backfill.js --dry-run` e depois sem `--dry-run`. É idempotente: envia os arquivos antigos ao bucket, registra `storage_objects`, recalcula o uso e lista quem já passou da cota. Use `LEGACY_STORAGE_PATH` se os arquivos antigos estiverem em outra pasta.
-5. Desenvolvimento sem MinIO: `STORAGE_DRIVER=local` (grava em `STORAGE_PATH`).
+5. **Validação automática com o MinIO real**: `./scripts/verify_minio.sh` (precisa de Docker e do `.env`). Sobe `mysql`, `redis`, `minio` e `backend`,
+   roda dentro do container o teste do driver S3 (bucket temporário, removido ao final), a cota ponta a ponta (`quota_e2e.mjs`, 71 checagens) e o
+   backfill em simulação. Termina com "TUDO OK" ou com o comando de log a consultar.
+6. Desenvolvimento sem MinIO: `STORAGE_DRIVER=local` (grava em `STORAGE_PATH`).
 
 ### Migrar para a AWS S3
 
@@ -99,7 +102,7 @@ mês do usuário em `usage_monthly` (jobs, falhas, CPU, GB·s de RAM, pico de me
 - [ ] Backup do volume `minio_data` (ou versionamento/replicação no S3).
 - [ ] Definir `S3_CAPACITY_BYTES` para o painel de sobrevenda refletir a realidade.
 - [ ] Rodar o `storage_backfill.js` e conferir a lista de usuários acima da cota.
-- [ ] Testar `docker compose up` com o MinIO real (os testes aqui usaram um mock S3 compatível; o MinIO em si não foi executado no ambiente de desenvolvimento).
+- [ ] Rodar `./scripts/verify_minio.sh` com o MinIO real. **Ainda não foi executado**: o ambiente de desenvolvimento não tinha Docker em execução nem acesso ao binário do MinIO; os testes usaram um servidor S3 compatível (moto) e a configuração do compose foi validada com `docker compose config`.
 
 ## 5. Limitações conhecidas (próximas fases)
 

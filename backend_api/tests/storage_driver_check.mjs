@@ -1,6 +1,7 @@
 // Testa o StorageService nos dois drivers (local e s3) com a mesma bateria.
 //   node tests/storage_driver_check.mjs            → roda local e, se S3_TEST_ENDPOINT existir, s3
 //   S3_TEST_ENDPOINT=http://127.0.0.1:5000 node tests/storage_driver_check.mjs   (ex.: `moto_server -p 5000` ou MinIO)
+//   Com MinIO/S3 real: informe também S3_TEST_ACCESS_KEY e S3_TEST_SECRET_KEY (o bucket de teste é criado e removido ao final).
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
@@ -9,7 +10,7 @@ import { Readable } from 'node:stream';
 if (!process.env.__DRIVER) {
   let bad = 0;
   const runs = [['local', {}]];
-  if (process.env.S3_TEST_ENDPOINT) runs.push(['s3', { S3_ENDPOINT: process.env.S3_TEST_ENDPOINT, S3_ACCESS_KEY: 'test', S3_SECRET_KEY: 'test', S3_BUCKET: `t${Date.now()}` }]);
+  if (process.env.S3_TEST_ENDPOINT) runs.push(['s3', { S3_ENDPOINT: process.env.S3_TEST_ENDPOINT, S3_ACCESS_KEY: process.env.S3_TEST_ACCESS_KEY || 'test', S3_SECRET_KEY: process.env.S3_TEST_SECRET_KEY || 'test', S3_BUCKET: `t${Date.now()}`, S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE || 'true', S3_TEST_CLEANUP: '1' }]);
   for (const [d, extra] of runs) {
     const r = spawnSync(process.execPath, [new URL(import.meta.url).pathname], { stdio: 'inherit', env: { ...process.env, __DRIVER: d, STORAGE_DRIVER: d, STORAGE_PATH: fs.mkdtempSync(path.join(os.tmpdir(), 'st-')), ...extra } });
     if (r.status) bad += 1;
@@ -80,5 +81,12 @@ await t('presign', async () => {
   if (st.driver === 's3') { if (!/^https?:\/\//.test(u)) throw new Error('url inválida'); } else eq(u, null);
 });
 await st.removePrefix('');
+if (st.driver === 's3' && process.env.S3_TEST_CLEANUP) { // remove o bucket temporário do teste (não toca no bucket de verdade)
+  try {
+    const { S3Client, DeleteBucketCommand } = require('@aws-sdk/client-s3');
+    await new S3Client({ region: process.env.S3_REGION || 'us-east-1', endpoint: process.env.S3_ENDPOINT || undefined, forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+      credentials: { accessKeyId: process.env.S3_ACCESS_KEY, secretAccessKey: process.env.S3_SECRET_KEY } }).send(new DeleteBucketCommand({ Bucket: process.env.S3_BUCKET }));
+  } catch (e) { console.log(`  (bucket de teste não removido: ${e.name})`); }
+}
 console.log(`[${st.driver}] ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);
