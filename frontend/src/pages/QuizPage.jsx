@@ -14,6 +14,7 @@ import SkeletonCard from '../components/ui/SkeletonCard';
 import EmptyState from '../components/ui/EmptyState';
 import Modal from '../components/ui/Modal';
 import PreviewModal from '../components/community/PreviewModal';
+import AppCrumbs from '../components/apps/AppsNav';
 
 const arr = (x) => (Array.isArray(x) ? x : []);
 const lbl = { color: 'var(--text-secondary)' };
@@ -631,7 +632,7 @@ export default function QuizPage() {
 
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
-      <Link to={`/communities/${cid}`} className="text-sm inline-flex items-center gap-1.5 hover:underline" style={muted}><ArrowLeft className="w-4 h-4" /> {community?.name || t('communities.backToCommunities')}</Link>
+      <AppCrumbs cid={cid} community={community} app="quizzes" trail={[{ label: quiz.title }]} />
       <div className="card p-5">
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">

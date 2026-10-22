@@ -1,6 +1,6 @@
 # Novos apps da comunidade: Quadro (gestão do lab) e Equipamentos (agendador)
 
-> **Status: planejamento (nada implementado).** Depois deste plano, a comunidade passa a ter 3 apps na aba **Apps**:
+> **Status: Equipamentos e Quadro implementados** (ver `equipamentos_agendador.md` e `quadro.md`). Depois deste plano, a comunidade passa a ter 3 apps na aba **Apps**:
 > **Quiz** (pronto), **Quadro** (o "CRM-Lab", estilo monday) e **Equipamentos** (agendador com página pública por QR Code).
 > Qualquer comunidade pode usar os três: um quiz para o pessoal do lab, tarefas para uma turma, e assim por diante.
 

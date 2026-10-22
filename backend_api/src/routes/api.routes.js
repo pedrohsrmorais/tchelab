@@ -55,6 +55,7 @@ router.delete('/users/:id',             authenticate, userCtrl.deleteUser);
 // Papéis: owner > admin > moderator > member (ver community.controller.js)
 const quizCtrl = require('../controllers/quiz.controller');
 const equipmentCtrl = require('../controllers/equipment.controller');
+const boardCtrl = require('../controllers/board.controller');
 const publicEquipmentCtrl = require('../controllers/publicEquipment.controller');
 const cg = communityCtrl.guard;
 router.get   ('/communities',                                   authenticate, communityCtrl.listMyCommunities);
@@ -119,6 +120,33 @@ router.put   ('/communities/:id/quizzes/:qid/submissions/:sid/grade',  authentic
 router.post  ('/communities/:id/quizzes/:qid/submissions/:sid/reopen', authenticate, cg('moderator'), quizCtrl.reopenSubmission);
 
 // ─── Equipamentos (agendador) ───────────────────────────────────────────────
+// Quadro (gestão do lab)
+router.get   ('/communities/:id/boards',                              authenticate, cg('member'),    boardCtrl.listBoards);
+router.post  ('/communities/:id/boards',                              authenticate, cg('moderator'), boardCtrl.createBoard);
+router.get   ('/communities/:id/boards/my-items',                     authenticate, cg('member'),    boardCtrl.myItems);
+router.post  ('/communities/:id/boards/reorder',                      authenticate, cg('moderator'), boardCtrl.reorderBoards);
+router.get   ('/communities/:id/boards/:bid',                         authenticate, cg('member'),    boardCtrl.getBoard);
+router.put   ('/communities/:id/boards/:bid',                         authenticate, cg('moderator'), boardCtrl.updateBoard);
+router.delete('/communities/:id/boards/:bid',                         authenticate, cg('moderator'), boardCtrl.deleteBoard);
+router.post  ('/communities/:id/boards/:bid/groups',                  authenticate, cg('moderator'), boardCtrl.createGroup);
+router.post  ('/communities/:id/boards/:bid/groups/reorder',          authenticate, cg('moderator'), boardCtrl.reorderGroups);
+router.put   ('/communities/:id/boards/:bid/groups/:gid',             authenticate, cg('moderator'), boardCtrl.updateGroup);
+router.delete('/communities/:id/boards/:bid/groups/:gid',             authenticate, cg('moderator'), boardCtrl.deleteGroup);
+router.post  ('/communities/:id/boards/:bid/columns',                 authenticate, cg('moderator'), boardCtrl.createColumn);
+router.post  ('/communities/:id/boards/:bid/columns/reorder',         authenticate, cg('moderator'), boardCtrl.reorderColumns);
+router.put   ('/communities/:id/boards/:bid/columns/:cid',            authenticate, cg('moderator'), boardCtrl.updateColumn);
+router.delete('/communities/:id/boards/:bid/columns/:cid',            authenticate, cg('moderator'), boardCtrl.deleteColumn);
+router.post  ('/communities/:id/boards/:bid/items',                   authenticate, cg('member'),    boardCtrl.createItem);
+router.post  ('/communities/:id/boards/:bid/items/bulk',              authenticate, cg('member'),    boardCtrl.bulkItems);
+router.get   ('/communities/:id/boards/:bid/items/:iid',              authenticate, cg('member'),    boardCtrl.getItem);
+router.put   ('/communities/:id/boards/:bid/items/:iid',              authenticate, cg('member'),    boardCtrl.updateItem);
+router.delete('/communities/:id/boards/:bid/items/:iid',              authenticate, cg('member'),    boardCtrl.deleteItem);
+router.post  ('/communities/:id/boards/:bid/items/:iid/move',         authenticate, cg('member'),    boardCtrl.moveItem);
+router.post  ('/communities/:id/boards/:bid/items/:iid/duplicate',    authenticate, cg('member'),    boardCtrl.duplicateItem);
+router.put   ('/communities/:id/boards/:bid/items/:iid/cells/:cid',   authenticate, cg('member'),    boardCtrl.setCell);
+router.post  ('/communities/:id/boards/:bid/items/:iid/comments',     authenticate, cg('member'),    boardCtrl.createComment);
+router.delete('/communities/:id/boards/:bid/items/:iid/comments/:cmid', authenticate, cg('member'),  boardCtrl.deleteComment);
+
 router.get   ('/communities/:id/equipment',                          authenticate, cg('member'),    equipmentCtrl.listEquipment);
 router.post  ('/communities/:id/equipment',                          authenticate, cg('moderator'), equipmentCtrl.createEquipment);
 router.get   ('/communities/:id/equipment/bookings/mine',            authenticate, cg('member'),    equipmentCtrl.myBookings);

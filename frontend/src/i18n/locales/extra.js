@@ -1,3 +1,5 @@
+import boardStrings from './board.strings.js';
+
 // Chaves novas (perfil, comunidades, projetos compartilhados).
 // Fonte única em tuplas [pt, en, es] — garante paridade entre os três idiomas.
 // pt.js / en.js / es.js recebem estas chaves por mesclagem em i18n/index.js.
@@ -676,6 +678,8 @@ const T = {
   'quiz.submitConfirmUnanswered': ['Há {{n}} pergunta(s) sem resposta. Entregar mesmo assim? Depois você não poderá alterar.', '{{n}} question(s) unanswered. Submit anyway? You will not be able to change them afterwards.', 'Hay {{n}} pregunta(s) sin respuesta. ¿Entregar de todos modos? Después no podrás cambiar.'],
   'quiz.submitted': ['Quiz entregue!', 'Quiz submitted!', '¡Cuestionario entregado!'],
 };
+
+Object.assign(T, boardStrings);
 
 const build = (idx) => {
   const out = {};

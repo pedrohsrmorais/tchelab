@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Users, MessageSquare, FolderOpen, Plus, Send, BookOpen, Link2, FileText, File as FileIcon,
   Trash2, Eye, EyeOff, Pencil, Copy, KeyRound, Settings, LogOut, Globe, Lock, Download, ExternalLink,
-  Crown, Ban, X, GitBranch, Database, ChevronUp, ChevronDown, Presentation, FileSpreadsheet, Image as ImageIcon, Upload, FolderPlus, ChevronRight, ClipboardList, LayoutGrid, Sparkles, CalendarClock,
+  Crown, Ban, X, GitBranch, Database, ChevronUp, ChevronDown, Presentation, FileSpreadsheet, Image as ImageIcon, Upload, FolderPlus, ChevronRight, ClipboardList, LayoutGrid, Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +22,11 @@ import { AccessPicker } from './ProjectDetailPage';
 import PreviewModal from '../components/community/PreviewModal';
 import { StatusBadge, SubStatusBadge } from './QuizPage';
 import EquipmentSection, { EquipmentCreateModal } from '../components/equipment/EquipmentSection';
+import BoardsSection, { BoardCreateModal } from '../components/board/BoardsSection';
+import MyTasks from '../components/board/MyTasks';
+import { APPS, appHref } from '../components/apps/AppsNav';
+import { todayKey } from '../components/board/boardUtils';
+import '../components/board/board.css';
 
 const arr = (x) => (Array.isArray(x) ? x : []);
 const lbl = { color: 'var(--text-secondary)' };
@@ -56,13 +61,17 @@ export default function CommunityDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const me = useAuthStore(s => s.user);
-  const [tab, setTab] = useState('content');
+  const [sp, setSp] = useSearchParams();
+  const tab = sp.get('tab') || 'content';
+  const app = sp.get('app') || '';
+  const setTab = (k) => setSp(k === 'content' ? {} : { tab: k }, { replace: true });
   const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
   const [itemModal, setItemModal] = useState(null);       // {sectionId, type?}
   const [sectionModal, setSectionModal] = useState(null); // {section?, parent?}
   const [quizModal, setQuizModal] = useState(null);       // {sectionId}
   const [equipmentModal, setEquipmentModal] = useState(false);
+  const [boardModal, setBoardModal] = useState(false);
 
   const { data: community, loading, error, refetch } = useApi(() => api.communities.get(id), [id]);
   const perms = community?.permissions || {};
@@ -151,7 +160,7 @@ export default function CommunityDetailPage() {
       {activeTab === 'apps' && (
         <AppsTab id={id} data={content} perms={perms}
           onAddItem={(type) => setItemModal({ sectionId: '', type })} onAddTopic={() => setSectionModal({ parent: null })}
-          onAddQuiz={() => setQuizModal({ sectionId: '' })} onAddEquipment={() => setEquipmentModal(true)} onLinkProject={() => setItemModal({ sectionId: '', type: 'project' })} />
+          onAddQuiz={() => setQuizModal({ sectionId: '' })} onAddEquipment={() => setEquipmentModal(true)} onAddBoard={() => setBoardModal(true)} app={app} onLinkProject={() => setItemModal({ sectionId: '', type: 'project' })} />
       )}
       {activeTab === 'projects' && (
         <ProjectsTab id={id} list={projectList} perms={perms} isMember={isMember} me={me} run={run} reload={refetchProjects} onLink={() => setModal('link')} />
@@ -169,6 +178,7 @@ export default function CommunityDetailPage() {
       <SectionModal state={sectionModal} onClose={() => setSectionModal(null)} id={id} sections={flattenSections(content?.sections)} reload={refetchContent} />
       <ItemModal state={itemModal} onClose={() => setItemModal(null)} id={id} sections={flattenSections(content?.sections)} reload={async () => { await refetchContent(); await refetchProjects(); await refetch(); }} />
       <EquipmentCreateModal open={equipmentModal} onClose={() => setEquipmentModal(false)} id={id} />
+      <BoardCreateModal open={boardModal} onClose={() => setBoardModal(false)} cid={id} />
       <QuizModal state={quizModal} onClose={() => setQuizModal(null)} id={id} sections={flattenSections(content?.sections)} />
 
       <LinkProjectModal open={modal === 'link'} onClose={() => setModal(null)} id={id} linked={projectList}
@@ -846,58 +856,114 @@ function AppCard({ icon: Icon, color, title, desc, onClick, disabled, testid }) 
   );
 }
 
-function AppsTab({ id, data, perms, onAddItem, onAddTopic, onAddQuiz, onAddEquipment }) {
+function AppsTab({ id, data, perms, app, onAddItem, onAddTopic, onAddQuiz, onAddEquipment, onAddBoard }) {
   const { t } = useTranslation();
   const canEdit = !!perms.can_moderate;
   const { data: quizzes } = useApi(() => api.quizzes.list(id), [id, data]);
-  const list = arr(quizzes);
+  const { data: boards } = useApi(() => api.boards.list(id, todayKey()), [id]);
+  const { data: mine } = useApi(() => api.boards.mine(id, todayKey()), [id]);
+  const { data: equip } = useApi(() => api.equipment.list(id), [id]);
+  const quizList = arr(quizzes);
+  const openTasks = arr(mine).filter(x => !x.done);
+  const lateTasks = openTasks.filter(x => x.overdue);
+  const counts = { boards: arr(boards).length, tasks: openTasks.length, equipment: arr(equip).length, quizzes: quizList.length };
+  const current = APPS.find(a => a.key === app)?.key || '';
+
+  const hub = {
+    boards: { desc: t('board.appDesc'), stat: counts.boards ? t('board.hubBoards', { count: counts.boards }) : t('board.hubNoBoards'), add: canEdit && onAddBoard, addLabel: t('board.newBoard') },
+    tasks: { desc: t('board.myTasksDesc'), stat: openTasks.length ? `${t('board.hubOpenTasks', { count: openTasks.length })}${lateTasks.length ? ` · ${t('board.overdueCount', { count: lateTasks.length })}` : ''}` : t('board.hubNoTasks') },
+    equipment: { desc: t('equipment.appDesc'), stat: counts.equipment ? t('equipment.hubCount', { count: counts.equipment }) : t('equipment.hubNone'), add: canEdit && onAddEquipment, addLabel: t('equipment.new') },
+    quizzes: { desc: t('quiz.appDesc'), stat: counts.quizzes ? t('quiz.hubCount', { count: counts.quizzes }) : t('quiz.hubNone'), add: canEdit && onAddQuiz, addLabel: t('quiz.newQuiz') },
+  };
+
   return (
-    <div className="space-y-6">
-      {canEdit && (
-        <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={muted}>{t('communities.appsCreate')}</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <AppCard testid="app-quiz" icon={ClipboardList} color="text-pink-400" title={t('quiz.appTitle')} desc={t('quiz.appDesc')} onClick={onAddQuiz} />
-            <AppCard testid="app-equipment" icon={CalendarClock} color="text-teal-400" title={t('equipment.appTitle')} desc={t('equipment.appDesc')} onClick={onAddEquipment} />
-            <AppCard testid="app-file" icon={Presentation} color="text-orange-400" title={t('communities.appFileTitle')} desc={t('communities.appFileDesc')} onClick={() => onAddItem('file')} />
-            <AppCard testid="app-workflow" icon={GitBranch} color="text-purple-400" title={t('communities.appWorkflowTitle')} desc={t('communities.appWorkflowDesc')} onClick={() => onAddItem('workflow')} />
-            <AppCard testid="app-dataset" icon={Database} color="text-cyan-400" title={t('communities.appDatasetTitle')} desc={t('communities.appDatasetDesc')} onClick={() => onAddItem('dataset')} />
-            <AppCard testid="app-project" icon={FolderOpen} color="text-indigo-400" title={t('communities.appProjectTitle')} desc={t('communities.appProjectDesc')} onClick={() => onAddItem('project')} />
-            <AppCard testid="app-link" icon={Link2} color="text-blue-400" title={t('communities.appLinkTitle')} desc={t('communities.appLinkDesc')} onClick={() => onAddItem('link')} />
-            <AppCard testid="app-text" icon={FileText} color="text-emerald-400" title={t('communities.appTextTitle')} desc={t('communities.appTextDesc')} onClick={() => onAddItem('text')} />
-            <AppCard testid="app-topic" icon={FolderPlus} color="text-amber-400" title={t('communities.appTopicTitle')} desc={t('communities.appTopicDesc')} onClick={onAddTopic} />
-            <AppCard icon={Sparkles} color="text-slate-400" title={t('communities.appStudyTitle')} desc={t('communities.appStudyDesc')} disabled />
-          </div>
+    <div className="space-y-6" data-testid="apps-tab">
+      <div className="flex flex-wrap gap-1" role="tablist" aria-label={t('communities.tabApps')}>
+        <Link to={appHref(id)} role="tab" aria-selected={current === ''} className={`board-tool ${current === '' ? 'on' : ''}`} data-testid="apps-overview"><LayoutGrid className="w-4 h-4" /> {t('communities.appsOverview')}</Link>
+        {APPS.map(a => { const Icon = a.icon; const on = current === a.key; return (
+          <Link key={a.key} to={appHref(id, a.key)} role="tab" aria-selected={on} className={`board-tool ${on ? 'on' : ''}`} data-testid={`apps-sub-${a.key}`}>
+            <Icon className={`w-4 h-4 ${on ? '' : a.color}`} /> {t(a.title)}{counts[a.key] ? <span className="text-[0.7rem] opacity-75">({counts[a.key]})</span> : null}
+          </Link>
+        ); })}
+      </div>
+
+      {current === '' && (
+        <>
+          <section>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {APPS.map(a => { const Icon = a.icon; const h = hub[a.key]; return (
+                <div key={a.key} className="card p-4 flex items-start gap-3" data-testid={`hub-${a.key}`}>
+                  <Link to={appHref(id, a.key)} className="flex items-start gap-3 min-w-0 flex-1 hover:opacity-90">
+                    <span className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-hover)' }}><Icon className={`w-5 h-5 ${a.color}`} /></span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t(a.title)}</span>
+                      <span className="block text-xs mt-0.5" style={muted}>{h.desc}</span>
+                      <span className="block text-xs mt-2 font-medium" style={{ color: 'var(--text-accent)' }}>{h.stat}</span>
+                    </span>
+                  </Link>
+                  {h.add && <button type="button" className="btn-ghost p-2 flex-shrink-0" onClick={h.add} aria-label={h.addLabel} title={h.addLabel} data-testid={`hub-add-${a.key}`}><Plus className="w-4 h-4" /></button>}
+                </div>
+              ); })}
+            </div>
+          </section>
+          {canEdit && (
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={muted}>{t('communities.appsCreate')}</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <AppCard testid="app-file" icon={Presentation} color="text-orange-400" title={t('communities.appFileTitle')} desc={t('communities.appFileDesc')} onClick={() => onAddItem('file')} />
+                <AppCard testid="app-workflow" icon={GitBranch} color="text-purple-400" title={t('communities.appWorkflowTitle')} desc={t('communities.appWorkflowDesc')} onClick={() => onAddItem('workflow')} />
+                <AppCard testid="app-dataset" icon={Database} color="text-cyan-400" title={t('communities.appDatasetTitle')} desc={t('communities.appDatasetDesc')} onClick={() => onAddItem('dataset')} />
+                <AppCard testid="app-project" icon={FolderOpen} color="text-indigo-400" title={t('communities.appProjectTitle')} desc={t('communities.appProjectDesc')} onClick={() => onAddItem('project')} />
+                <AppCard testid="app-link" icon={Link2} color="text-blue-400" title={t('communities.appLinkTitle')} desc={t('communities.appLinkDesc')} onClick={() => onAddItem('link')} />
+                <AppCard testid="app-text" icon={FileText} color="text-emerald-400" title={t('communities.appTextTitle')} desc={t('communities.appTextDesc')} onClick={() => onAddItem('text')} />
+                <AppCard testid="app-topic" icon={FolderPlus} color="text-amber-400" title={t('communities.appTopicTitle')} desc={t('communities.appTopicDesc')} onClick={onAddTopic} />
+                <AppCard icon={Sparkles} color="text-slate-400" title={t('communities.appStudyTitle')} desc={t('communities.appStudyDesc')} disabled />
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {current === 'boards' && <BoardsSection id={id} canEdit={canEdit} onAdd={onAddBoard} />}
+      {current === 'tasks' && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider" style={muted}>{t('board.myTasks')}</h2>
+          <MyTasks cid={id} />
         </section>
       )}
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={muted}>{t('quiz.appTitle')}</h2>
-        {list.length === 0 ? (
-          <EmptyState icon={ClipboardList} title={t('quiz.noneTitle')} description={canEdit ? t('quiz.noneDescEdit') : t('quiz.noneDesc')}
-            action={canEdit ? <button className="btn-primary text-sm flex items-center gap-1.5" onClick={onAddQuiz}><Plus className="w-3.5 h-3.5" /> {t('quiz.newQuiz')}</button> : undefined} />
-        ) : (
-          <ul className="space-y-2">
-            {list.map(q => (
-              <li key={q.uuid}>
-                <Link to={`/communities/${id}/quizzes/${q.uuid}`} className="card p-4 flex items-center gap-3 hover:opacity-90" data-testid="quiz-list-row">
-                  <ClipboardList className="w-5 h-5 text-pink-400 flex-shrink-0" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{q.title}</span>
-                    <span className="block text-xs" style={muted}>
-                      {t('quiz.questionsCount', { count: q.question_count })}
-                      {q.due_at ? ` · ${t('quiz.dueOn', { date: new Date(q.due_at).toLocaleString(currentLocale(), { dateStyle: 'short', timeStyle: 'short' }) })}` : ''}
-                      {canEdit ? ` · ${t('quiz.submissionsShort', { count: q.submission_count })}` : (q.my_score != null && q.my_status === 'graded' ? ` · ${t('quiz.yourScore')}: ${q.my_score}/${q.total_points}` : '')}
+      {current === 'equipment' && <EquipmentSection id={id} canEdit={canEdit} onAdd={onAddEquipment} refreshKey={data} />}
+      {current === 'quizzes' && (
+        <section>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wider" style={muted}>{t('quiz.appTitle')}</h2>
+            {canEdit && quizList.length > 0 && <button className="btn-primary text-sm flex items-center gap-1.5" onClick={onAddQuiz}><Plus className="w-3.5 h-3.5" /> {t('quiz.newQuiz')}</button>}
+          </div>
+          {quizList.length === 0 ? (
+            <EmptyState icon={ClipboardList} title={t('quiz.noneTitle')} description={canEdit ? t('quiz.noneDescEdit') : t('quiz.noneDesc')}
+              action={canEdit ? <button className="btn-primary text-sm flex items-center gap-1.5" onClick={onAddQuiz}><Plus className="w-3.5 h-3.5" /> {t('quiz.newQuiz')}</button> : undefined} />
+          ) : (
+            <ul className="space-y-2">
+              {quizList.map(q => (
+                <li key={q.uuid}>
+                  <Link to={`/communities/${id}/quizzes/${q.uuid}`} className="card p-4 flex items-center gap-3 hover:opacity-90" data-testid="quiz-list-row">
+                    <ClipboardList className="w-5 h-5 text-pink-400 flex-shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{q.title}</span>
+                      <span className="block text-xs" style={muted}>
+                        {t('quiz.questionsCount', { count: q.question_count })}
+                        {q.due_at ? ` · ${t('quiz.dueOn', { date: new Date(q.due_at).toLocaleString(currentLocale(), { dateStyle: 'short', timeStyle: 'short' }) })}` : ''}
+                        {canEdit ? ` · ${t('quiz.submissionsShort', { count: q.submission_count })}` : (q.my_score != null && q.my_status === 'graded' ? ` · ${t('quiz.yourScore')}: ${q.my_score}/${q.total_points}` : '')}
+                      </span>
                     </span>
-                  </span>
-                  {canEdit ? <StatusBadge status={q.status} /> : (q.my_status ? <SubStatusBadge status={q.my_status} /> : <StatusBadge status={q.status} />)}
-                  <ChevronRight className="w-4 h-4" style={muted} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <EquipmentSection id={id} canEdit={canEdit} onAdd={onAddEquipment} refreshKey={data} />
+                    {canEdit ? <StatusBadge status={q.status} /> : (q.my_status ? <SubStatusBadge status={q.my_status} /> : <StatusBadge status={q.status} />)}
+                    <ChevronRight className="w-4 h-4" style={muted} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   );
 }

@@ -21,6 +21,7 @@ const CommunitiesPage    = lazy(() => import('./pages/CommunitiesPage'));
 const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage'));
 const QuizPage           = lazy(() => import('./pages/QuizPage'));
 const EquipmentPage      = lazy(() => import('./pages/EquipmentPage'));
+const BoardPage          = lazy(() => import('./pages/BoardPage'));
 const PublicEquipmentPage = lazy(() => import('./pages/public/PublicEquipmentPage'));
 const PublicBookingPage  = lazy(() => import('./pages/public/PublicBookingPage'));
 const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
@@ -114,6 +115,7 @@ export default function App() {
           <Route path="communities/:id" element={<CommunityDetailPage />} />
           <Route path="communities/:id/quizzes/:qid" element={<QuizPage />} />
           <Route path="communities/:id/equipment/:eid" element={<EquipmentPage />} />
+          <Route path="communities/:id/boards/:bid" element={<BoardPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="workflows/:id" element={<WorkflowEditorPage />} />
           <Route path="catalogo" element={<CatalogPage />} />

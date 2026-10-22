@@ -246,6 +246,121 @@ const TABLES = [
       CONSTRAINT \`fk_booking_equipment\` FOREIGN KEY (\`equipment_id\`) REFERENCES \`equipment\` (\`id\`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
 
+  // ── Quadro (gestão do lab, estilo monday) ───────────────────────────────
+  ['boards', `
+    CREATE TABLE IF NOT EXISTS \`boards\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`community_id\` bigint unsigned NOT NULL,
+      \`title\` varchar(150) ${COLLATE} NOT NULL,
+      \`description\` text ${COLLATE},
+      \`color\` varchar(16) ${COLLATE} DEFAULT NULL,
+      \`edit_policy\` enum('staff','own','members') ${COLLATE} NOT NULL DEFAULT 'members',
+      \`position\` int NOT NULL DEFAULT 0,
+      \`next_seq\` int NOT NULL DEFAULT 1,
+      \`rev\` int NOT NULL DEFAULT 1,
+      \`created_by\` bigint unsigned DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_board_uuid\` (\`uuid\`),
+      KEY \`idx_board_community\` (\`community_id\`,\`position\`),
+      CONSTRAINT \`fk_board_community\` FOREIGN KEY (\`community_id\`) REFERENCES \`communities\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['board_groups', `
+    CREATE TABLE IF NOT EXISTS \`board_groups\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`board_id\` bigint unsigned NOT NULL,
+      \`title\` varchar(150) ${COLLATE} NOT NULL,
+      \`color\` varchar(16) ${COLLATE} NOT NULL DEFAULT '#579bfc',
+      \`position\` int NOT NULL DEFAULT 0,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_bgroup_uuid\` (\`uuid\`),
+      KEY \`idx_bgroup_board\` (\`board_id\`,\`position\`),
+      CONSTRAINT \`fk_bgroup_board\` FOREIGN KEY (\`board_id\`) REFERENCES \`boards\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['board_columns', `
+    CREATE TABLE IF NOT EXISTS \`board_columns\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`board_id\` bigint unsigned NOT NULL,
+      \`title\` varchar(100) ${COLLATE} NOT NULL,
+      \`type\` varchar(20) ${COLLATE} NOT NULL,
+      \`config\` json DEFAULT NULL,
+      \`position\` int NOT NULL DEFAULT 0,
+      \`width\` int NOT NULL DEFAULT 150,
+      \`hidden\` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_bcol_uuid\` (\`uuid\`),
+      KEY \`idx_bcol_board\` (\`board_id\`,\`position\`),
+      CONSTRAINT \`fk_bcol_board\` FOREIGN KEY (\`board_id\`) REFERENCES \`boards\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['board_items', `
+    CREATE TABLE IF NOT EXISTS \`board_items\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`board_id\` bigint unsigned NOT NULL,
+      \`group_id\` bigint unsigned NOT NULL,
+      \`seq\` int NOT NULL DEFAULT 0,
+      \`title\` varchar(300) ${COLLATE} NOT NULL,
+      \`cells\` json DEFAULT NULL,
+      \`position\` double NOT NULL DEFAULT 0,
+      \`created_by\` bigint unsigned DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_bitem_uuid\` (\`uuid\`),
+      KEY \`idx_bitem_board\` (\`board_id\`,\`group_id\`,\`position\`),
+      CONSTRAINT \`fk_bitem_board\` FOREIGN KEY (\`board_id\`) REFERENCES \`boards\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_bitem_group\` FOREIGN KEY (\`group_id\`) REFERENCES \`board_groups\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['board_item_people', `
+    CREATE TABLE IF NOT EXISTS \`board_item_people\` (
+      \`item_id\` bigint unsigned NOT NULL,
+      \`column_id\` bigint unsigned NOT NULL,
+      \`user_id\` bigint unsigned NOT NULL,
+      PRIMARY KEY (\`item_id\`,\`column_id\`,\`user_id\`),
+      KEY \`idx_bpeople_user\` (\`user_id\`),
+      KEY \`idx_bpeople_col\` (\`column_id\`),
+      CONSTRAINT \`fk_bpeople_item\` FOREIGN KEY (\`item_id\`) REFERENCES \`board_items\` (\`id\`) ON DELETE CASCADE,
+      CONSTRAINT \`fk_bpeople_col\` FOREIGN KEY (\`column_id\`) REFERENCES \`board_columns\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['board_comments', `
+    CREATE TABLE IF NOT EXISTS \`board_comments\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`uuid\` char(36) ${COLLATE} NOT NULL,
+      \`item_id\` bigint unsigned NOT NULL,
+      \`user_id\` bigint unsigned DEFAULT NULL,
+      \`body\` text ${COLLATE} NOT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_bcomment_uuid\` (\`uuid\`),
+      KEY \`idx_bcomment_item\` (\`item_id\`,\`created_at\`),
+      CONSTRAINT \`fk_bcomment_item\` FOREIGN KEY (\`item_id\`) REFERENCES \`board_items\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
+  ['board_activity', `
+    CREATE TABLE IF NOT EXISTS \`board_activity\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`board_id\` bigint unsigned NOT NULL,
+      \`item_id\` bigint unsigned DEFAULT NULL,
+      \`user_id\` bigint unsigned DEFAULT NULL,
+      \`kind\` varchar(24) ${COLLATE} NOT NULL,
+      \`column_id\` bigint unsigned DEFAULT NULL,
+      \`data\` json DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_bact_item\` (\`item_id\`,\`created_at\`),
+      KEY \`idx_bact_board\` (\`board_id\`,\`created_at\`),
+      CONSTRAINT \`fk_bact_board\` FOREIGN KEY (\`board_id\`) REFERENCES \`boards\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+
   ['quiz_questions', `
     CREATE TABLE IF NOT EXISTS \`quiz_questions\` (
       \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,

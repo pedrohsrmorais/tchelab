@@ -10,8 +10,37 @@ const post  = (url, data)   => client.post(url, data);
 const put   = (url, data)   => client.put(url, data);
 const patch = (url, data)   => client.patch(url, data);
 const del   = (url)         => client.delete(url);
+const delb  = (url, data)   => client.delete(url, { data });
 
 export const api = {
+
+  // ── Quadro (gestão do lab) ────────────────────────────────────────────────
+  boards: {
+    list:        (cid, today)            => get(`/communities/${cid}/boards`, { today }),
+    create:      (cid, d)                => post(`/communities/${cid}/boards`, d),
+    mine:        (cid, today)            => get(`/communities/${cid}/boards/my-items`, { today }),
+    get:         (cid, bid, rev)         => get(`/communities/${cid}/boards/${bid}`, rev ? { rev } : undefined),
+    update:      (cid, bid, d)           => put(`/communities/${cid}/boards/${bid}`, d),
+    remove:      (cid, bid)              => del(`/communities/${cid}/boards/${bid}`),
+    createGroup: (cid, bid, d)           => post(`/communities/${cid}/boards/${bid}/groups`, d),
+    updateGroup: (cid, bid, gid, d)      => put(`/communities/${cid}/boards/${bid}/groups/${gid}`, d),
+    removeGroup: (cid, bid, gid, confirm) => delb(`/communities/${cid}/boards/${bid}/groups/${gid}`, { confirm }),
+    reorderGroups:  (cid, bid, order)    => post(`/communities/${cid}/boards/${bid}/groups/reorder`, { order }),
+    createColumn:   (cid, bid, d)        => post(`/communities/${cid}/boards/${bid}/columns`, d),
+    updateColumn:   (cid, bid, col, d)   => put(`/communities/${cid}/boards/${bid}/columns/${col}`, d),
+    removeColumn:   (cid, bid, col, confirm) => delb(`/communities/${cid}/boards/${bid}/columns/${col}`, { confirm }),
+    reorderColumns: (cid, bid, order)    => post(`/communities/${cid}/boards/${bid}/columns/reorder`, { order }),
+    createItem:  (cid, bid, d)           => post(`/communities/${cid}/boards/${bid}/items`, d),
+    getItem:     (cid, bid, iid)         => get(`/communities/${cid}/boards/${bid}/items/${iid}`),
+    updateItem:  (cid, bid, iid, d)      => put(`/communities/${cid}/boards/${bid}/items/${iid}`, d),
+    removeItem:  (cid, bid, iid)         => del(`/communities/${cid}/boards/${bid}/items/${iid}`),
+    moveItem:    (cid, bid, iid, d)      => post(`/communities/${cid}/boards/${bid}/items/${iid}/move`, d),
+    duplicateItem: (cid, bid, iid)       => post(`/communities/${cid}/boards/${bid}/items/${iid}/duplicate`, {}),
+    bulkItems:   (cid, bid, d)           => post(`/communities/${cid}/boards/${bid}/items/bulk`, d),
+    setCell:     (cid, bid, iid, col, value) => put(`/communities/${cid}/boards/${bid}/items/${iid}/cells/${col}`, { value }),
+    addComment:  (cid, bid, iid, body)   => post(`/communities/${cid}/boards/${bid}/items/${iid}/comments`, { body }),
+    removeComment: (cid, bid, iid, cmid) => del(`/communities/${cid}/boards/${bid}/items/${iid}/comments/${cmid}`),
+  },
 
   // ── Equipamentos (agendador) ──────────────────────────────────────────────
   equipment: {

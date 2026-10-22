@@ -17,7 +17,9 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0,
 });
 
-pool.on('connection', () => {
+pool.on('connection', (conn) => {
+  // NOW()/DEFAULT CURRENT_TIMESTAMP em UTC, igual ao `timezone: '+00:00'` do driver (o servidor do banco pode estar em outro fuso)
+  conn.query("SET time_zone = '+00:00'", () => {});
   console.log('[DB] Nova conexão adicionada ao pool');
 });
 

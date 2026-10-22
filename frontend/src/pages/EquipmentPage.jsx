@@ -11,6 +11,7 @@ import { currentLocale } from '../i18n';
 import { parseApiError } from '../utils/errors';
 import { fmtRange, dayLabel, addDays, zonedToIso, timeOf } from '../utils/tz';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import AppCrumbs from '../components/apps/AppsNav';
 import EmptyState from '../components/ui/EmptyState';
 import Modal from '../components/ui/Modal';
 import BookingModal from '../components/equipment/BookingModal';
@@ -106,7 +107,7 @@ export default function EquipmentPage() {
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
-      <Link to={`/communities/${cid}`} className="text-sm inline-flex items-center gap-1.5 hover:underline" style={muted}><ArrowLeft className="w-4 h-4" /> {community?.name || t('communities.backToCommunities')}</Link>
+      <AppCrumbs cid={cid} community={community} app="equipment" trail={[{ label: eq.name }]} />
 
       <div className="card p-5">
         <div className="flex flex-col sm:flex-row gap-5">

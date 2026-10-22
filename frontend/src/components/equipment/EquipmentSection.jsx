@@ -36,7 +36,10 @@ export default function EquipmentSection({ id, canEdit, onAdd, refreshKey }) {
   const list = arr(data);
   return (
     <section className="space-y-3" data-testid="equipment-section">
-      <h2 className="text-sm font-semibold uppercase tracking-wider" style={muted}>{t('equipment.appTitle')}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider" style={muted}>{t('equipment.appTitle')}</h2>
+        {canEdit && list.length > 0 && <button className="btn-primary text-sm flex items-center gap-1.5" onClick={onAdd}><Plus className="w-3.5 h-3.5" /> {t('equipment.new')}</button>}
+      </div>
       {arr(mine).length > 0 && (
         <div className="card p-4" data-testid="my-bookings">
           <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>{t('equipment.myBookings')}</h3>
