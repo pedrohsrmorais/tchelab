@@ -47,6 +47,22 @@ export const useAuthStore = create(
         }
       },
 
+      // Atualiza a tela na hora (otimista) e grava na conta em segundo plano.
+      // Falha de rede nunca atrapalha: o valor continua valendo neste navegador.
+      savePreferences: async (patch) => {
+        const u = get().user;
+        if (!u) return;
+        set({ user: { ...u, preferences: { ...(u.preferences || {}), ...patch } } });
+        try {
+          const { data } = await api.user.update(u.uuid, { preferences: patch });
+          const saved = (data?.data ?? data)?.preferences;
+          if (saved) set({ user: { ...get().user, preferences: saved } });
+        } catch { /* mantém o valor local */ }
+      },
+
+      // Substitui o usuário (ex.: após salvar o perfil) sem perder o resto do estado.
+      setUser: (user) => set({ user }),
+
       isPlus: () => {
         const u = get().user;
         return u?.role === 'admin' || u?.plan === 'plus' || u?.plan === 'enterprise';

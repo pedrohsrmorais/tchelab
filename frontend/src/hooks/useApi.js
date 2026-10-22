@@ -22,7 +22,8 @@ export function useApi(apiFn, deps = [], opts = {}) {
     }
   }, deps) // eslint-disable-line
 
-  useEffect(() => { execute() }, [execute]) // eslint-disable-line
+  // o erro já fica em `error`; evita "unhandled rejection" no console quando a carga inicial falha
+  useEffect(() => { execute().catch(() => {}) }, [execute]) // eslint-disable-line
 
   return { data, loading, error, refetch: execute }
 }

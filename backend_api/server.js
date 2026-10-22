@@ -41,7 +41,17 @@ const ENV  = process.env.NODE_ENV || 'development';
 app.set('trust proxy', 1);
 
 // ─── Security headers ────────────────────────────────────────────────────────
-app.use(helmet());
+// CSP padrão do helmet + blob: em frames/imagens (pré-visualização de PDF/imagem de comunidade,
+// baixados com autenticação e exibidos via URL de blob).
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'frame-src': ["'self'", 'blob:'],
+      'img-src': ["'self'", 'data:', 'blob:'],
+    },
+  },
+}));
 
 // ─── HTTP logging ────────────────────────────────────────────────────────────
 if (ENV !== 'test') {

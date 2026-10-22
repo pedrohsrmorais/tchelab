@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
+import { useAuthStore } from '../store/auth';
+
 export const THEMES = ['dark', 'light', 'classic'];
 
-const ThemeContext = createContext({ theme: 'dark', setTheme: () => {} });
+const ThemeContext = createContext({ theme: 'dark', setTheme: () => {}, applyTheme: () => {} });
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
@@ -20,7 +22,8 @@ export function ThemeProvider({ children }) {
     try { localStorage.setItem('tchelab_theme', theme); } catch {}
   }, [theme]);
 
-  const setTheme = (next) => {
+  /** Aplica o tema na interface (sem gravar na conta). */
+  const applyTheme = (next) => {
     if (THEMES.includes(next)) {
       // Aplica o atributo já, antes do re-render: componentes que calculam cor
       // em JS lendo data-theme (ver techniqueRegistry.matlabize) precisam dele
@@ -30,11 +33,19 @@ export function ThemeProvider({ children }) {
     }
   };
 
+  /** Troca o tema e, se logado, grava na conta para valer em qualquer dispositivo. */
+  const setTheme = (next) => {
+    if (!THEMES.includes(next)) return;
+    applyTheme(next);
+    const { token, savePreferences } = useAuthStore.getState();
+    if (token) savePreferences({ theme: next });
+  };
+
   // Mantido por compatibilidade com código antigo que só conhecia dark/light.
   const toggle = () => setThemeState(t => (t === 'dark' ? 'light' : 'dark'));
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggle }}>
+    <ThemeContext.Provider value={{ theme, setTheme, applyTheme, toggle }}>
       {children}
     </ThemeContext.Provider>
   );

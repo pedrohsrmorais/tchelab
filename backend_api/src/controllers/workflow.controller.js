@@ -3,7 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
-const { LEVEL, guardWorkflow } = require('../services/access.service');
+const { LEVEL, guardWorkflow, workflowLevel } = require('../services/access.service');
 const { parseDefinition } = require('../services/workflowDefinition.service');
 
 async function resolveWorkflow(uuid) {
@@ -129,7 +129,12 @@ async function getWorkflow(req, res) {
     if (!workflow) return R.notFound(res, 'Workflow');
     if (!(await guardWorkflow(req, res, workflow, LEVEL.READ))) return;
     const { nodes, edges } = await buildDefinition(workflow.id);
-    return R.ok(res, { ...workflow, nodes, edges });
+    const level = await workflowLevel(workflow, req.user);
+    return R.ok(res, {
+      ...workflow, nodes, edges,
+      my_access: level >= LEVEL.OWNER ? 'owner' : (level >= LEVEL.EDIT ? 'editor' : 'viewer'),
+      can_edit: level >= LEVEL.EDIT,
+    });
   } catch (err) { return R.serverError(res, err); }
 }
 

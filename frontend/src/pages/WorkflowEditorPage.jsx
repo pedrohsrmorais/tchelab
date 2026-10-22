@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo, createContext, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -195,8 +195,13 @@ function DatasetCombobox({ datasets, value, onChange, placeholder }) {
 // via workflows.definition.canvas — ver handleAddTechnique/autosave abaixo —
 // então não se perdem mais ao sair e voltar ao workflow.)
 // ────────────────────────────────────────────────────────────────────────────────
+// Modo somente leitura (usuário com acesso de leitura ao workflow, ex.: projeto vinculado a uma
+// comunidade com nível "leitura"). Os nós consultam este contexto para esconder ações de edição.
+const ReadOnlyCtx = createContext(false);
+
 function DatasetNode({ id, data, selected }) {
   const { t } = useTranslation();
+  const ro = useContext(ReadOnlyCtx);
   const datasets = data.datasets || [];
   const selectedDs = datasets.find(d => d.uuid === data.datasetUuid);
 
@@ -233,21 +238,25 @@ function DatasetNode({ id, data, selected }) {
         >
           <Eye size={13} />
         </button>
-        <button
-          className="nodrag"
-          title={t('workflows.deleteNode')}
-          onClick={() => data.onRemove && data.onRemove(id)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
-        >
-          <Trash2 size={12} />
-        </button>
+        {!ro && (
+          <button
+            className="nodrag"
+            title={t('workflows.deleteNode')}
+            onClick={() => data.onRemove && data.onRemove(id)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
 
-      <DatasetCombobox
-        datasets={datasets}
-        value={data.datasetUuid || ''}
-        onChange={(uuid) => data.onChange && data.onChange(id, uuid, datasets.find(d => d.uuid === uuid))}
-      />
+      <div style={ro ? { pointerEvents: 'none', opacity: 0.8 } : undefined}>
+        <DatasetCombobox
+          datasets={datasets}
+          value={data.datasetUuid || ''}
+          onChange={(uuid) => data.onChange && data.onChange(id, uuid, datasets.find(d => d.uuid === uuid))}
+        />
+      </div>
 
       {selectedDs && (
         <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
@@ -275,6 +284,7 @@ function DatasetNode({ id, data, selected }) {
 // Handle genérico por lado que escondia as portas reais da técnica.
 // ────────────────────────────────────────────────────────────────────────────────
 function TechniqueNode({ id, data, selected }) {
+  const ro = useContext(ReadOnlyCtx);
   const { t } = useTranslation();
   const familyCfg = getFamilyConfig(data.family);
   const color  = familyCfg?.color  || '#64748b';
@@ -347,14 +357,16 @@ function TechniqueNode({ id, data, selected }) {
         >
           <Sliders size={12} />
         </button>
-        <button
-          className="nodrag"
-          title={t('workflows.deleteNode')}
-          onClick={() => data.onRemove && data.onRemove(id)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
-        >
-          <Trash2 size={12} />
-        </button>
+        {!ro && (
+          <button
+            className="nodrag"
+            title={t('workflows.deleteNode')}
+            onClick={() => data.onRemove && data.onRemove(id)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
 
       <p style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px' }}>
@@ -674,6 +686,7 @@ function ConfigFieldInput({ type, spec, value, onChange }) {
 // ────────────────────────────────────────────────────────────────────────────────
 function NodeConfigPanel({ node, onClose, onSave, saving }) {
   const { t } = useTranslation();
+  const ro = useContext(ReadOnlyCtx);
   const schema = node?.data?.parameterSchema || {};
   const [values, setValues] = useState(() => ({ ...(node?.data?.parameters || {}) }));
 
@@ -703,7 +716,7 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
         <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{t('workflows.noConfigurableParams')}</p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto', ...(ro ? { pointerEvents: 'none', opacity: 0.75 } : {}) }}>
         {fields.map(([key, spec]) => {
           const type = spec?.type;
           return (
@@ -726,14 +739,14 @@ function NodeConfigPanel({ node, onClose, onSave, saving }) {
         <button onClick={onClose} className="btn-ghost" style={{ flex: 1, fontSize: '0.74rem', justifyContent: 'center' }}>
           {t('common.cancel')}
         </button>
-        <button
+        {!ro && <button
           onClick={() => onSave(node.id, Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined)))}
           disabled={saving}
           className="btn-primary"
           style={{ flex: 1, fontSize: '0.74rem', justifyContent: 'center' }}
         >
           {saving ? <Loader2 size={12} className="anim-spin" /> : t('common.save')}
-        </button>
+        </button>}
       </div>
     </div>
   );
@@ -1010,6 +1023,10 @@ export default function WorkflowEditorPage() {
 
   // ── Load workflow ────────────────────────────────────────────────────────────
   const { data: raw, loading } = useApi(() => api.workflows.get(id), [id]);
+  // Sem permissão de edição (ex.: workflow de projeto público/compartilhado só para leitura)
+  const canEdit = (raw?.data ?? raw)?.can_edit !== false;
+  const canEditRef = useRef(true);
+  canEditRef.current = canEdit;
   const { data: nodesRaw, refetch: refetchNodes } = useApi(() => api.workflows.nodes(id), [id]);
   const { data: edgesRaw, refetch: refetchEdges } = useApi(() => api.workflows.edges(id), [id]);
 
@@ -1028,6 +1045,7 @@ export default function WorkflowEditorPage() {
   // ── Dataset node callbacks (refs para não recriar nodes a cada render) ──────
   const onDatasetChangeRef = useRef(null);
   onDatasetChangeRef.current = (nodeId, uuid, dsObj) => {
+    if (!canEditRef.current) return;
     setNodes(prev => prev.map(n =>
       n.id === nodeId
         ? { ...n, data: { ...n.data, datasetUuid: uuid, label: dsObj?.name || t('workflows.defaultDatasetLabel') } }
@@ -1188,6 +1206,7 @@ export default function WorkflowEditorPage() {
   // quem conectava e saía em menos de 800ms perdia dataset/ligações.
   const pendingCanvasRef = useRef(null);
   const saveCanvasNow = useCallback((wfId, payload) => {
+    if (!canEditRef.current) return Promise.resolve();
     pendingCanvasRef.current = null;
     return api.workflows.update(wfId, { definition: { canvas: payload } }).catch(() => {
       // Autosave silencioso — uma falha aqui não deve interromper o
@@ -1240,6 +1259,7 @@ export default function WorkflowEditorPage() {
 
   // ── Remoção de nó (dataset ou técnica), com limpeza em cascata ──────────────
   const removeNode = useCallback((nodeId) => {
+    if (!canEditRef.current) return;
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
 
@@ -1283,6 +1303,7 @@ export default function WorkflowEditorPage() {
 
   // ── onNodeDragStop: persiste a posição final (evita 1 request por pixel) ───
   const onNodeDragStop = useCallback((_evt, node) => {
+    if (!canEditRef.current) return;
     if (node.type !== 'technique') return;
     api.workflows.updateNode(id, node.id, {
       position_x: Math.round(node.position.x),
@@ -1294,6 +1315,7 @@ export default function WorkflowEditorPage() {
 
   // ── onEdgesChange: aplica o default + sincroniza remoções ───────────────────
   const onEdgesChange = useCallback((changes) => {
+    if (!canEditRef.current) { onEdgesChangeBase(changes.filter(c => c.type !== 'remove')); return; }
     changes.forEach(ch => {
       if (ch.type !== 'remove') return;
       const edge = edges.find(e => e.id === ch.id);
@@ -1319,6 +1341,7 @@ export default function WorkflowEditorPage() {
 
   // ── onConnect — valida compatibilidade por PORTA e sincroniza com backend ───
   const onConnect = useCallback((params) => {
+    if (!canEditRef.current) return;
     const sourceNode = nodes.find(n => n.id === params.source);
     const targetNode = nodes.find(n => n.id === params.target);
     if (!sourceNode || !targetNode) return;
@@ -1406,6 +1429,7 @@ export default function WorkflowEditorPage() {
   // (x = 300 + (n%4)*240...) — era essa grade que fazia o nó "aparecer numa
   // região aleatória" em vez de onde o usuário soltou.
   const handleAddTechnique = useCallback((tech, dropPosition) => {
+    if (!canEditRef.current) return;
     nodeCount.current += 1;
     const nodeKey = `${tech.slug}_${Date.now().toString(36)}${nodeCount.current}`;
     // Sem posição de drop: coloca o nó à direita do último nó do canvas, com
@@ -1460,6 +1484,7 @@ export default function WorkflowEditorPage() {
 
   // ── Salvar parâmetros de um nó ───────────────────────────────────────────────
   const handleSaveNodeConfig = useCallback(async (nodeId, parameters) => {
+    if (!canEditRef.current) return;
     setSavingConfig(true);
     try {
       await api.workflows.updateNode(id, nodeId, { parameters });
@@ -1492,6 +1517,7 @@ export default function WorkflowEditorPage() {
 
   // ── Execute: resolve dataset_bindings (uuid → tensor real) e dispara ───────
   const handleDispatch = async () => {
+    if (!canEditRef.current) return;
     if (errors.length > 0) {
       toast.error(t('workflows.fixConnectionErrors'));
       return;
@@ -1682,6 +1708,7 @@ export default function WorkflowEditorPage() {
   const workflow = raw?.data ?? raw;
 
   return (
+    <ReadOnlyCtx.Provider value={!canEdit}>
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 3rem)', gap: 0 }}>
 
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
@@ -1735,20 +1762,30 @@ export default function WorkflowEditorPage() {
           </button>
         )}
 
-        <button onClick={() => setPanelOpen(v => !v)} className="btn-ghost" style={{ fontSize: '0.78rem', gap: 5 }}>
-          <Settings2 size={14} />
-          {panelOpen ? t('workflows.hideTechniques') : t('workflows.techniques')}
-        </button>
+        {!canEdit && (
+          <span className="badge badge-blue" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }} title={t('workflows.readOnlyHint')}>
+            <Eye size={12} /> {t('workflows.readOnly')}
+          </span>
+        )}
 
-        <button
-          onClick={handleDispatch}
-          disabled={executing}
-          className="btn-primary"
-          style={{ fontSize: '0.8rem', gap: 5 }}
-        >
-          {executing ? <Loader2 size={13} className="anim-spin" /> : <Play size={13} />}
-          {executing ? t('workflows.executing') : t('workflows.execute')}
-        </button>
+        {canEdit && (
+          <button onClick={() => setPanelOpen(v => !v)} className="btn-ghost" style={{ fontSize: '0.78rem', gap: 5 }}>
+            <Settings2 size={14} />
+            {panelOpen ? t('workflows.hideTechniques') : t('workflows.techniques')}
+          </button>
+        )}
+
+        {canEdit && (
+          <button
+            onClick={handleDispatch}
+            disabled={executing}
+            className="btn-primary"
+            style={{ fontSize: '0.8rem', gap: 5 }}
+          >
+            {executing ? <Loader2 size={13} className="anim-spin" /> : <Play size={13} />}
+            {executing ? t('workflows.executing') : t('workflows.execute')}
+          </button>
+        )}
       </div>
 
       {/* ── Main area ───────────────────────────────────────────────────────── */}
@@ -1786,6 +1823,9 @@ export default function WorkflowEditorPage() {
             onEdgesChange={onEdgesChange}
             onNodeDragStop={onNodeDragStop}
             onConnect={onConnect}
+            nodesDraggable={canEdit}
+            nodesConnectable={canEdit}
+            deleteKeyCode={canEdit ? ['Backspace', 'Delete'] : null}
             nodeTypes={NODE_TYPES}
             fitView
             fitViewOptions={{ padding: 0.2 }}
@@ -1807,7 +1847,7 @@ export default function WorkflowEditorPage() {
               style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}
             />
 
-            {nodes.filter(n => n.type === 'technique').length === 0 && (
+            {canEdit && nodes.filter(n => n.type === 'technique').length === 0 && (
               <Panel position="top-center">
                 <div style={{
                   background: 'var(--bg-elevated)', border: '1px solid var(--border)',
@@ -1868,7 +1908,7 @@ export default function WorkflowEditorPage() {
         </div>
 
         {/* ── Painel de técnicas ──────────────────────────────────────────────── */}
-        {panelOpen && (
+        {canEdit && panelOpen && (
           <aside style={{
             width: 300, background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)',
             display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
@@ -2011,5 +2051,6 @@ export default function WorkflowEditorPage() {
         technique={sidebarModalTech}
       />
     </div>
+    </ReadOnlyCtx.Provider>
   );
 }

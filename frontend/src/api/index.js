@@ -20,16 +20,19 @@ export const api = {
     logout:          ()        => post('/auth/logout'),
     me:              ()        => get('/auth/me'),
     forgotPassword:  (d)       => post('/auth/forgot-password', d),
+    changePassword:  (d)       => post('/auth/change-password', d),
   },
 
   // ── User ──────────────────────────────────────────────────────────────────
   user: {
-    // id = UUID do usuário (disponível em useAuthStore().user.uuid)
+    // id = UUID do usuário (useAuthStore().user.uuid) ou 'me'
+    get:             (id)      => get(`/users/${id}`),
     update:          (id, d)   => put(`/users/${id}`, d),
     uploadAvatar:    (id, fd)  => client.post(`/users/${id}/avatar`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    deleteAvatar:    (id)      => del(`/users/${id}/avatar`),
     stats:           (id)      => get(`/users/${id}/stats`),
-    // Troca de senha deve ser feita via POST /auth/reset-password (token por e-mail)
-    // Não há rota PATCH /users/:id/password — use auth.forgotPassword para iniciar o fluxo
+    projects:        (id)      => get(`/users/${id}/projects`),
+    communities:     (id)      => get(`/users/${id}/communities`),
   },
 
   // ── Projects ──────────────────────────────────────────────────────────────
@@ -62,33 +65,71 @@ export const api = {
     removeArticle:   (id, aId) => del(`/projects/${id}/articles/${aId}`),
 
     history:         (id, p)   => get(`/projects/${id}/history`, p),
+
+    // Técnicas favoritas / próprias do projeto
+    listTechniques:  (id)      => get(`/projects/${id}/techniques`),
+    addTechnique:    (id, tId) => post(`/projects/${id}/techniques`, { technique_id: tId }),
+    removeTechnique: (id, tId) => del(`/projects/${id}/techniques/${tId}`),
+    // Comunidades onde o projeto está vinculado
+    listCommunities: (id)      => get(`/projects/${id}/communities`),
   },
 
   // ── Communities ──────────────────────────────────────────────────────────
+  // Papéis: owner > admin > moderator > member. Detalhes em community.controller.js
   communities: {
-    // GET /communities retorna as comunidades do usuário autenticado
-    list:            (p)       => get('/communities', p),
-    listMine:        (p)       => get('/communities', p),           // alias — same route
+    list:            (p)       => get('/communities', p),           // as minhas
+    listMine:        (p)       => get('/communities', p),           // alias
     listPublic:      (p)       => get('/communities/public', p),
     create:          (d)       => post('/communities', d),
     get:             (id)      => get(`/communities/${id}`),
     update:          (id, d)   => put(`/communities/${id}`, d),
     delete:          (id)      => del(`/communities/${id}`),
+    join:            (id)      => post(`/communities/${id}/join`),  // comunidade pública
+    leave:           (id)      => post(`/communities/${id}/leave`),
+    transfer:        (id, uid) => post(`/communities/${id}/transfer`, { user_uuid: uid }),
 
+    // Convites por código/link
+    previewInvite:   (code)    => get(`/communities/invite/${code}`),
+    joinWithCode:    (code)    => post('/communities/join', { code }),
+    listInvites:     (id)      => get(`/communities/${id}/invites`),
+    createInvite:    (id, d)   => post(`/communities/${id}/invites`, d),
+    revokeInvite:    (id, iid) => del(`/communities/${id}/invites/${iid}`),
+
+    // Membros
     listMembers:     (id)      => get(`/communities/${id}/members`),
-    addMember:       (id, d)   => post(`/communities/${id}/members`, d),
-    removeMember:    (id, uid) => del(`/communities/${id}/members/${uid}`),
+    updateMember:    (id, uid, d) => put(`/communities/${id}/members/${uid}`, d),
+    removeMember:    (id, uid, ban = false) => del(`/communities/${id}/members/${uid}${ban ? '?ban=1' : ''}`),
+    listBans:        (id)      => get(`/communities/${id}/bans`),
+    removeBan:       (id, uid) => del(`/communities/${id}/bans/${uid}`),
 
-    // Body: { project_id }
-    linkProject:     (id, pId) => post(`/communities/${id}/projects`, { project_id: pId }),
+    // Projetos vinculados (access: 'read' | 'edit')
     listProjects:    (id)      => get(`/communities/${id}/projects`),
-    // Body: { dataset_id }
+    linkProject:     (id, pId, access = 'read', sectionId = null) => post(`/communities/${id}/projects`, { project_id: pId, access, section_id: sectionId }),
+    updateProjectLink: (id, pId, d) => put(`/communities/${id}/projects/${pId}`, d),
+    unlinkProject:   (id, pId) => del(`/communities/${id}/projects/${pId}`),
+
+    // Conteúdo estilo Moodle (tópicos, links, textos, PDFs)
+    content:         (id)      => get(`/communities/${id}/content`),
+    createSection:   (id, d)   => post(`/communities/${id}/sections`, d),
+    updateSection:   (id, sid, d) => put(`/communities/${id}/sections/${sid}`, d),
+    reorderSections: (id, order) => put(`/communities/${id}/sections-order`, { order }),
+    deleteSection:   (id, sid) => del(`/communities/${id}/sections/${sid}`),
+    createItem:      (id, d)   => d instanceof FormData
+      ? client.post(`/communities/${id}/items`, d, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 })
+      : post(`/communities/${id}/items`, d),
+    updateItem:      (id, iid, d) => put(`/communities/${id}/items/${iid}`, d),
+    deleteItem:      (id, iid) => del(`/communities/${id}/items/${iid}`),
+    // Arquivo protegido por login: baixa como blob (o <a href> direto não leva o token)
+    fileBlob:        (id, iid, download = false) => client.get(`/communities/${id}/items/${iid}/file${download ? '?download=1' : ''}`, { responseType: 'blob' }),
+
+    // Datasets / workflows compartilhados (legado)
     shareDataset:    (id, dsId) => post(`/communities/${id}/datasets`, { dataset_id: dsId }),
-    // Body: { workflow_id }
     shareWorkflow:   (id, wId) => post(`/communities/${id}/workflows`, { workflow_id: wId }),
 
+    // Chat
     listMessages:    (id, p)   => get(`/communities/${id}/messages`, p),
     sendMessage:     (id, d)   => post(`/communities/${id}/messages`, d),
+    deleteMessage:   (id, mid) => del(`/communities/${id}/messages/${mid}`),
   },
 
   // ── Datasets ─────────────────────────────────────────────────────────────

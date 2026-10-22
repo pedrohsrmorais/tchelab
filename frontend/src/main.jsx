@@ -6,6 +6,7 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
 import { ThemeProvider } from './context/ThemeContext';
 import App from './App';
+import PreferencesSync from './components/layout/PreferencesSync';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -13,6 +14,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
         <BrowserRouter>
+          <PreferencesSync />
           <App />
           <Toaster
             position="top-right"

@@ -30,6 +30,8 @@ const AIPage             = lazy(() => import('./pages/AIPage'));
 const AdminPage          = lazy(() => import('./pages/AdminPage'));
 const ProfilePage        = lazy(() => import('./pages/ProfilePage'));
 const WorkspacePage      = lazy(() => import('./pages/WorkspacePage'));
+const UserProfilePage    = lazy(() => import('./pages/UserProfilePage'));
+const JoinCommunityPage  = lazy(() => import('./pages/JoinCommunityPage'));
 
 // Pré-carrega todos os chunks após a renderização inicial para que
 // navegações subsequentes nunca acionem o Suspense interno.
@@ -54,6 +56,8 @@ if (typeof window !== 'undefined') {
     import('./pages/AdminPage');
     import('./pages/ProfilePage');
     import('./pages/WorkspacePage');
+    import('./pages/UserProfilePage');
+    import('./pages/JoinCommunityPage');
   };
   if ('requestIdleCallback' in window) {
     requestIdleCallback(prefetch);
@@ -114,6 +118,8 @@ export default function App() {
             <ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>
           } />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="users/:id" element={<UserProfilePage />} />
+          <Route path="join/:code" element={<JoinCommunityPage />} />
           <Route path="workspace" element={<WorkspacePage />} />
         </Route>
 

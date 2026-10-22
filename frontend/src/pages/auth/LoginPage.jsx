@@ -4,6 +4,9 @@ import { Eye, EyeOff, FlaskConical, Mail, Lock, User, ArrowRight, Sparkles, KeyR
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/auth';
+import { useTheme } from '../../context/ThemeContext';
+import { LANGUAGES } from '../../i18n';
+import { setLanguage } from '../../i18n/preferences';
 
 // Utility style for inputs with left icon — ensures text never overlaps the icon
 const iconInput = { paddingLeft: '2.5rem' };
@@ -62,7 +65,8 @@ const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
 }));
 
 export default function LoginPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const { login } = useAuthStore();
   const [tab, setTab] = useState('login'); // 'login' | 'register'
@@ -109,7 +113,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { api } = await import('../../api');
-      await api.auth.register({ name: regForm.name, email: regForm.email, password: regForm.password });
+      await api.auth.register({
+        name: regForm.name, email: regForm.email, password: regForm.password,
+        // idioma/tema já escolhidos nesta tela passam a valer na conta nova
+        preferences: { language: String(i18n.language).slice(0, 2), theme },
+      });
       toast.success(t('auth.accountCreated'));
       setTab('login');
       setLoginForm({ email: regForm.email, password: '' });
@@ -142,6 +150,31 @@ export default function LoginPage() {
         <OrbitRing radius={320} duration={30} delay={0} dotCount={4} />
         <OrbitRing radius={420} duration={45} delay={5} dotCount={3} />
         <OrbitRing radius={520} duration={60} delay={10} dotCount={5} />
+      </div>
+
+      {/* Seletor de idioma (antes do login) */}
+      <div
+        role="group"
+        aria-label={t('common.language')}
+        className="absolute z-20 flex gap-1 p-1 rounded-xl"
+        style={{ top: 16, right: 16, background: 'rgba(15,23,42,0.75)', border: '1px solid rgba(59,130,246,0.25)', backdropFilter: 'blur(12px)' }}
+      >
+        {LANGUAGES.map(l => {
+          const active = String(i18n.language).slice(0, 2) === l.code;
+          return (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => setLanguage(l.code)}
+              aria-pressed={active}
+              title={l.label}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
+              style={{ background: active ? 'linear-gradient(135deg,#1d4ed8,#2563eb)' : 'transparent', color: active ? '#fff' : '#94a3b8' }}
+            >
+              {l.code.toUpperCase()}
+            </button>
+          );
+        })}
       </div>
 
       {/* Card */}

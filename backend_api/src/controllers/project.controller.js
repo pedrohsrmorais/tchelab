@@ -44,7 +44,7 @@ async function listProjects(req, res) {
 
     if (scope === 'mine' || scope === 'all') {
       const [rows] = await db.query(
-        `SELECT ${PROJECT_COLUMNS}, p.user_id AS owner_id
+        `SELECT ${PROJECT_COLUMNS}, p.user_id AS owner_id, pm.role AS member_role
            FROM projects p
            JOIN users u ON u.id = p.user_id
            JOIN project_members pm ON pm.project_id = p.id
@@ -53,7 +53,8 @@ async function listProjects(req, res) {
         [req.user.id],
       );
       for (const r of rows) {
-        out.push({ ...r, my_access: r.owner_id === req.user.id ? 'owner' : 'member', via: null });
+        const byRole = { admin: 'admin', editor: 'editor', collaborator: 'editor' };
+        out.push({ ...r, my_access: r.owner_id === req.user.id ? 'owner' : (byRole[r.member_role] || 'viewer'), via: null });
       }
     }
 
@@ -78,7 +79,7 @@ async function listProjects(req, res) {
       }
     }
 
-    return R.ok(res, out.map(({ owner_id, can_edit, community_names, ...rest }) => rest));
+    return R.ok(res, out.map(({ owner_id, can_edit, community_names, member_role, ...rest }) => rest));
   } catch (err) { return R.serverError(res, err); }
 }
 

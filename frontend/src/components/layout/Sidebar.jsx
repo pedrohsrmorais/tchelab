@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import i18n from '../../i18n';
+import i18n, { LANGUAGES } from '../../i18n';
+import { setLanguage } from '../../i18n/preferences';
+import Avatar from '../ui/Avatar';
 import { useTheme, THEMES } from '../../context/ThemeContext';
 import { useAuthStore } from '../../store/auth';
 import {
@@ -25,10 +27,7 @@ const NAV_MAIN = [
   { to: '/jobs',       icon: Zap,             key: 'jobs'       },
 ];
 
-const LANGS = [
-  { code: 'pt', label: 'Português' },
-  { code: 'en', label: 'English'   },
-];
+const LANGS = LANGUAGES;
 
 const THEME_ICONS = { dark: Moon, light: Sun, classic: Monitor };
 
@@ -44,10 +43,10 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
   const isDark = theme === 'dark';
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
-  const handleLang   = (code)   => { i18n.changeLanguage(code); try { localStorage.setItem('tchelab_lang', code); } catch {} setLangOpen(false); };
+  const handleLang   = (code)   => { setLanguage(code); setLangOpen(false); };
   const handleTheme  = (name)   => { setTheme(name); setThemeOpen(false); };
 
-  const currentLang  = LANGS.find(l => l.code === i18n.language) || LANGS[0];
+  const currentLang  = LANGS.find(l => l.code === String(i18n.language).slice(0, 2)) || LANGS[0];
   const ThemeIcon    = THEME_ICONS[theme] || Moon;
 
   return (
@@ -292,12 +291,12 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
                   style={{
                     width: '100%',
                     padding: '0.5rem 0.75rem',
-                    background: i18n.language === l.code ? 'var(--bg-hover)' : 'none',
+                    background: String(i18n.language).slice(0, 2) === l.code ? 'var(--bg-hover)' : 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: i18n.language === l.code ? 'var(--text-accent)' : 'var(--text-secondary)',
+                    color: String(i18n.language).slice(0, 2) === l.code ? 'var(--text-accent)' : 'var(--text-secondary)',
                     fontSize: '0.8rem',
-                    fontWeight: i18n.language === l.code ? 600 : 400,
+                    fontWeight: String(i18n.language).slice(0, 2) === l.code ? 600 : 400,
                     textAlign: 'left',
                     transition: 'background 0.12s',
                   }}
@@ -315,16 +314,19 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
       {/* ── User ────────────────────────────────────────────────────────────── */}
       <div style={{ padding: '0.625rem 0.5rem', borderTop: `1px solid var(--border)` }}>
         {!collapsed && (
-          <div
+          <NavLink
+            to="/profile"
+            title={t('nav.profile')}
             style={{
               padding: '0.625rem',
               borderRadius: 'var(--radius)',
               background: 'var(--bg-hover)',
               marginBottom: '0.375rem',
               display: 'flex', alignItems: 'center', gap: '0.625rem',
+              textDecoration: 'none',
             }}
           >
-            <Avatar name={user?.name || user?.email} size={30} />
+            <Avatar user={user} size={30} />
             <div style={{ overflow: 'hidden', flex: 1 }}>
               <p style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user?.name || t('dashboard.defaultUserName')}
@@ -334,7 +336,12 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
               </p>
             </div>
             {isPlus() && <span className="badge badge-plus" style={{ fontSize: '0.55rem' }}>PLUS</span>}
-          </div>
+          </NavLink>
+        )}
+        {collapsed && (
+          <NavLink to="/profile" title={t('nav.profile')} style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.375rem' }}>
+            <Avatar user={user} size={28} />
+          </NavLink>
         )}
 
         <button
@@ -426,23 +433,6 @@ function NavItem({ to, icon: Icon, label, collapsed, accent }) {
         </div>
       )}
     </NavLink>
-  );
-}
-
-// ── Avatar ────────────────────────────────────────────────────────────────────
-function Avatar({ name, size = 32 }) {
-  const initials = (name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-  const hue = [...(name || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 60 + 200;
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: `hsl(${hue},65%,40%)`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, fontSize: size * 0.36, fontWeight: 700,
-      color: '#fff', letterSpacing: '-0.02em',
-    }}>
-      {initials}
-    </div>
   );
 }
 
