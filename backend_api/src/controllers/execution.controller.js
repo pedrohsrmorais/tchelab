@@ -5,6 +5,7 @@ const db = require('../config/db.config');
 const jobService = require('../services/job.service');
 const pipeline = require('../services/executionPipeline.service');
 const R = require('../utils/response');
+const quota = require('../services/quota.service');
 const { LEVEL, guardWorkflow } = require('../services/access.service');
 
 async function resolveWorkflow(uuid) {
@@ -348,18 +349,20 @@ async function saveNodeOutputAsDataset(req, res) {
       data: { tensor: value },
     };
 
-    const [insertResult] = await db.query(
-      `INSERT INTO datasets
-         (uuid, user_id, name, description, visibility, data_type, dimensions,
-          storage_path, metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'private', 'tensor', ?, NULL, ?, NOW(), NOW())`,
-      [
-        newUuid, req.user.id, name.trim(),
-        description || `Gerado por "${en.technique_name}" (porta "${port}") na execução ${execution.uuid}.`,
-        JSON.stringify(dims), JSON.stringify(metadata),
-      ],
-    );
-    const newDatasetId = insertResult.insertId;
+    const metaStr = JSON.stringify(metadata);
+    const desc = description || `Gerado por "${en.technique_name}" (porta "${port}") na execução ${execution.uuid}.`;
+    // vira variável do Workspace e conta na cota de quem salvou
+    const saved = await quota.guard(req.user.id, quota.datasetRowBytes(metaStr, dims, desc), async () => {
+      const [insertResult] = await db.query(
+        `INSERT INTO datasets
+           (uuid, user_id, name, description, visibility, data_type, dimensions,
+            storage_path, metadata, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'private', 'tensor', ?, NULL, ?, NOW(), NOW())`,
+        [newUuid, req.user.id, name.trim(), desc, JSON.stringify(dims), metaStr],
+      );
+      return { kind: 'dataset', refType: 'dataset', refId: insertResult.insertId, size: quota.datasetRowBytes(metaStr, dims, desc) };
+    });
+    const newDatasetId = saved.refId;
     await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [req.user.id]);
 
     if (source_dataset_id) {
@@ -376,6 +379,22 @@ async function saveNodeOutputAsDataset(req, res) {
 
     const [rows] = await db.query('SELECT * FROM datasets WHERE id = ?', [newDatasetId]);
     return R.created(res, rows[0]);
+  } catch (err) { if (quota.handleError(res, err)) return undefined; return R.serverError(res, err); }
+}
+
+// DELETE /executions/:id — remove a execução e suas saídas e devolve o espaço à cota de quem executou
+async function deleteExecution(req, res) {
+  try {
+    const [rows] = await db.query('SELECT id, user_id, status FROM executions WHERE uuid = ?', [req.params.id]);
+    if (!rows.length) return R.notFound(res, 'Execução');
+    const ex = rows[0];
+    if (ex.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    if (['queued', 'running'].includes(ex.status)) {
+      return R.error(res, 409, 'EXECUTION_RUNNING', 'Cancele a execução antes de excluí-la.');
+    }
+    await db.query('DELETE FROM executions WHERE id = ?', [ex.id]); // nós e métricas saem por cascata
+    await quota.freeByRef('execution', ex.id);
+    return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
 
@@ -400,6 +419,7 @@ async function getExecutionLogs(req, res) {
 }
 
 module.exports = {
+  deleteExecution,
   listExecutions, dispatchExecution, getExecution, cancelExecution,
   listExecutionNodes, getExecutionNode, getExecutionLogs, saveNodeOutputAsDataset,
   dispatchExecutionCore, resolveWorkflow,

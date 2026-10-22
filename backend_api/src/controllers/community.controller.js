@@ -5,7 +5,8 @@ const path = require('path');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
-const storage = require('../config/storage.config');
+const storage = require('../services/storage');
+const quota = require('../services/quota.service');
 const R = require('../utils/response');
 const { communityUpload } = require('../utils/multer');
 const { LEVEL, projectLevel, workflowLevel, datasetLevel, communityRole } = require('../services/access.service');
@@ -204,10 +205,10 @@ async function updateCommunity(req, res) {
 async function deleteCommunity(req, res) {
   try {
     const [files] = await db.query(
-      "SELECT file_path, preview_path FROM community_items WHERE community_id = ? AND file_path IS NOT NULL", [req.community.id],
+      "SELECT id, file_path, preview_path FROM community_items WHERE community_id = ? AND file_path IS NOT NULL", [req.community.id],
     );
     await db.query('DELETE FROM communities WHERE id = ?', [req.community.id]);
-    files.forEach((f) => { removeStoredFile(f.file_path); removeStoredFile(f.preview_path); });
+    await purgeItemFiles(files);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -724,10 +725,19 @@ async function removeWorkflowShare(req, res) {
 
 // ─── Conteúdo estilo "Moodle": tópicos com materiais ────────────────────────
 
-function removeStoredFile(filePath) {
-  if (!filePath) return;
-  const full = path.join(storage.communities, path.basename(filePath));
-  fs.promises.unlink(full).catch(() => {});
+/**
+ * Apaga do storage os arquivos de itens (original + prévia) e devolve o espaço à cota de quem enviou.
+ * `rows`: [{ id, file_path, preview_path }] lidas ANTES de apagar as linhas do banco.
+ */
+async function purgeItemFiles(rows) {
+  for (const f of rows) {
+    try {
+      const keys = new Set(f.id ? await quota.freeByRef('community_item', f.id, { reason: 'remove' }) : []);
+      if (f.file_path) keys.add(`communities/${path.basename(f.file_path)}`);
+      if (f.preview_path) keys.add(`communities/${path.basename(f.preview_path)}`);
+      for (const k of keys) await storage.remove(k).catch(() => {});
+    } catch (e) { console.warn('[community] falha ao remover arquivo:', e.message); }
+  }
 }
 
 function cleanUrl(input) {
@@ -949,12 +959,12 @@ async function deleteSection(req, res) {
     const s = await sectionRow(req.community.id, req.params.sid);
     if (!s) return R.notFound(res, 'Tópico');
     const ids = [s.id, ...(await sectionDescendants(s.id))];
-    const [files] = await db.query('SELECT file_path, preview_path FROM community_items WHERE section_id IN (?) AND file_path IS NOT NULL', [ids]);
+    const [files] = await db.query('SELECT id, file_path, preview_path FROM community_items WHERE section_id IN (?) AND file_path IS NOT NULL', [ids]);
     // Projetos do tópico (e dos subtópicos) voltam para "geral" (o vínculo é preservado).
     await db.query('UPDATE community_projects SET section_id = NULL WHERE section_id IN (?)', [ids]);
     // filhos primeiro (itens e quizzes saem por cascata)
     await db.query('DELETE FROM community_sections WHERE id IN (?) ORDER BY id DESC', [ids]);
-    files.forEach((f) => { removeStoredFile(f.file_path); removeStoredFile(f.preview_path); });
+    await purgeItemFiles(files);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -964,7 +974,7 @@ function itemUpload(req, res, next) {
   if (!String(req.headers['content-type'] || '').startsWith('multipart/')) return next();
   return communityUpload.single('file')(req, res, (err) => {
     if (!err) return next();
-    const message = err.code === 'LIMIT_FILE_SIZE' ? 'O arquivo deve ter no máximo 100 MB.' : err.message;
+    const message = err.code === 'LIMIT_FILE_SIZE' ? 'O arquivo é maior que o limite do servidor.' : err.message;
     return R.unprocessable(res, [{ field: 'file', message }]);
   });
 }
@@ -1025,28 +1035,42 @@ async function createItem(req, res) {
       [req.community.id, sectionId],
     );
     const uuid = uuidv4();
-    await db.query(
-      `INSERT INTO community_items
-         (uuid, community_id, section_id, type, title, description, url, file_path, file_name, file_mime, file_size, position, created_by,
-          ref_id, access, preview_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        uuid, req.community.id, sectionId, type, title,
-        b.description ? String(b.description).slice(0, 20000) : null, url,
-        req.file ? path.basename(req.file.path) : null,
-        req.file ? Buffer.from(req.file.originalname, 'latin1').toString('utf8').slice(0, 255) : null,
-        req.file ? req.file.mimetype : null,
-        req.file ? req.file.size : null,
-        next, req.user.id,
-        refId, refAccess, wantsPreview ? 'pending' : 'none',
-      ],
-    );
-    if (wantsPreview) {
+    const storedName = req.file ? path.basename(req.file.path) : null;
+    const fileKey = storedName ? `communities/${storedName}` : null;
+    const insertItem = async () => {
+      await db.query(
+        `INSERT INTO community_items
+           (uuid, community_id, section_id, type, title, description, url, file_path, file_name, file_mime, file_size, position, created_by,
+            ref_id, access, preview_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          uuid, req.community.id, sectionId, type, title,
+          b.description ? String(b.description).slice(0, 20000) : null, url,
+          storedName,
+          req.file ? Buffer.from(req.file.originalname, 'latin1').toString('utf8').slice(0, 255) : null,
+          req.file ? req.file.mimetype : null,
+          req.file ? req.file.size : null,
+          next, req.user.id,
+          refId, refAccess, wantsPreview ? 'pending' : 'none',
+        ],
+      );
       const [[row]] = await db.query('SELECT id FROM community_items WHERE uuid = ?', [uuid]);
-      enqueuePreview(row.id, path.basename(req.file.path));
-    }
+      return row.id;
+    };
+    let itemId;
+    if (req.file) {
+      // o arquivo conta na cota de quem enviou (professor ou aluno)
+      const done = await quota.guard(req.user.id, req.file.size, async () => {
+        await storage.putFile(fileKey, req.file.path, { contentType: req.file.mimetype });
+        try { itemId = await insertItem(); } catch (e) { await storage.remove(fileKey).catch(() => {}); throw e; }
+        return { kind: 'community_file', refType: 'community_item', refId: itemId, key: fileKey, size: req.file.size };
+      });
+      itemId = done.refId;
+    } else itemId = await insertItem();
+    if (wantsPreview) enqueuePreview(itemId, storedName, req.user.id);
+    discard();
     return R.created(res, { uuid, type, title });
-  } catch (err) { discard(); return R.serverError(res, err); }
+  } catch (err) { discard(); if (quota.handleError(res, err)) return undefined; return R.serverError(res, err); }
 }
 
 // PUT /communities/:id/items/:iid
@@ -1126,8 +1150,7 @@ async function deleteItem(req, res) {
     const [rows] = await db.query('SELECT id, file_path, preview_path FROM community_items WHERE uuid = ? AND community_id = ?', [req.params.iid, req.community.id]);
     if (!rows.length) return R.notFound(res, 'Item');
     await db.query('DELETE FROM community_items WHERE id = ?', [rows[0].id]);
-    removeStoredFile(rows[0].file_path);
-    removeStoredFile(rows[0].preview_path);
+    await purgeItemFiles([rows[0]]);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -1149,18 +1172,18 @@ async function downloadItemFile(req, res) {
       }
       if (hidden) return R.notFound(res, 'Arquivo');
     }
-    const full = path.join(storage.communities, path.basename(it.file_path));
-    if (!fs.existsSync(full)) return R.notFound(res, 'Arquivo');
+    const fileKey = `communities/${path.basename(it.file_path)}`;
+    if (!(await storage.exists(fileKey))) return R.notFound(res, 'Arquivo');
 
     // ?preview=1 -> PDF gerado a partir de PPT/DOC/XLS (quando a conversão terminou)
     if (req.query.preview === '1') {
       if (it.preview_status !== 'ready' || !it.preview_path) return R.notFound(res, 'Pré-visualização');
-      const pfull = path.join(storage.communities, path.basename(it.preview_path));
-      if (!fs.existsSync(pfull)) return R.notFound(res, 'Pré-visualização');
+      const pkey = `communities/${path.basename(it.preview_path)}`;
+      if (!(await storage.exists(pkey))) return R.notFound(res, 'Pré-visualização');
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(`${path.parse(it.file_name || 'arquivo').name}.pdf`)}`);
-      return fs.createReadStream(pfull).pipe(res);
+      return (await storage.getStream(pkey)).pipe(res);
     }
 
     const inline = req.query.download !== '1' && (it.file_mime === 'application/pdf' || String(it.file_mime).startsWith('image/'));
@@ -1170,7 +1193,7 @@ async function downloadItemFile(req, res) {
       'Content-Disposition',
       `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(it.file_name || 'arquivo')}`,
     );
-    return fs.createReadStream(full).pipe(res);
+    return (await storage.getStream(fileKey)).pipe(res);
   } catch (err) { return R.serverError(res, err); }
 }
 

@@ -56,7 +56,7 @@ async function getPublic(req, res) {
 
 // GET /public/equipment/:token/image
 async function getImage(req, res) {
-  try { return eqc.sendImage(res, await byToken(req.params.token), 'public'); } catch (err) { return R.serverError(res, err); }
+  try { return await eqc.sendImage(res, await byToken(req.params.token), 'public'); } catch (err) { return R.serverError(res, err); }
 }
 
 // GET /public/equipment/:token/availability?from=&to=

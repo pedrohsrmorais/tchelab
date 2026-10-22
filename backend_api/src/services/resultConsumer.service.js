@@ -43,6 +43,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const redis = require('../config/redis.config');
+const quota = require('./quota.service');
 const { advanceExecution } = require('./executionPipeline.service');
 
 const RESULT_CHANNEL = process.env.RESULT_CHANNEL || 'tchelab_resultados';
@@ -127,9 +128,25 @@ async function handleResultMessage(raw) {
       return;
     }
 
-    const [exRows] = await db.query('SELECT id FROM executions WHERE uuid = ?', [execUuid]);
+    const [exRows] = await db.query('SELECT id, user_id FROM executions WHERE uuid = ?', [execUuid]);
     if (!exRows.length) return;
     const executionId = exRows[0].id;
+
+    // As saídas contam na cota de quem executou (e não expiram). Sem espaço (ou saída maior que o máximo por item do
+    // plano), o nó falha sem gravar nada e o usuário vê o motivo. Reserva antes, confirma depois de gravar.
+    let nodeStatus = isSuccess ? 'completed' : 'failed';
+    let nodeOutputs = outputs || null;
+    let nodeError = error || null;
+    let outputReserved = 0;
+    let outputBytes = 0;
+    if (isSuccess && outputs) {
+      outputBytes = Buffer.byteLength(JSON.stringify(outputs)) + 512;
+      try { outputReserved = await quota.reserveOutput(exRows[0].user_id, outputBytes); } catch (qe) {
+        if (!(qe instanceof quota.QuotaError)) throw qe;
+        nodeStatus = 'failed'; nodeOutputs = null; nodeError = `${qe.code}: ${qe.message}`;
+        await db.query("UPDATE jobs SET status = 'failed', result = NULL, error_message = ? WHERE uuid = ?", [nodeError, jobUuid]);
+      }
+    }
 
     const [enRows] = await db.query(
       `SELECT en.id FROM execution_nodes en
@@ -145,13 +162,16 @@ async function handleResultMessage(raw) {
              started_at = COALESCE(started_at, NOW()), finished_at = NOW(), updated_at = NOW()
        WHERE id = ?`,
       [
-        isSuccess ? 'completed' : 'failed',
-        outputs ? JSON.stringify(outputs) : null,
+        nodeStatus,
+        nodeOutputs ? JSON.stringify(nodeOutputs) : null,
         duration_ms != null ? Math.round(duration_ms) : null,
-        error || null,
+        nodeError,
         enRows[0].id,
       ],
     );
+    if (outputReserved && nodeStatus === 'completed') {
+      await quota.commit(exRows[0].user_id, outputReserved, { kind: 'execution_output', refType: 'execution', refId: executionId, size: outputBytes });
+    } else if (outputReserved) await quota.release(exRows[0].user_id, outputReserved);
 
     // Libera os nós seguintes (ou marca como 'skipped' se este falhou) antes
     // de decidir se a execução acabou.
@@ -309,9 +329,19 @@ async function finalizeDatasetOperation(executionId, executionStatus) {
       data: { ...(sourceMeta.data || {}), tensor },
       last_operation: { technique: techSlug, params },
     };
+    const newMetaStr = JSON.stringify(newMeta);
+    try {
+      const before = await quota.sizeOfRef('dataset', op.source_dataset_id);
+      const oldLen = Buffer.byteLength(typeof sourceDs.metadata === 'string' ? sourceDs.metadata : JSON.stringify(sourceDs.metadata || {}));
+      await quota.resize(sourceDs.user_id, 'dataset', op.source_dataset_id, Math.max(0, before - oldLen + Buffer.byteLength(newMetaStr)), { kind: 'dataset' });
+    } catch (qe) {
+      if (!(qe instanceof quota.QuotaError)) throw qe;
+      await db.query(`UPDATE dataset_operations SET status = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, [`${qe.code}: ${qe.message}`, op.id]);
+      return;
+    }
     await db.query(
       `UPDATE datasets SET dimensions = ?, metadata = ?, data_type = 'tensor', updated_at = NOW() WHERE id = ?`,
-      [JSON.stringify(dims), JSON.stringify(newMeta), op.source_dataset_id],
+      [JSON.stringify(dims), newMetaStr, op.source_dataset_id],
     );
     await db.query(
       `UPDATE dataset_operations SET status = 'completed', output_dataset_id = ?, updated_at = NOW() WHERE id = ?`,
@@ -329,22 +359,28 @@ async function finalizeDatasetOperation(executionId, executionStatus) {
     source_params: params,
     data: { tensor },
   };
-  const [insertResult] = await db.query(
-    `INSERT INTO datasets
-       (uuid, user_id, name, description, visibility, data_type, dimensions,
-        x_points, x_min, x_max, file_format, storage_path,
-        metadata, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'private', 'tensor', ?, NULL, NULL, NULL, 'json', NULL, ?, NOW(), NOW())`,
-    [
-      newUuid,
-      op.user_id,
-      name,
-      `Gerado a partir de "${sourceDs.name}" via ${techName}.`,
-      JSON.stringify(dims),
-      JSON.stringify(newMetadata),
-    ],
-  );
-  const newDatasetId = insertResult.insertId;
+  const newMetaStr = JSON.stringify(newMetadata);
+  const newDesc = `Gerado a partir de "${sourceDs.name}" via ${techName}.`;
+  let newDatasetId;
+  try {
+    // a variável gerada entra no Workspace de quem pediu a operação e conta na cota dele
+    const done = await quota.guard(op.user_id, quota.datasetRowBytes(newMetaStr, dims, newDesc), async () => {
+      const [insertResult] = await db.query(
+        `INSERT INTO datasets
+           (uuid, user_id, name, description, visibility, data_type, dimensions,
+            x_points, x_min, x_max, file_format, storage_path,
+            metadata, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'private', 'tensor', ?, NULL, NULL, NULL, 'json', NULL, ?, NOW(), NOW())`,
+        [newUuid, op.user_id, name, newDesc, JSON.stringify(dims), newMetaStr],
+      );
+      return { kind: 'dataset', refType: 'dataset', refId: insertResult.insertId, size: quota.datasetRowBytes(newMetaStr, dims, newDesc) };
+    });
+    newDatasetId = done.refId;
+  } catch (qe) {
+    if (!(qe instanceof quota.QuotaError)) throw qe;
+    await db.query(`UPDATE dataset_operations SET status = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, [`${qe.code}: ${qe.message}`, op.id]);
+    return;
+  }
 
   await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [op.user_id]);
 

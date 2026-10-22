@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
-const { datasetUpload, pdfUpload, equipmentImageUpload } = require('../utils/multer');
+const { datasetUpload, pdfUpload, equipmentImageUpload, uploadGuard } = require('../utils/multer');
 
 // Controllers
 const authCtrl            = require('../controllers/auth.controller');
@@ -20,6 +20,7 @@ const workflowCtrl        = require('../controllers/workflow.controller');
 const workflowNodeCtrl    = require('../controllers/workflowNode.controller');
 const workflowEdgeCtrl    = require('../controllers/workflowEdge.controller');
 const executionCtrl       = require('../controllers/execution.controller');
+const storageCtrl         = require('../controllers/storage.controller');
 const modelCtrl           = require('../controllers/model.controller');
 const predictionCtrl      = require('../controllers/prediction.controller');
 const metricCtrl          = require('../controllers/metric.controller');
@@ -98,7 +99,7 @@ router.post  ('/communities/:id/sections',                      authenticate, cg
 router.put   ('/communities/:id/sections-order',                authenticate, cg('moderator'), communityCtrl.reorderSections);
 router.put   ('/communities/:id/sections/:sid',                 authenticate, cg('moderator'), communityCtrl.updateSection);
 router.delete('/communities/:id/sections/:sid',                 authenticate, cg('moderator'), communityCtrl.deleteSection);
-router.post  ('/communities/:id/items',                         authenticate, cg('moderator'), communityCtrl.itemUpload, communityCtrl.createItem);
+router.post  ('/communities/:id/items',                         authenticate, cg('moderator'), uploadGuard, communityCtrl.itemUpload, communityCtrl.createItem);
 router.put   ('/communities/:id/items-order',                    authenticate, cg('moderator'), communityCtrl.reorderItems);
 router.put   ('/communities/:id/items/:iid',                    authenticate, cg('moderator'), communityCtrl.updateItem);
 router.delete('/communities/:id/items/:iid',                    authenticate, cg('moderator'), communityCtrl.deleteItem);
@@ -155,7 +156,7 @@ router.put   ('/communities/:id/equipment/:eid',                     authenticat
 router.delete('/communities/:id/equipment/:eid',                     authenticate, cg('moderator'), equipmentCtrl.deleteEquipment);
 router.post  ('/communities/:id/equipment/:eid/public-token',        authenticate, cg('moderator'), equipmentCtrl.rotateToken);
 router.get   ('/communities/:id/equipment/:eid/image',               authenticate, cg('member'),    equipmentCtrl.getImage);
-router.post  ('/communities/:id/equipment/:eid/image',               authenticate, cg('moderator'), equipmentImageUpload.single('image'), equipmentCtrl.uploadImage);
+router.post  ('/communities/:id/equipment/:eid/image',               authenticate, cg('moderator'), uploadGuard, equipmentImageUpload.single('image'), equipmentCtrl.uploadImage);
 router.delete('/communities/:id/equipment/:eid/image',               authenticate, cg('moderator'), equipmentCtrl.deleteImage);
 router.put   ('/communities/:id/equipment/:eid/windows',             authenticate, cg('moderator'), equipmentCtrl.saveWindows);
 router.get   ('/communities/:id/equipment/:eid/blocks',              authenticate, cg('moderator'), equipmentCtrl.listBlocks);
@@ -234,7 +235,7 @@ router.delete('/collections/:id/spectra/:sid',                  authenticate, co
 // ─── DATASETS ──────────────────────────────────────────────────────────────────
 router.get   ('/datasets',                                      authenticate, datasetCtrl.listDatasets);
 router.post  ('/datasets',                                      authenticate, datasetCtrl.createDataset);
-router.post  ('/datasets/import',                               authenticate, datasetUpload.single('file'), datasetCtrl.smartImport);
+router.post  ('/datasets/import',                               authenticate, uploadGuard, datasetUpload.single('file'), datasetCtrl.smartImport);
 router.get   ('/datasets/:id',                                  authenticate, datasetCtrl.getDataset);
 router.post  ('/datasets/:id/copy',                             authenticate, datasetCtrl.copyDataset);
 router.put   ('/datasets/:id',                                  authenticate, datasetCtrl.updateDataset);
@@ -253,7 +254,7 @@ router.get   ('/operations/:id',                                authenticate, da
 // ─── ARTICLES ──────────────────────────────────────────────────────────────────
 router.get   ('/articles',                                      authenticate, articleCtrl.listArticles);
 router.post  ('/articles',                                      authenticate, articleCtrl.createArticle);
-router.post  ('/articles/upload',                               authenticate, pdfUpload.single('pdf'), articleCtrl.uploadPDF);
+router.post  ('/articles/upload',                               authenticate, uploadGuard, pdfUpload.single('pdf'), articleCtrl.uploadPDF);
 router.get   ('/articles/:id',                                  authenticate, articleCtrl.getArticle);
 router.put   ('/articles/:id',                                  authenticate, articleCtrl.updateArticle);
 router.delete('/articles/:id',                                  authenticate, articleCtrl.deleteArticle);
@@ -305,6 +306,7 @@ router.post  ('/workflows/:wid/executions',                     authenticate, ex
 
 // ─── EXECUTIONS ────────────────────────────────────────────────────────────────
 router.get   ('/executions/:id',                                authenticate, executionCtrl.getExecution);
+router.delete('/executions/:id',                                authenticate, executionCtrl.deleteExecution);
 router.post  ('/executions/:id/cancel',                         authenticate, executionCtrl.cancelExecution);
 router.get   ('/executions/:id/nodes',                          authenticate, executionCtrl.listExecutionNodes);
 router.get   ('/executions/:id/nodes/:nid',                     authenticate, executionCtrl.getExecutionNode);
@@ -361,6 +363,11 @@ router.delete('/ai-interactions/:id',                           authenticate, ai
 router.get   ('/audit-logs',                                    authenticate, auditCtrl.listAuditLogs);
 router.get   ('/audit-logs/:id',                                authenticate, auditCtrl.getAuditLog);
 router.get   ('/audit-logs/resource/:type/:uuid',               authenticate, auditCtrl.getResourceAuditLogs);
+router.get   ('/storage/usage',                                 authenticate, storageCtrl.myUsage);
+router.get   ('/admin/storage',                                 authenticate, storageCtrl.adminOverview);
+router.get   ('/admin/storage/plans',                           authenticate, storageCtrl.listPlans);
+router.put   ('/admin/storage/plans/:code',                     authenticate, storageCtrl.updatePlan);
+router.put   ('/admin/storage/users/:uuid',                     authenticate, storageCtrl.updateUserQuota);
 router.get   ('/admin/stats',                                   authenticate, auditCtrl.getAdminStats);
 
 module.exports = router;

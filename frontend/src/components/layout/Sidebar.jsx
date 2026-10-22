@@ -8,6 +8,7 @@ import { useTheme, THEMES } from '../../context/ThemeContext';
 import { useAuthStore } from '../../store/auth';
 import { LogOut, ChevronRight, Sun, Moon, Monitor, Globe, ChevronDown } from 'lucide-react';
 import { NAV_ICONS } from '../../config/icons';
+import StorageMeter from '../storage/StorageMeter';
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 // Agrupados por intenção (dados → análise → colaboração), com rótulo de seção (NN/g: agrupar e rotular
@@ -322,6 +323,7 @@ export function Sidebar({ collapsed, onToggle, mobile = false, mobileOpen = fals
 
       {/* ── User ────────────────────────────────────────────────────────────── */}
       <div style={{ padding: '0.625rem 0.5rem', borderTop: `1px solid var(--border)` }}>
+        <StorageMeter collapsed={collapsed} />
         {!collapsed && (
           <NavLink
             to="/profile"

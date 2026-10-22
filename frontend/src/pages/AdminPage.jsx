@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Shield, Users, Activity, Database, Cpu, FileText, Search, RefreshCw, ChevronRight } from 'lucide-react';
+import { Shield, Users, Activity, Database, Cpu, HardDrive, FileText, Search, RefreshCw, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { api } from '../api';
 import StatCard from '../components/ui/StatCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import EmptyState from '../components/ui/EmptyState';
+import AdminStoragePanel from '../components/storage/AdminStoragePanel';
 
 
 function Tab({ active, onClick, children }) {
@@ -46,6 +47,7 @@ export default function AdminPage() {
       <div className="flex items-center gap-2">
         <Tab active={tab === 'stats'} onClick={() => setTab('stats')}><Activity className="w-4 h-4 inline mr-1.5" />{t('admin.statsTab')}</Tab>
         <Tab active={tab === 'audit'} onClick={() => setTab('audit')}><FileText className="w-4 h-4 inline mr-1.5" />{t('admin.auditTab')}</Tab>
+        <Tab active={tab === 'storage'} onClick={() => setTab('storage')}><HardDrive className="w-4 h-4 inline mr-1.5" />{t('storage.title')}</Tab>
       </div>
 
       {tab === 'stats' && (
@@ -84,6 +86,8 @@ export default function AdminPage() {
           )}
         </div>
       )}
+
+      {tab === 'storage' && <AdminStoragePanel />}
 
       {tab === 'audit' && (
         <div className="space-y-4">

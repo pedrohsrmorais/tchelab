@@ -40,6 +40,48 @@ async function addColumn(table, column, ddl) {
 }
 
 const TABLES = [
+  // ── Armazenamento: planos, objetos e trilha de auditoria da cota por usuário ─────────
+  ['storage_plans', `
+    CREATE TABLE IF NOT EXISTS \`storage_plans\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`code\` varchar(40) ${COLLATE} NOT NULL,
+      \`name\` varchar(120) ${COLLATE} NOT NULL,
+      \`quota_bytes\` bigint unsigned NOT NULL,
+      \`max_file_bytes\` bigint unsigned NOT NULL,
+      \`max_concurrent_jobs\` int unsigned NOT NULL DEFAULT 2,
+      \`monthly_cpu_seconds\` bigint unsigned DEFAULT NULL,
+      \`is_default\` tinyint(1) NOT NULL DEFAULT 0,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`uq_storage_plan_code\` (\`code\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+  ['storage_objects', `
+    CREATE TABLE IF NOT EXISTS \`storage_objects\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`user_id\` bigint unsigned NOT NULL,
+      \`kind\` varchar(30) ${COLLATE} NOT NULL,
+      \`ref_type\` varchar(30) ${COLLATE} NOT NULL,
+      \`ref_id\` bigint unsigned NOT NULL,
+      \`storage_key\` varchar(500) ${COLLATE} DEFAULT NULL,
+      \`size_bytes\` bigint unsigned NOT NULL DEFAULT 0,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`deleted_at\` datetime DEFAULT NULL,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_storage_obj_user\` (\`user_id\`,\`deleted_at\`),
+      KEY \`idx_storage_obj_ref\` (\`ref_type\`,\`ref_id\`),
+      KEY \`idx_storage_obj_key\` (\`storage_key\`(190))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
+  ['storage_ledger', `
+    CREATE TABLE IF NOT EXISTS \`storage_ledger\` (
+      \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+      \`user_id\` bigint unsigned NOT NULL,
+      \`delta_bytes\` bigint NOT NULL,
+      \`reason\` varchar(60) ${COLLATE} NOT NULL,
+      \`object_id\` bigint unsigned DEFAULT NULL,
+      \`created_at\` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_storage_ledger_user\` (\`user_id\`,\`created_at\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`],
   // ── Convites por código/link ────────────────────────────────────────────
   ['community_invites', `
     CREATE TABLE IF NOT EXISTS \`community_invites\` (
@@ -492,6 +534,25 @@ async function migrate() {
       await db.query(ddl);
       console.log(`[migrate] tabela ${name} criada`);
     }
+  }
+
+
+  // armazenamento: colunas de cota no usuário e planos iniciais (valores editáveis depois pelo admin)
+  await addColumn('users', 'storage_plan_id', 'bigint unsigned DEFAULT NULL');
+  await addColumn('users', 'storage_quota_bytes', 'bigint unsigned DEFAULT NULL');
+  await addColumn('users', 'storage_used_bytes', 'bigint unsigned NOT NULL DEFAULT 0');
+  await addColumn('users', 'storage_reserved_bytes', 'bigint unsigned NOT NULL DEFAULT 0');
+  if (await hasTable('storage_plans')) {
+    const MB = 1024 * 1024;
+    await db.query(
+      `INSERT IGNORE INTO storage_plans (code, name, quota_bytes, max_file_bytes, max_concurrent_jobs, is_default) VALUES
+        ('beta',  'Beta',  ?, ?, 2, 1),
+        ('staff', 'Equipe', ?, ?, 4, 0)`,
+      [100 * MB, 20 * MB, 10 * 1024 * MB, 200 * MB],
+    );
+    await db.query(
+      `UPDATE users SET storage_plan_id = (SELECT id FROM storage_plans WHERE is_default = 1 LIMIT 1) WHERE storage_plan_id IS NULL`,
+    );
   }
 
   // quizzes: tentativas configuráveis (0 = ilimitadas) e política de nota

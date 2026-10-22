@@ -18,10 +18,25 @@ client.interceptors.request.use(cfg => {
 let refreshing = false
 let queue = []
 
+// Cota de armazenamento: o backend responde 413 (STORAGE_QUOTA_EXCEEDED / FILE_TOO_LARGE) ou 503 (STORAGE_SERVER_FULL).
+// Avisamos o app por eventos (evita import circular com o store) — o QuotaDialog global abre e ajuda a liberar espaço.
+const QUOTA_CODES = ['STORAGE_QUOTA_EXCEEDED', 'FILE_TOO_LARGE', 'STORAGE_SERVER_FULL']
+const emit = (name, detail) => { try { window.dispatchEvent(new CustomEvent(name, { detail })) } catch { /* sem window */ } }
+
 client.interceptors.response.use(
-  r => r,
+  r => {
+    // Qualquer escrita bem-sucedida pode ter mudado o consumo: o medidor se atualiza.
+    const m = String(r.config?.method || 'get').toLowerCase()
+    if (m !== 'get' && !/\/storage\//.test(r.config?.url || '')) emit('tchelab:storage-dirty')
+    return r
+  },
   async err => {
     const orig = err.config
+    const qe = err.response?.data?.error
+    if (qe && QUOTA_CODES.includes(qe.code)) {
+      err.isQuotaError = true
+      emit('tchelab:quota', { code: qe.code, message: qe.message, details: qe.details })
+    }
     // 401 em login/cadastro/refresh/recuperação é "credenciais inválidas", não "sessão expirada":
     // tentar refresh + reload aqui apagava o toast de erro e o formulário (usuário via a página
     // "piscar" sem nenhuma mensagem). O erro segue para quem chamou, que mostra o toast.

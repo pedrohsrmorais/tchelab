@@ -14,7 +14,8 @@ const { DateTime } = require('luxon');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
-const storage = require('../config/storage.config');
+const storage = require('../services/storage');
+const quota = require('../services/quota.service');
 const slots = require('../services/equipmentSlots.service');
 const mail = require('../services/mail.service');
 const tpl = require('../services/mail.templates');
@@ -224,7 +225,7 @@ async function deleteEquipment(req, res) {
     const eq = await eqRow(req);
     if (!eq) return R.notFound(res, 'Equipamento');
     await db.query('DELETE FROM equipment WHERE id = ?', [eq.id]);
-    if (eq.image_path) fs.rm(path.join(storage.equipment, path.basename(eq.image_path)), { force: true }, () => {});
+    await dropImage(eq);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -241,6 +242,15 @@ async function rotateToken(req, res) {
 }
 
 // ── Imagem ──────────────────────────────────────────────────────────────────
+/** Remove a imagem do equipamento do storage e devolve o espaço à cota de quem a enviou. */
+async function dropImage(eq) {
+  if (!eq.image_path) return;
+  try {
+    await quota.freeByRef('equipment_image', eq.id, { reason: 'remove' });
+    await storage.remove(`equipment/${path.basename(eq.image_path)}`);
+  } catch (e) { console.warn('[equipment] falha ao remover imagem:', e.message); }
+}
+
 // POST /communities/:id/equipment/:eid/image   (multipart, campo "image") — middleware multer na rota
 async function uploadImage(req, res) {
   const cleanup = () => { if (req.file) fs.rm(req.file.path, { force: true }, () => {}); };
@@ -252,12 +262,24 @@ async function uploadImage(req, res) {
     const head = Buffer.alloc(12); const fd = fs.openSync(req.file.path, 'r'); fs.readSync(fd, head, 0, 12, 0); fs.closeSync(fd);
     const ok = (head[0] === 0xff && head[1] === 0xd8) || head.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) || (head.slice(0, 4).toString() === 'RIFF' && head.slice(8, 12).toString() === 'WEBP');
     if (!ok) { cleanup(); return R.unprocessable(res, [fieldErr('image', 'O arquivo não é uma imagem válida.')]); }
-    const old = eq.image_path;
-    await db.query('UPDATE equipment SET image_path = ? WHERE id = ?', [path.basename(req.file.path), eq.id]);
-    if (old) fs.rm(path.join(storage.equipment, path.basename(old)), { force: true }, () => {});
+    const name = path.basename(req.file.path);
+    const key = `equipment/${name}`;
+    // a imagem conta na cota de quem a enviou
+    await quota.guard(req.user.id, req.file.size, async () => {
+      await storage.putFile(key, req.file.path, { contentType: IMG_MIME[path.extname(name).toLowerCase()] });
+      try { await db.query('UPDATE equipment SET image_path = ? WHERE id = ?', [name, eq.id]); } catch (e) { await storage.remove(key).catch(() => {}); throw e; }
+      return { kind: 'equipment_image', refType: 'equipment_image', refId: eq.id, key, size: req.file.size };
+    });
+    // a imagem antiga (se havia) foi substituída: libera só as anteriores à nova
+    if (eq.image_path) {
+      const oldKey = `equipment/${path.basename(eq.image_path)}`;
+      await quota.freeByKey(oldKey, { reason: 'replace' }).catch(() => {});
+      await storage.remove(oldKey).catch(() => {});
+    }
+    cleanup();
     const [[fresh]] = await db.query('SELECT * FROM equipment WHERE id = ?', [eq.id]);
     return R.ok(res, await equipmentShape(req, fresh));
-  } catch (err) { cleanup(); return R.serverError(res, err); }
+  } catch (err) { cleanup(); if (quota.handleError(res, err)) return undefined; return R.serverError(res, err); }
 }
 
 // DELETE /communities/:id/equipment/:eid/image
@@ -266,24 +288,28 @@ async function deleteImage(req, res) {
     const eq = await eqRow(req);
     if (!eq) return R.notFound(res, 'Equipamento');
     await db.query('UPDATE equipment SET image_path = NULL WHERE id = ?', [eq.id]);
-    if (eq.image_path) fs.rm(path.join(storage.equipment, path.basename(eq.image_path)), { force: true }, () => {});
+    await dropImage(eq);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
 
 /** Serve o arquivo de imagem (usado também pela rota pública). */
-function sendImage(res, eq, cacheScope) {
-  if (!eq || !eq.image_path) return R.notFound(res, 'Imagem');
-  const full = path.join(storage.equipment, path.basename(eq.image_path));
-  if (!fs.existsSync(full)) return R.notFound(res, 'Imagem');
-  res.setHeader('Content-Type', IMG_MIME[path.extname(full).toLowerCase()] || 'application/octet-stream');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-  res.setHeader('Cache-Control', `${cacheScope}, max-age=300`);
-  return res.sendFile(full);
+async function sendImage(res, eq, cacheScope) {
+  try {
+    if (!eq || !eq.image_path) return R.notFound(res, 'Imagem');
+    const key = `equipment/${path.basename(eq.image_path)}`;
+    if (!(await storage.exists(key))) return R.notFound(res, 'Imagem');
+    res.setHeader('Content-Type', IMG_MIME[path.extname(key).toLowerCase()] || 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.setHeader('Cache-Control', `${cacheScope}, max-age=300`);
+    const stream = await storage.getStream(key);
+    stream.on('error', () => res.destroy());
+    return stream.pipe(res);
+  } catch (err) { return R.serverError(res, err); }
 }
 async function getImage(req, res) {
-  try { return sendImage(res, await eqRow(req), 'private'); } catch (err) { return R.serverError(res, err); }
+  try { return await sendImage(res, await eqRow(req), 'private'); } catch (err) { return R.serverError(res, err); }
 }
 
 // ── Janelas e bloqueios ─────────────────────────────────────────────────────

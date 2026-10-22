@@ -12,7 +12,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const db = require('../config/db.config');
-const storage = require('../config/storage.config');
+const storageCfg = require('../config/storage.config');
+const storage = require('./storage');
+const quota = require('./quota.service');
 
 const OFFICE_EXT = new Set(['.ppt', '.pptx', '.pps', '.ppsx', '.odp', '.doc', '.docx', '.odt', '.rtf', '.xls', '.xlsx', '.ods']);
 const TIMEOUT_MS = Number(process.env.OFFICE_PREVIEW_TIMEOUT_MS || 120000);
@@ -39,19 +41,34 @@ function convert(srcPath, outDir) {
   });
 }
 
-/** Enfileira a conversão de um item (arquivo já gravado em storage.communities). */
-function enqueuePreview(itemId, storedName) {
+/**
+ * Enfileira a conversão de um item (arquivo já gravado no storage em `communities/<storedName>`).
+ * O LibreOffice precisa de arquivos locais: baixa o original para uma pasta temporária, converte e envia o PDF
+ * de volta. O PDF conta na cota de quem enviou o arquivo (`payerId`); se não couber, a prévia é descartada
+ * (o arquivo original continua disponível para download).
+ */
+function enqueuePreview(itemId, storedName, payerId) {
   chain = chain.then(async () => {
-    const src = path.join(storage.communities, storedName);
-    const pdf = path.join(storage.communities, `${path.parse(storedName).name}.pdf`);
+    const work = fs.mkdtempSync(path.join(storageCfg.tmp, 'prev-'));
+    const src = path.join(work, storedName);
+    const pdfName = `${path.parse(storedName).name}.pdf`;
+    const pdfLocal = path.join(work, pdfName);
+    const pdfKey = `communities/${pdfName}`;
     try {
-      await convert(src, storage.communities);
-      if (!fs.existsSync(pdf)) throw new Error('PDF não gerado');
-      await db.query("UPDATE community_items SET preview_path = ?, preview_status = 'ready' WHERE id = ?", [path.basename(pdf), itemId]);
+      await storage.downloadTo(`communities/${storedName}`, src);
+      await convert(src, work);
+      if (!fs.existsSync(pdfLocal)) throw new Error('PDF não gerado');
+      const size = fs.statSync(pdfLocal).size;
+      await quota.guard(payerId, size, async () => {
+        await storage.putFile(pdfKey, pdfLocal, { contentType: 'application/pdf' });
+        await db.query("UPDATE community_items SET preview_path = ?, preview_status = 'ready' WHERE id = ?", [pdfName, itemId]);
+        return { kind: 'community_preview', refType: 'community_item', refId: itemId, key: pdfKey, size };
+      });
     } catch (err) {
       console.warn(`[preview] item ${itemId}: ${err.message}`);
+      await storage.remove(pdfKey).catch(() => {});
       await db.query("UPDATE community_items SET preview_status = 'failed' WHERE id = ?", [itemId]).catch(() => {});
-    }
+    } finally { fs.rm(work, { recursive: true, force: true }, () => {}); }
   }).catch(() => {});
 }
 

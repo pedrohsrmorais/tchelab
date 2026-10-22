@@ -7,7 +7,8 @@ const db = require('../config/db.config');
 const jobService = require('../services/job.service');
 const lineageService = require('../services/lineage.service');
 const R = require('../utils/response');
-const storageCfg = require('../config/storage.config');
+const storage = require('../services/storage');
+const quota = require('../services/quota.service');
 const { LEVEL, guardDataset } = require('../services/access.service');
 
 /**
@@ -179,7 +180,10 @@ async function createDataset(req, res) {
     }
 
     const uuid = uuidv4();
-    const [result] = await db.query(
+    // `storage_path` enviado pelo cliente é ignorado: só o servidor decide onde um arquivo fica no storage.
+    void storage_path;
+    const result = await quota.guard(req.user.id, quota.datasetRowBytes(dimensions, mode_labels, mode_ranges, augmentation_scheme, description), async () => {
+      const [r] = await db.query(
       `INSERT INTO datasets
          (uuid, user_id, name, description, data_type, technique, dimensions, mode_labels,
           mode_ranges, sample_axis, data_order, augmentation_scheme, file_format,
@@ -194,15 +198,17 @@ async function createDataset(req, res) {
         sample_axis !== undefined ? sample_axis : null,
         data_order || 1,
         JSON.stringify(augmentation_scheme || null),
-        file_format || null, storage_path || null,
+        file_format || null, null,
         visibility || 'private',
       ],
-    );
+      );
+      return { kind: 'dataset', refType: 'dataset', refId: r.insertId, size: quota.datasetRowBytes(dimensions, mode_labels, mode_ranges, augmentation_scheme, description) };
+    }).then((o) => ({ insertId: o.refId }));
 
     await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [req.user.id]);
     const [rows] = await db.query('SELECT * FROM datasets WHERE id = ?', [result.insertId]);
     return R.created(res, rows[0]);
-  } catch (err) { return R.serverError(res, err); }
+  } catch (err) { if (quota.handleError(res, err)) return undefined; return R.serverError(res, err); }
 }
 
 /**
@@ -279,7 +285,9 @@ async function importTensorFromJson(req, res) {
     data: { tensor: finalTensor },
   };
 
-  const [result] = await db.query(
+  const metaStr = JSON.stringify(metadata);
+  const result = await quota.guard(req.user.id, quota.datasetRowBytes(metaStr, dims, description), async () => {
+    const [r] = await db.query(
     `INSERT INTO datasets
        (uuid, user_id, name, description, visibility, data_type, dimensions,
         x_points, x_min, x_max, file_format, storage_path,
@@ -292,9 +300,11 @@ async function importTensorFromJson(req, res) {
       description || null,
       visibility || 'private',
       JSON.stringify(dims),
-      JSON.stringify(metadata),
+      metaStr,
     ],
-  );
+    );
+    return { kind: 'dataset', refType: 'dataset', refId: r.insertId, size: quota.datasetRowBytes(metaStr, dims, description) };
+  }).then((o) => ({ insertId: o.refId }));
 
   await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [req.user.id]);
 
@@ -304,15 +314,17 @@ async function importTensorFromJson(req, res) {
 
 // POST /datasets/import
 async function smartImport(req, res) {
+  const tmpFile = req.file && req.file.path;
   try {
     // New JSON-tensor path (3D/4D+ pasted data): no file is sent, the body
     // is a JSON object carrying the already-assembled nested-array tensor.
     // The classic multipart/form-data (CSV) flow below is untouched.
     if (!req.file && req.is('application/json') && req.body && (req.body.data_type === 'tensor' || Array.isArray(req.body.tensor))) {
-      return importTensorFromJson(req, res);
+      return await importTensorFromJson(req, res);
     }
 
     if (!req.file) return R.badRequest(res, 'Arquivo não enviado.');
+    await quota.precheck(req.user.id, req.file.size); // máximo por arquivo e espaço livre, antes de interpretar o arquivo
     const { name, description, visibility, separator: forceSep } = req.body;
     const dsUuid = uuidv4();
 
@@ -359,33 +371,37 @@ async function smartImport(req, res) {
       },
     };
 
-    const [result] = await db.query(
-      `INSERT INTO datasets
-         (uuid, user_id, name, description, visibility, data_type, dimensions,
-          x_points, x_min, x_max, file_format, storage_path,
-          metadata, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?, NOW(), NOW())`,
-      [
-        dsUuid,
-        req.user.id,
-        dsName,
-        description || null,
-        visibility || 'private',
-        dataType,
-        JSON.stringify(dimensions),
-        analysis.x_points || null,
-        analysis.x_min,
-        analysis.x_max,
-        req.file.path,
-        JSON.stringify(metadata),
-      ],
-    );
+    // o arquivo original vai para o storage e a matriz interpretada fica no banco; os dois contam na cota
+    const metaStr = JSON.stringify(metadata);
+    const fileKey = `datasets/${dsUuid}${path.extname(req.file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8) || '.csv'}`;
+    const total = quota.datasetRowBytes(metaStr, dimensions, description) + req.file.size;
+    const result = await quota.guard(req.user.id, total, async () => {
+      await storage.putFile(fileKey, req.file.path, { contentType: 'text/csv' });
+      try {
+        const [r] = await db.query(
+          `INSERT INTO datasets
+             (uuid, user_id, name, description, visibility, data_type, dimensions,
+              x_points, x_min, x_max, file_format, storage_path,
+              metadata, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?, NOW(), NOW())`,
+          [
+            dsUuid, req.user.id, dsName, description || null, visibility || 'private', dataType,
+            JSON.stringify(dimensions), analysis.x_points || null, analysis.x_min, analysis.x_max,
+            fileKey, metaStr,
+          ],
+        );
+        return { kind: 'dataset', refType: 'dataset', refId: r.insertId, key: fileKey, size: total };
+      } catch (e) { await storage.remove(fileKey).catch(() => {}); throw e; }
+    }, { fileBytes: req.file.size }).then((o) => ({ insertId: o.refId }));
 
     await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [req.user.id]);
 
     const [rows2] = await db.query('SELECT * FROM datasets WHERE id = ?', [result.insertId]);
     return R.created(res, rows2[0]);
-  } catch (err) { return R.serverError(res, err); }
+  } catch (err) {
+    if (quota.handleError(res, err)) return undefined;
+    return R.serverError(res, err);
+  } finally { if (tmpFile) fs.promises.unlink(tmpFile).catch(() => {}); }
 }
 
 // GET /datasets/:id
@@ -406,16 +422,14 @@ async function copyDataset(req, res) {
     if (!(await guardDataset(req, res, ds, LEVEL.READ))) return;
 
     const uuid = uuidv4();
-    // Arquivo em disco (importações de arquivo) é copiado; variáveis coladas vivem no metadata.
-    let storagePath = ds.storage_path;
-    if (storagePath) {
-      const candidates = [storagePath, path.join(storageCfg.base, storagePath)];
-      const src = candidates.find((c) => fs.existsSync(c) && fs.statSync(c).isFile());
-      if (src) {
-        fs.mkdirSync(storageCfg.datasets, { recursive: true });
-        storagePath = path.join(storageCfg.datasets, `${uuid}${path.extname(src)}`);
-        fs.copyFileSync(src, storagePath);
-      }
+    // Arquivo guardado (importações de arquivo) é copiado dentro do storage; variáveis coladas vivem no metadata.
+    // A cópia conta na cota de quem copia (decisão de produto: tudo que entra no Workspace conta).
+    let newKey = null;
+    let fileSize = 0;
+    if (ds.storage_path) {
+      const srcKey = `datasets/${path.basename(ds.storage_path)}`;
+      const st = await storage.stat(srcKey);
+      if (st) { fileSize = st.size; newKey = `datasets/${uuid}${path.extname(srcKey)}`; }
     }
     const name = (req.body && req.body.name ? String(req.body.name) : ds.name).slice(0, 255);
     const cols = ['uuid', 'user_id', 'name', 'description', 'visibility', 'data_type', 'technique', 'x_unit', 'y_unit', 'spectra_count',
@@ -426,17 +440,25 @@ async function copyDataset(req, res) {
       if (c === 'user_id') return req.user.id;
       if (c === 'name') return name;
       if (c === 'visibility') return 'private';
-      if (c === 'storage_path') return storagePath;
+      if (c === 'storage_path') return newKey;
       const v = ds[c];
       return v !== null && typeof v === 'object' && !(v instanceof Date) ? JSON.stringify(v) : v;
     });
-    const [result] = await db.query(
-      `INSERT INTO datasets (${cols.join(', ')}, created_at, updated_at) VALUES (${cols.map(() => '?').join(', ')}, NOW(), NOW())`, vals,
-    );
+    const total = quota.datasetRowBytes(...[ds.metadata, ds.dimensions, ds.mode_labels, ds.mode_ranges, ds.augmentation_scheme, ds.reference_labels, ds.description]
+      .map((v) => (v !== null && typeof v === 'object' ? JSON.stringify(v) : v))) + fileSize;
+    const out = await quota.guard(req.user.id, total, async () => {
+      if (newKey) await storage.copy(`datasets/${path.basename(ds.storage_path)}`, newKey);
+      try {
+        const [r] = await db.query(
+          `INSERT INTO datasets (${cols.join(', ')}, created_at, updated_at) VALUES (${cols.map(() => '?').join(', ')}, NOW(), NOW())`, vals,
+        );
+        return { kind: 'dataset', refType: 'dataset', refId: r.insertId, key: newKey, size: total };
+      } catch (e) { if (newKey) await storage.remove(newKey).catch(() => {}); throw e; }
+    }, { fileBytes: fileSize });
     await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [req.user.id]);
-    const [rows] = await db.query('SELECT * FROM datasets WHERE id = ?', [result.insertId]);
+    const [rows] = await db.query('SELECT * FROM datasets WHERE id = ?', [out.refId]);
     return R.created(res, rows[0]);
-  } catch (err) { return R.serverError(res, err); }
+  } catch (err) { if (quota.handleError(res, err)) return undefined; return R.serverError(res, err); }
 }
 
 // PUT /datasets/:id
@@ -457,10 +479,25 @@ async function updateDataset(req, res) {
     }
     if (!fields.length) return R.badRequest(res, 'Nenhum campo para atualizar.');
     values.push(ds.id);
-    await db.query(`UPDATE datasets SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`, values);
+
+    // se o conteúdo (metadata) muda de tamanho, a cota do dono acompanha — crescer precisa caber
+    let resized = null;
+    if (req.body.metadata !== undefined) {
+      const [[cur]] = await db.query('SELECT COALESCE(LENGTH(CAST(metadata AS CHAR)), 0) AS len FROM datasets WHERE id = ?', [ds.id]);
+      const newLen = Buffer.byteLength(typeof req.body.metadata === 'object' ? JSON.stringify(req.body.metadata) : String(req.body.metadata));
+      const before = await quota.sizeOfRef('dataset', ds.id);
+      resized = { before, target: Math.max(0, before - Number(cur.len) + newLen) };
+      if (resized.target !== before) await quota.resize(ds.user_id, 'dataset', ds.id, resized.target, { kind: 'dataset' });
+    }
+    try {
+      await db.query(`UPDATE datasets SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`, values);
+    } catch (e) {
+      if (resized && resized.target !== resized.before) await quota.resize(ds.user_id, 'dataset', ds.id, resized.before, { kind: 'dataset' }).catch(() => {});
+      throw e;
+    }
     const [rows] = await db.query('SELECT * FROM datasets WHERE id = ?', [ds.id]);
     return R.ok(res, rows[0]);
-  } catch (err) { return R.serverError(res, err); }
+  } catch (err) { if (quota.handleError(res, err)) return undefined; return R.serverError(res, err); }
 }
 
 // DELETE /datasets/:id
@@ -470,6 +507,9 @@ async function deleteDataset(req, res) {
     if (!ds) return R.notFound(res, 'Dataset');
     if (ds.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
     await db.query('UPDATE datasets SET deleted_at = NOW() WHERE id = ?', [ds.id]);
+    // devolve o espaço à cota e apaga o arquivo guardado (o conteúdo no banco é limpo pelo expurgo periódico)
+    try { for (const k of await quota.freeByRef('dataset', ds.id)) await storage.remove(k).catch(() => {}); }
+    catch (e) { console.warn('[dataset] liberar cota:', e.message); }
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }

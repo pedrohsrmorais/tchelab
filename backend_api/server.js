@@ -13,12 +13,7 @@ const storageConfig = require('./src/config/storage.config');
 
 const apiRouter  = require('./src/routes/api.routes');
 
-// ─── Ensure storage directories exist ────────────────────────────────────────
-Object.values(storageConfig).forEach((dir) => {
-  if (typeof dir === 'string') {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+const storage = require('./src/services/storage');
 
 const app  = express();
 const PORT = process.env.PORT || 3003;
@@ -138,7 +133,18 @@ const distPath = process.env.FRONTEND_DIST
 
 // Avatares são públicos (aparecem em perfis/listas); demais arquivos do
 // storage (datasets, PDFs de comunidades…) passam por rotas autenticadas.
-app.use('/storage/avatars', express.static(storageConfig.avatars, { index: false, maxAge: '1h' }));
+app.get('/storage/avatars/:name', async (req, res) => {
+  try {
+    const name = path.basename(req.params.name);
+    const ext = path.extname(name).toLowerCase();
+    const type = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' }[ext];
+    if (!type) return res.status(404).end();
+    const stream = await storage.getStream(`avatars/${name}`);
+    res.set({ 'Content-Type': type, 'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+    stream.on('error', () => res.destroy());
+    return stream.pipe(res);
+  } catch { return res.status(404).end(); }
+});
 
 app.use(express.static(distPath, { index: false }));
 
@@ -173,7 +179,10 @@ app.use((err, req, res, next) => {
 // ─── Startup ─────────────────────────────────────────────────────────────────
 // Migrações idempotentes antes de aceitar tráfego (ver src/config/migrate.js).
 // Uma falha aqui é logada mas não impede a API de subir.
-require('./src/config/migrate').migrate()
+storage.init()
+  .then(() => console.log(`[storage] driver ${storage.driver}`))
+  .catch((err) => console.error('[storage] falha ao inicializar:', err.message))
+  .then(() => require('./src/config/migrate').migrate())
   .catch((err) => console.error('[migrate] falhou:', err.message))
   .finally(() => {
     app.listen(PORT, () => {

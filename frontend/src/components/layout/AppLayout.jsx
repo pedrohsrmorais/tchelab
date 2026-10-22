@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import Sidebar from './Sidebar';
 import { useAuthStore } from '../../store/auth';
 import { useTheme } from '../../context/ThemeContext';
+import QuotaDialog from '../storage/QuotaDialog';
+import { wireStorageEvents } from '../../store/storage';
 
 function ContentLoader() {
   const { t } = useTranslation();
@@ -42,6 +44,9 @@ export default function AppLayout() {
   const [initialLoading, setInitialLoading]     = useState(true);
   const { fetchMe } = useAuthStore();
   const { theme } = useTheme();
+
+  // Medidor de armazenamento: atualiza no foco, por intervalo e após escritas; QuotaDialog abre em 413.
+  useEffect(() => wireStorageEvents(), []);
 
   const location = useLocation();
   const outlet    = useOutlet(); // elemento da rota atualmente casada (via <Outlet/>)
@@ -151,6 +156,7 @@ export default function AppLayout() {
           </div>
         )}
       </main>
+      <QuotaDialog />
     </div>
   );
 }

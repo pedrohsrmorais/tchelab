@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   User, Lock, Save, Eye, EyeOff, Camera, Trash2, Globe, Palette, ShieldCheck, ExternalLink,
-  GraduationCap, Building2, Mail, Cake, Check, Link2,
+  GraduationCap, Building2, Mail, Cake, Check, Link2, HardDrive,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,9 @@ import Avatar from '../components/ui/Avatar';
 import { COVERS, COVER_KEYS, coverBackground } from '../config/profileCovers';
 import { parseApiError } from '../utils/errors';
 
-const TABS = ['profile', 'preferences', 'security'];
+import StorageBreakdown from '../components/storage/StorageBreakdown';
+
+const TABS = ['profile', 'preferences', 'security', 'storage'];
 
 function Field({ label, hint, error, children, htmlFor }) {
   return (
@@ -48,7 +50,9 @@ export default function ProfilePage() {
   const { t, i18n } = useTranslation();
   const { user, setUser, savePreferences, isPlus, isAdmin } = useAuthStore();
   const { theme, setTheme } = useTheme();
-  const [tab, setTab] = useState('profile');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => (TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'profile'));
+  useEffect(() => { const q = searchParams.get('tab'); if (TABS.includes(q)) setTab(q); }, [searchParams]);
   const fileRef = useRef(null);
 
   const fromUser = (u) => ({
@@ -339,6 +343,16 @@ export default function ProfilePage() {
               <GraduationCap className="inline w-3 h-3 mr-1" /><Building2 className="inline w-3 h-3 mr-1" />{t('account.alwaysPublic')}
             </p>
           </div>
+        </div>
+      )}
+
+      {tab === 'storage' && (
+        <div className="card p-6">
+          <h2 className="text-base font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            <HardDrive className="w-4 h-4" style={{ color: 'var(--text-accent)' }} /> {t('storage.title')}
+          </h2>
+          <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>{t('storage.intro')}</p>
+          <StorageBreakdown />
         </div>
       )}
 

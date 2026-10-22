@@ -1,5 +1,6 @@
 import boardStrings from './board.strings.js';
 import catalogStrings from './catalog.strings.js';
+import storageStrings from './storage.strings.js';
 
 // Chaves novas (perfil, comunidades, projetos compartilhados).
 // Fonte única em tuplas [pt, en, es] — garante paridade entre os três idiomas.
@@ -687,6 +688,7 @@ const T = {
 
 Object.assign(T, boardStrings);
 Object.assign(T, catalogStrings);
+Object.assign(T, storageStrings);
 
 const build = (idx) => {
   const out = {};

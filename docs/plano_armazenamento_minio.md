@@ -48,8 +48,8 @@ conversa de 22/10/2026 (resumo no fim deste arquivo).
 | Conta na cota | Não conta |
 |---|---|
 | Objetos do usuário no bucket: datasets, saídas de execução guardadas, modelos, PDFs de artigo, avatar | Linhas pequenas do MySQL (nomes, configurações, comentários) |
-| JSON grande que sobrar no MySQL (`datasets.metadata`, `execution_nodes.*`), medido em bytes | Datasets públicos/da plataforma usados **por referência** (ver pergunta 1) |
-| Arquivos de comunidade (ver pergunta 2) | Arquivos temporários (`tmp/`), que expiram sozinhos |
+| JSON grande que sobrar no MySQL (`datasets.metadata`, `execution_nodes.*`), medido em bytes | Datasets de outras pessoas apenas **visualizados/usados em workflow sem copiar** (cópia e importação contam) |
+| Arquivos de comunidade, na cota de quem enviou | Arquivos temporários (`tmp/`), que expiram sozinhos |
 
 Para a cota ficar previsível, o MySQL passa a ter **teto por linha** (ex.: 1 MB de JSON por dataset/execução);
 acima disso o dado vai para o bucket.
@@ -88,8 +88,7 @@ PDF/material de comunidade, avatar, foto de equipamento, salvar modelo.
 - **Diálogo de bloqueio**: lista dos datasets do usuário ordenados por tamanho, com botão de excluir; e, no futuro, o
   botão "Aumentar espaço".
 - **Leitura nunca é bloqueada**: com a cota cheia o usuário ainda abre, consulta, baixa e **exclui**. Só gravar é
-  recusado. Execução de workflow que gera saída guardada é recusada com mensagem clara (a saída temporária continua
-  funcionando, ver pergunta 3).
+  recusado. Execução de workflow é recusada com mensagem clara quando não há espaço mínimo livre.
 - **Admin**: tela de uso por usuário, ajuste de cota/plano, e painel de capacidade (ver 3.6).
 
 ### 3.5 Limpeza (resolve o item 4)
@@ -97,7 +96,7 @@ PDF/material de comunidade, avatar, foto de equipamento, salvar modelo.
 - Prefixo `tmp/` com **ciclo de vida de 24 h** (política do bucket, funciona igual no S3).
 - **Lixeira**: excluir dataset marca `deleted_at` e a cota é devolvida na hora (ou após N dias, se preferir lixeira
   que conta); um job diário apaga o objeto de verdade depois de N dias.
-- **Saídas de execução** com expiração (ex.: 30 dias) a menos que o usuário "salve como dataset/modelo".
+- **Saídas de execução** não expiram (decisão 3): o usuário vê quanto cada uma ocupa e exclui.
 - **Reconciliação semanal**: compara `storage_objects` × bucket × `users.storage_used_bytes`, corrige divergência,
   remove órfãos e gera relatório.
 
@@ -106,8 +105,7 @@ PDF/material de comunidade, avatar, foto de equipamento, salvar modelo.
 - Painel admin com **cota alocada × capacidade real** do volume (ex.: 40 usuários × 500 MB = 20 GB alocados de 200 GB)
   e razão de sobrealocação configurável.
 - **Trava global**: se o disco do MinIO passar de 90%, novas gravações são recusadas para todos, com aviso ao admin.
-- Limite por arquivo e por tipo (hoje 2 GB sem processamento real) passa a vir do plano, com valor inicial realista
-  (ex.: 100–200 MB), e o parser lê em streaming.
+- Limite por arquivo (hoje 2 GB sem processamento real) passa a vir do plano: **20 MB** no Beta; o parser lê em streaming.
 
 ## 4. Custo por usuário (armazenamento + processamento + memória)
 
@@ -133,11 +131,13 @@ AWS e no custo real do seu servidor/disco).
 
 ## 5. Fases de execução
 
+> Status (22/10/2026): fases 1 e 2 entregues — ver `armazenamento.md`. As chaves mantiveram a pasta por tipo (`datasets/`, `communities/`…) em vez de `u/<usuario>/…`; o dono fica em `storage_objects`. O backfill (`backend_api/scripts/storage_backfill.js`) já cobre parte da fase 5.
+
 | Fase | Entrega | Resolve | Risco |
 |---|---|---|---|
-| **0** | Decidir as 4 perguntas abaixo; fixar cota/limites do plano Beta; medir tamanho real dos dados atuais | — | baixo |
-| **1** | MinIO no compose (+ bucket e chaves no bootstrap), `StorageService` (drivers local e s3), testes do driver | base | baixo |
-| **2** | Cota: tabelas, reserva/confirmação/liberação, erro padronizado, endpoint `GET /storage/usage`, medidor no perfil/sidebar, diálogo de bloqueio, admin de cotas; ligada primeiro em **uploads de arquivo** (comunidade, avatar, equipamento, PDF) | item 6 + cota | médio |
+| **0** | Decisões fechadas (seção 6); medir tamanho real dos dados atuais | — | baixo |
+| **1** ✅ | MinIO no compose (+ bucket e chaves no bootstrap), `StorageService` (drivers local e s3), testes do driver | base | baixo |
+| **2** ✅ | Cota: tabelas, reserva/confirmação/liberação, erro padronizado, endpoint `GET /storage/usage`, medidor no perfil/sidebar, diálogo de bloqueio, admin de cotas; ligada primeiro em **uploads de arquivo** (comunidade, avatar, equipamento, PDF) | item 6 + cota | médio |
 | **3** | Datasets e saídas no bucket (`.npy` + resumo/prévia no MySQL); importação em streaming; `dispatch` por referência; worker lendo do bucket (credencial própria); teto de JSON por linha | itens 3 e teto de 10 MB | **alto** (toca o caminho de execução) |
 | **4** | Limpeza: lifecycle de `tmp/`, lixeira, expiração de saídas, reconciliação semanal | item 4 | baixo |
 | **5** | Migração dos dados atuais (script com `--dry-run`, idempotente, com verificação de hash/tamanho e driver `local` como leitura de segurança até concluir) | — | médio |
@@ -147,16 +147,21 @@ AWS e no custo real do seu servidor/disco).
 Cada fase fecha com build, testes e commit próprio. As fases 1–2 já entregam valor sozinhas (cota funcionando para
 arquivos); a 3 é a mais delicada e a que remove o teto de 10 MB.
 
-## 6. Perguntas que mudam o desenho
+## 6. Decisões tomadas (22/10/2026)
 
-1. **Importar da plataforma** (dataset público/da comunidade): conta na cota de quem importa? Sugestão: usar **por
-   referência não conta**; **copiar** para o Workspace conta (copia-na-escrita).
-2. **Arquivos de comunidade**: quem paga, o professor que enviou ou o dono da comunidade? Sugestão: o dono da
-   comunidade (é quem contrata a licença).
-3. **Saídas de execução**: contam na cota com expiração (30 dias) ou são temporárias e só "Salvar como dataset" conta?
-   Sugestão: temporárias por 7 dias fora da cota; salvar conta.
-4. **Cota inicial do plano Beta** e **tamanho máximo por arquivo** (sugestão de partida: 500 MB por usuário e 100 MB por
-   arquivo, ajustáveis sem deploy).
+1. **Tudo que entra no Workspace conta na cota**, inclusive cópia/importação de dataset da plataforma ou de comunidade
+   e variáveis geradas por operações.
+2. **Arquivo de comunidade conta na cota de quem enviou** (professor ou aluno).
+3. **Saídas de execução contam na cota e não expiram**: o usuário libera espaço excluindo. Consequências adotadas:
+   - o MySQL deixa de guardar a **entrada** de cada nó (só referência), para a mesma matriz não ser cobrada duas vezes;
+   - **teto de saída por job** (20 MB, igual ao teto por arquivo) para uma execução não estourar a cota de uma vez;
+   - antes de executar, a plataforma confere se há espaço mínimo livre; sem espaço, bloqueia a execução e mostra o
+     diálogo de "liberar espaço". Se a saída final não couber, o nó falha com `STORAGE_QUOTA_EXCEEDED` (não grava
+     parcial).
+4. **Plano Beta: 100 MB por usuário e 20 MB por arquivo** (configurável por plano e por usuário, sem deploy).
+
+Com 100 MB de cota, cuidar do consumo vira parte da experiência: o medidor de uso e a lista "o que ocupa espaço"
+(datasets e saídas, por tamanho) são parte da entrega da fase 2, não um extra.
 
 ## 7. Apêndice: situação atual (resumo)
 

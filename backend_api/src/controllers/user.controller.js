@@ -3,7 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../config/db.config');
-const storage = require('../config/storage.config');
+const storage = require('../services/storage');
+const quota = require('../services/quota.service');
 const R = require('../utils/response');
 const { avatarUpload } = require('../utils/multer');
 const profile = require('../utils/userProfile');
@@ -103,11 +104,14 @@ async function updateUser(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
-/** Remove um arquivo de avatar antigo (só dentro da pasta de avatares). */
-function removeAvatarFile(avatarUrl) {
+/** Remove o arquivo de avatar antigo do storage e devolve o espaço dele à cota. */
+async function removeAvatarFile(avatarUrl, userId) {
   if (!avatarUrl || !avatarUrl.startsWith('/storage/avatars/')) return;
-  const file = path.join(storage.avatars, path.basename(avatarUrl.split('?')[0]));
-  fs.promises.unlink(file).catch(() => {});
+  const key = `avatars/${path.basename(avatarUrl.split('?')[0])}`;
+  try {
+    await quota.freeByKey(key, { reason: 'remove' });
+    await storage.remove(key);
+  } catch (e) { console.warn('[avatar] não foi possível remover o avatar antigo:', e.message); }
 }
 
 /** Multer com resposta 422 amigável em vez de 500. */
@@ -121,16 +125,30 @@ function avatarMiddleware(req, res, next) {
 
 // POST /users/:id/avatar
 async function uploadAvatar(req, res) {
+  const tmp = req.file && req.file.path;
   try {
     if (!req.file) return R.unprocessable(res, [{ field: 'avatar', message: 'Arquivo de avatar não enviado.' }]);
     const user = await findUser(req);
-    if (!user) { fs.promises.unlink(req.file.path).catch(() => {}); return R.notFound(res, 'Usuário'); }
+    if (!user) return R.notFound(res, 'Usuário');
 
-    const avatarUrl = `/storage/avatars/${path.basename(req.file.path)}`;
-    await db.query('UPDATE users SET avatar_url = ?, updated_at = NOW() WHERE id = ?', [avatarUrl, user.id]);
-    removeAvatarFile(user.avatar_url);
+    const name = path.basename(req.file.path); // já vem como avatar-<id>-<timestamp>.<ext>
+    const key = `avatars/${name}`;
+    const avatarUrl = `/storage/avatars/${name}`;
+    // a foto conta na cota de quem é o dono do perfil
+    await quota.guard(user.id, req.file.size, async () => {
+      await storage.putFile(key, req.file.path, { contentType: req.file.mimetype });
+      try {
+        const [r] = await db.query('UPDATE users SET avatar_url = ?, updated_at = NOW() WHERE id = ?', [avatarUrl, user.id]);
+        if (!r.affectedRows) throw new Error('usuário não encontrado');
+      } catch (e) { await storage.remove(key).catch(() => {}); throw e; }
+      return { kind: 'avatar', refType: 'user_avatar', refId: user.id, key, size: req.file.size };
+    });
+    await removeAvatarFile(user.avatar_url, user.id);
     return R.ok(res, { avatar_url: avatarUrl });
-  } catch (err) { return R.serverError(res, err); }
+  } catch (err) {
+    if (quota.handleError(res, err)) return undefined;
+    return R.serverError(res, err);
+  } finally { if (tmp) fs.promises.unlink(tmp).catch(() => {}); }
 }
 
 // DELETE /users/:id/avatar
@@ -139,7 +157,7 @@ async function deleteAvatar(req, res) {
     const user = await findUser(req);
     if (!user) return R.notFound(res, 'Usuário');
     await db.query('UPDATE users SET avatar_url = NULL, updated_at = NOW() WHERE id = ?', [user.id]);
-    removeAvatarFile(user.avatar_url);
+    await removeAvatarFile(user.avatar_url, user.id);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }

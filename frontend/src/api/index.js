@@ -14,6 +14,15 @@ const delb  = (url, data)   => client.delete(url, { data });
 
 export const api = {
 
+  // ── Armazenamento por usuário (cota) ──────────────────────────────────────
+  storage: {
+    usage:       (details)   => get('/storage/usage', details ? { details: 1, limit: 30 } : undefined),
+    adminOverview: ()        => get('/admin/storage'),
+    plans:       ()          => get('/admin/storage/plans'),
+    updatePlan:  (code, d)   => put(`/admin/storage/plans/${code}`, d),
+    updateUser:  (uuid, d)   => put(`/admin/storage/users/${uuid}`, d),
+  },
+
   // ── Quadro (gestão do lab) ────────────────────────────────────────────────
   boards: {
     list:        (cid, today)            => get(`/communities/${cid}/boards`, { today }),
@@ -299,6 +308,7 @@ export const api = {
   executions: {
     get:             (id)      => get(`/executions/${id}`),
     cancel:          (id)      => post(`/executions/${id}/cancel`),
+    delete:          (id)      => del(`/executions/${id}`),
     nodes:           (id)      => get(`/executions/${id}/nodes`),
     getNode:         (id, nid) => get(`/executions/${id}/nodes/${nid}`),
     logs:            (id)      => get(`/executions/${id}/logs`),

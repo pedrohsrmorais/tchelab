@@ -4,7 +4,9 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const db = require('../config/db.config');
 const jobService = require('../services/job.service');
-const storage = require('../config/storage.config');
+const fs = require('fs');
+const storage = require('../services/storage');
+const quota = require('../services/quota.service');
 const R = require('../utils/response');
 
 async function resolveArticle(uuid) {
@@ -64,29 +66,42 @@ async function createArticle(req, res) {
 
 // POST /articles/upload
 async function uploadPDF(req, res) {
+  const tmp = req.file && req.file.path;
   try {
     if (!req.file) return R.badRequest(res, 'Arquivo PDF não enviado.');
 
     const uuid = uuidv4();
-    const pdfDest = path.join(storage.articles, `${uuid}.pdf`);
+    const key = `articles/${uuid}.pdf`;
 
-    const [result] = await db.query(
-      `INSERT INTO articles
-         (uuid, user_id, pdf_path, extraction_status, created_at, updated_at)
-       VALUES (?, ?, ?, 'pending', NOW(), NOW())`,
-      [uuid, req.user.id, pdfDest],
-    );
-
-    const { id: jobId, uuid: jobUuid } = await jobService.createJob({
-      job_type: 'extract_pdf',
-      user_id: req.user.id,
-      article_id: result.insertId,
-      payload: { tmp_path: req.file.path, dest_path: pdfDest, article_uuid: uuid },
+    // o PDF conta na cota de quem enviou; grava no storage antes de criar o registro
+    const done = await quota.guard(req.user.id, req.file.size, async () => {
+      await storage.putFile(key, req.file.path, { contentType: 'application/pdf' });
+      let articleId;
+      try {
+        const [result] = await db.query(
+          `INSERT INTO articles
+             (uuid, user_id, pdf_path, extraction_status, created_at, updated_at)
+           VALUES (?, ?, ?, 'pending', NOW(), NOW())`,
+          [uuid, req.user.id, key],
+        );
+        articleId = result.insertId;
+      } catch (e) { await storage.remove(key).catch(() => {}); throw e; }
+      return { kind: 'article_pdf', refType: 'article', refId: articleId, key, size: req.file.size };
     });
 
-    const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [result.insertId]);
+    const { uuid: jobUuid } = await jobService.createJob({
+      job_type: 'extract_pdf',
+      user_id: req.user.id,
+      article_id: done.refId,
+      payload: { storage_key: key, article_uuid: uuid },
+    });
+
+    const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [done.refId]);
     return R.accepted(res, { article: rows[0], job_id: jobUuid });
-  } catch (err) { return R.serverError(res, err); }
+  } catch (err) {
+    if (quota.handleError(res, err)) return undefined;
+    return R.serverError(res, err);
+  } finally { if (tmp) fs.promises.unlink(tmp).catch(() => {}); }
 }
 
 // GET /articles/:id
@@ -130,6 +145,8 @@ async function deleteArticle(req, res) {
     if (article.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
     await db.query('UPDATE articles SET deleted_at = NOW() WHERE id = ?', [article.id]);
     await db.query('DELETE FROM project_articles WHERE article_id = ?', [article.id]);
+    // devolve o espaço do PDF e apaga o arquivo
+    try { for (const k of await quota.freeByRef('article', article.id)) await storage.remove(k).catch(() => {}); } catch (e) { console.warn('[article] liberar cota:', e.message); }
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
