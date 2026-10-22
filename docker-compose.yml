@@ -68,6 +68,20 @@ services:
       retries: 10
     networks: [tchelab]
 
+  # MinIO: armazenamento de objetos compatível com S3 (arquivos dos usuários). Fica só na rede interna;
+  # o console (porta 9001) não é publicado — acesse por túnel SSH ou publique atrás de autenticação.
+  # Para migrar para a AWS: STORAGE_DRIVER=s3, S3_ENDPOINT vazio, S3_FORCE_PATH_STYLE=false e as chaves da AWS no .env.
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    networks: [tchelab]
+
   backend:
     build:
       context: .
@@ -78,6 +92,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        # a imagem do MinIO não traz curl/mc para healthcheck; o backend tenta de novo ao iniciar (storage.init)
+        condition: service_started
     environment:
       <<: [*mysql-env, *queue-env]
       PORT: "3003"
@@ -93,6 +110,16 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
       DB_POOL_MAX: ${DB_POOL_MAX:-20}
       STORAGE_PATH: /app/storage
+      # Arquivos dos usuários: MinIO (S3). `local` volta a gravar em STORAGE_PATH (só desenvolvimento).
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-s3}
+      S3_ENDPOINT: ${S3_ENDPOINT-http://minio:9000}
+      S3_BUCKET: ${S3_BUCKET:-tchelab}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      # Capacidade provisionada para o armazenamento (bytes). Usada no painel "cota alocada × capacidade".
+      S3_CAPACITY_BYTES: ${S3_CAPACITY_BYTES:-0}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-TcheLab <onboarding@resend.dev>}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
@@ -122,6 +149,7 @@ volumes:
   mysql_data:
   redis_data:
   storage_data:
+  minio_data:
 
 networks:
   tchelab:
