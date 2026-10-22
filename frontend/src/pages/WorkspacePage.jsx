@@ -22,6 +22,7 @@ import React, {
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import client from '../api/client';
+import { api } from '../api';
 import TechniqueModal from '../components/ui/TechniqueModal';
 import {
   Play, Trash2, Plus, Eye, Terminal, RefreshCw,
@@ -80,6 +81,9 @@ const tensorPreview = (metadata) => {
   } catch { return null; }
 };
 
+/** Erro com chave i18n — traduzido por quem captura (ver ImportModal). */
+const i18nError = (key, vars) => Object.assign(new Error(key), { i18n: [key, vars] });
+
 const parseInline = (text) => {
   const cleaned = text.trim().replace(/\s+/g, ' ');
   const rowTexts = cleaned.split(';').map(r => r.trim()).filter(Boolean);
@@ -87,13 +91,13 @@ const parseInline = (text) => {
   const rows = rowTexts.map(r =>
     r.split(',').map(v => {
       const n = parseFloat(v.trim());
-      if (isNaN(n)) throw new Error(`Valor inválido: "${v.trim()}"`);
+      if (isNaN(n)) throw i18nError('workspace.invalidValue', { value: v.trim() });
       return n;
     })
   );
   if (rows.length === 1) return { tensor: rows[0], dimensions: [rows[0].length] };
   const cols = rows[0].length;
-  if (!rows.every(r => r.length === cols)) throw new Error('Número de colunas inconsistente.');
+  if (!rows.every(r => r.length === cols)) throw i18nError('workspace.inconsistentCols');
   return { tensor: rows, dimensions: [rows.length, cols] };
 };
 
@@ -375,6 +379,7 @@ function ConsoleLine({ e, s }) {
 
 /** Preview da variável no estilo Variable Editor do MATLAB */
 function VarEditor({ variable, s, theme }) {
+  const { t: tr } = useTranslation();
   const cl = theme === 'classic';
   const dims = pj(variable.dimensions, []);
   const meta = pj(variable.metadata, {});
@@ -439,13 +444,13 @@ function VarEditor({ variable, s, theme }) {
           </table>
           {(dims[0] > 12 || (dims[1] && dims[1] > 12)) && (
             <p style={{ fontSize: '0.67rem', color: 'var(--text-muted)', padding: '4px 8px', background: cl ? '#f8f8f8' : 'transparent' }}>
-              Exibindo até 12×12 de {fmtSizeMat(dims)}
+              {tr('workspace.showingUpTo', { size: fmtSizeMat(dims) })}
             </p>
           )}
         </div>
       ) : (
         <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-          Sem dados numéricos para exibir.
+          {tr('workspace.noNumeric')}
         </div>
       )}
     </div>
@@ -455,6 +460,7 @@ function VarEditor({ variable, s, theme }) {
 // ─── Modal de Import ──────────────────────────────────────────────────────────
 
 function ImportModal({ onClose, onImported, s, theme }) {
+  const { t: tr } = useTranslation();
   const cl = theme === 'classic';
   const [tab, setTab] = useState('inline');
   const [name, setName] = useState('');
@@ -467,25 +473,26 @@ function ImportModal({ onClose, onImported, s, theme }) {
   async function submit() {
     setError('');
     const varName = name.trim();
-    if (!varName) return setError('Dê um nome à variável.');
+    if (!varName) return setError(tr('workspace.needName'));
     setLoading(true);
+    let created = null;
     try {
       if (tab === 'inline') {
-        if (!raw.trim()) { setError('Insira os dados.'); setLoading(false); return; }
+        if (!raw.trim()) { setError(tr('workspace.needData')); setLoading(false); return; }
         let parsed;
-        try { parsed = parseInline(raw); } catch (e) { setError(e.message); setLoading(false); return; }
-        await client.post('/datasets/import', { name: varName, tensor: parsed.tensor, dimensions: parsed.dimensions });
+        try { parsed = parseInline(raw); } catch (e) { setError(e.i18n ? tr(...e.i18n) : e.message); setLoading(false); return; }
+        created = await client.post('/datasets/import', { name: varName, tensor: parsed.tensor, dimensions: parsed.dimensions });
       } else {
-        if (!file) { setError('Selecione um arquivo.'); setLoading(false); return; }
+        if (!file) { setError(tr('workspace.needFile')); setLoading(false); return; }
         const form = new FormData();
         form.append('file', file);
         form.append('name', varName);
-        await client.post('/datasets/import', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        created = await client.post('/datasets/import', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       }
-      onImported(varName);
+      onImported(varName, created?.data?.data?.uuid);
       onClose();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || 'Erro ao importar.');
+      setError(e.response?.data?.error?.message || e.response?.data?.message || e.message || tr('workspace.importError'));
     } finally { setLoading(false); }
   }
 
@@ -502,7 +509,7 @@ function ImportModal({ onClose, onImported, s, theme }) {
         {/* Title bar */}
         <div style={{ background: hdrBg, padding: cl ? '4px 10px' : '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ color: hdrColor, fontSize: cl ? '0.82rem' : '0.875rem', fontWeight: 700, textShadow: 'none', fontFamily: cl ? 'var(--font-sans)' : 'inherit' }}>
-            Importar Variável — Workspace
+            {tr('workspace.importTitle')}
           </span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: hdrColor, cursor: 'pointer', opacity: 0.8, lineHeight: 1 }}>✕</button>
         </div>
@@ -510,47 +517,47 @@ function ImportModal({ onClose, onImported, s, theme }) {
         <div style={{ padding: cl ? '12px' : '1rem', display: 'flex', flexDirection: 'column', gap: cl ? 10 : 14 }}>
           {/* Nome */}
           <div>
-            <label style={s.label}>Nome da variável</label>
-            <input style={s.input} placeholder="ex: X" autoFocus
+            <label style={s.label}>{tr('workspace.varName')}</label>
+            <input style={s.input} placeholder={tr('workspace.varNamePh')} autoFocus
               value={name} onChange={e => setName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} />
           </div>
 
           {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: `1px solid ${cl ? '#ccc' : 'var(--border)'}`, marginBottom: -1 }}>
-            {[{ id: 'inline', label: '  Inline', icon: Braces }, { id: 'csv', label: '  Arquivo', icon: FileText }].map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
+            {[{ id: 'inline', label: tr('workspace.tabInline'), icon: Braces }, { id: 'csv', label: tr('workspace.tabFile'), icon: FileText }].map(tb => (
+              <button key={tb.id} onClick={() => setTab(tb.id)} style={{
                 display: 'flex', alignItems: 'center', gap: 4,
                 padding: cl ? '4px 10px' : '5px 12px',
                 fontSize: cl ? '0.77rem' : '0.75rem',
-                background: tab === t.id ? (cl ? '#fff' : 'var(--bg-elevated)') : 'transparent',
-                border: cl ? `1px solid ${tab === t.id ? '#ccc' : 'transparent'}` : 'none',
-                borderBottom: tab === t.id ? `2px solid ${cl ? '#4a7fbf' : 'var(--accent)'}` : '2px solid transparent',
+                background: tab === tb.id ? (cl ? '#fff' : 'var(--bg-elevated)') : 'transparent',
+                border: cl ? `1px solid ${tab === tb.id ? '#ccc' : 'transparent'}` : 'none',
+                borderBottom: tab === tb.id ? `2px solid ${cl ? '#4a7fbf' : 'var(--accent)'}` : '2px solid transparent',
                 cursor: 'pointer',
-                color: tab === t.id ? (cl ? '#003880' : 'var(--text-accent)') : 'var(--text-muted)',
-                fontWeight: tab === t.id ? 700 : 400,
+                color: tab === tb.id ? (cl ? '#003880' : 'var(--text-accent)') : 'var(--text-muted)',
+                fontWeight: tab === tb.id ? 700 : 400,
                 borderRadius: cl ? '2px 2px 0 0' : 0,
                 marginBottom: -1,
               }}>
-                <t.icon size={11} />{t.label}
+                <tb.icon size={11} />{tb.label}
               </button>
             ))}
           </div>
 
           {tab === 'inline' && (
             <div>
-              <label style={s.label}>Dados</label>
+              <label style={s.label}>{tr('workspace.data')}</label>
               <textarea style={{ ...s.input, height: 72, resize: 'vertical', fontFamily: 'var(--font-mono)' }}
-                placeholder={'1, 2, 3, 4         ← vetor 1×4\n1, 2; 3, 4       ← matriz 2×2'}
+                placeholder={tr('workspace.dataPh')}
                 value={raw} onChange={e => setRaw(e.target.value)} />
               <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 3 }}>
-                Use <code>,</code> para colunas e <code>;</code> para linhas. Ex: <code>1,2,3</code> → 1×3 double
+                {tr('workspace.dataHint')}
               </p>
             </div>
           )}
 
           {tab === 'csv' && (
             <div>
-              <label style={s.label}>Arquivo CSV ou JSON</label>
+              <label style={s.label}>{tr('workspace.fileLabel')}</label>
               <div onClick={() => fileRef.current?.click()} style={{
                 border: cl ? '1px solid #aaa' : '2px dashed var(--border)',
                 borderRadius: cl ? 2 : 'var(--radius-sm)',
@@ -558,7 +565,7 @@ function ImportModal({ onClose, onImported, s, theme }) {
                 background: cl ? '#fff' : 'var(--bg-base)',
               }}>
                 <Upload size={18} style={{ color: 'var(--text-muted)', marginBottom: 4 }} />
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{file ? file.name : 'Clique para selecionar'}</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{file ? file.name : tr('workspace.clickSelect')}</p>
                 <input ref={fileRef} type="file" accept=".csv,.txt,.json" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0])} />
               </div>
             </div>
@@ -573,9 +580,9 @@ function ImportModal({ onClose, onImported, s, theme }) {
         </div>
 
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', padding: cl ? '8px 12px' : '0.65rem 1rem', borderTop: cl ? '1px solid #ccc' : '1px solid var(--border)', background: cl ? '#ece8e0' : 'transparent' }}>
-          <button style={s.btnSecondary} onClick={onClose}>Cancelar</button>
+          <button style={s.btnSecondary} onClick={onClose}>{tr('common.cancel')}</button>
           <button style={s.btnPrimary(loading)} onClick={submit} disabled={loading}>
-            {loading ? 'Importando…' : 'OK'}
+            {loading ? tr('workspace.importing') : 'OK'}
           </button>
         </div>
       </div>
@@ -651,7 +658,7 @@ function TechInfoPanel({ tech, s, theme, onOpenModal }) {
           {Object.keys(iSchema).length > 0 && (
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.65rem', letterSpacing: '0.06em', color: cl ? '#4a7fbf' : 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>
-                Entradas (inputs)
+                {t('workspace.techInputs')}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {Object.entries(iSchema).map(([port, def]) => (
@@ -679,7 +686,7 @@ function TechInfoPanel({ tech, s, theme, onOpenModal }) {
           {Object.keys(oSchema).length > 0 && (
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.65rem', letterSpacing: '0.06em', color: cl ? '#2a7a40' : '#3fb950', marginBottom: 4, textTransform: 'uppercase' }}>
-                Saídas (outputs)
+                {t('workspace.techOutputs')}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {Object.entries(oSchema).map(([port, def]) => (
@@ -755,6 +762,7 @@ function TechInfoPanel({ tech, s, theme, onOpenModal }) {
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function WorkspacePage() {
+  const { t: tr } = useTranslation();
   const { theme } = useTheme();
   const s = useWsStyles(theme);
   const cl = theme === 'classic';
@@ -770,6 +778,15 @@ export default function WorkspacePage() {
   const [variables, setVariables]       = useState([]);
   const [techniques, setTechniques]     = useState([]);
   const [loadingVars, setLoadingVars]   = useState(true);
+
+  // Escopo por projeto: o workspace mostra todas as variáveis do usuário ou só as de um projeto.
+  const [projects, setProjects]   = useState([]);
+  const [ownList, setOwnList]     = useState([]);
+  const [projectId, setProjectId] = useState(() => {
+    try { return localStorage.getItem('tchelab_ws_project') || ''; } catch { return ''; }
+  });
+  const project = projects.find(p => p.uuid === projectId) || null;
+  const projectCanEdit = !!project && ['owner', 'admin', 'editor'].includes(project.my_access);
 
   const [selectedVar, setSelectedVar]   = useState(null);
   const [selectedTech, setSelectedTech] = useState(null);
@@ -795,11 +812,60 @@ export default function WorkspacePage() {
   const loadVars = useCallback(async () => {
     try {
       setLoadingVars(true);
-      const res = await client.get('/datasets');
+      const res = projectId
+        ? await api.projects.listDatasets(projectId, { with_metadata: 1 })
+        : await client.get('/datasets', { params: { limit: 200, with_metadata: 1 } });
       const all = res.data?.data ?? res.data ?? [];
       setVariables(all.filter(d => !d.deleted_at));
     } catch { /* silencioso */ } finally { setLoadingVars(false); }
+  }, [projectId]);
+
+  // Lista de projetos (próprios + compartilhados) para o seletor de escopo
+  useEffect(() => {
+    api.projects.list({ scope: 'all' }).then(res => {
+      const list = res.data?.data ?? res.data ?? [];
+      setProjects(Array.isArray(list) ? list : []);
+      setProjectId(cur => (cur && !list.some(p => p.uuid === cur) ? '' : cur));
+    }).catch(() => {});
   }, []);
+
+  // Variáveis do usuário que ainda não estão no projeto (para "adicionar existente")
+  const loadOwn = useCallback(async () => {
+    try {
+      const res = await client.get('/datasets', { params: { limit: 200 } });
+      setOwnList((res.data?.data ?? res.data ?? []).filter(d => !d.deleted_at));
+    } catch { /* silencioso */ }
+  }, []);
+  useEffect(() => { if (projectId && projectCanEdit) loadOwn(); }, [projectId, projectCanEdit, loadOwn, variables.length]);
+
+  const chooseProject = (id) => {
+    setProjectId(id); setSelectedVar(null);
+    try { if (id) localStorage.setItem('tchelab_ws_project', id); else localStorage.removeItem('tchelab_ws_project'); } catch { /* storage indisponível */ }
+  };
+
+  async function linkToProject(datasetUuid) {
+    if (!projectId || !projectCanEdit || !datasetUuid) return;
+    try {
+      await api.projects.addDataset(projectId, datasetUuid);
+      addHist({ cmd: `link ${ownList.find(d => d.uuid === datasetUuid)?.name || ''}`, status: 'ok', info: project?.name });
+      await loadVars();
+    } catch (e) {
+      addHist({ cmd: 'link', status: 'error', info: e.response?.data?.error?.message || e.message });
+    }
+  }
+
+  // Saídas de operações herdam o projeto selecionado
+  async function linkOutputs(names) {
+    if (!projectId || !projectCanEdit || !names.length) return;
+    try {
+      const res = await client.get('/datasets', { params: { limit: 200 } });
+      const all = res.data?.data ?? res.data ?? [];
+      for (const nm of names) {
+        const cand = all.filter(d => d.name === nm).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+        if (cand) await api.projects.addDataset(projectId, cand.uuid).catch(() => {});
+      }
+    } catch { /* silencioso */ }
+  }
 
   const loadTechs = useCallback(async () => {
     try {
@@ -846,14 +912,28 @@ export default function WorkspacePage() {
 
   // ── Delete variável ──────────────────────────────────────────────────────────
   async function deleteVar(v) {
-    if (!window.confirm(`Remover "${v.name}" do workspace?`)) return;
+    if (projectId) {
+      // No escopo de um projeto, "remover" só desvincula — o dataset continua no workspace geral.
+      if (!projectCanEdit) return;
+      if (!window.confirm(tr('workspace.unlinkConfirm', { name: v.name }))) return;
+      try {
+        await api.projects.removeDataset(projectId, v.uuid);
+        setVariables(vs => vs.filter(x => x.uuid !== v.uuid));
+        if (selectedVar?.uuid === v.uuid) setSelectedVar(null);
+        addHist({ cmd: `unlink ${v.name}`, status: 'ok' });
+      } catch (e) {
+        addHist({ cmd: `unlink ${v.name}`, status: 'error', info: e.response?.data?.error?.message || tr('workspace.errorGeneric') });
+      }
+      return;
+    }
+    if (!window.confirm(tr('workspace.deleteConfirm', { name: v.name }))) return;
     try {
       await client.delete(`/datasets/${v.uuid}`);
       setVariables(vs => vs.filter(x => x.uuid !== v.uuid));
       if (selectedVar?.uuid === v.uuid) setSelectedVar(null);
       addHist({ cmd: `clear ${v.name}`, status: 'ok' });
     } catch (e) {
-      addHist({ cmd: `clear ${v.name}`, status: 'error', info: e.response?.data?.message || 'Erro' });
+      addHist({ cmd: `clear ${v.name}`, status: 'error', info: e.response?.data?.message || tr('workspace.errorGeneric') });
     }
   }
 
@@ -865,7 +945,7 @@ export default function WorkspacePage() {
     const primaryKey = iKeys[0] || 'X';
     const primaryId = inputBindings[primaryKey];
     if (!primaryId) {
-      addHist({ cmd: `${selectedTech.slug}(?)`, status: 'error', info: `Vincule a entrada "${primaryKey}"` });
+      addHist({ cmd: `${selectedTech.slug}(?)`, status: 'error', info: tr('workspace.bindInput', { key: primaryKey }) });
       return;
     }
 
@@ -901,7 +981,7 @@ export default function WorkspacePage() {
       });
       const opId = res.data?.data?.operation_id;
       setRunningOp({ op_id: opId, histId, startMs: ts });
-      startPoll(opId, histId, ts);
+      startPoll(opId, histId, ts, oKeys.map(k => outputNames[k]).filter(Boolean));
     } catch (e) {
       const msg = e.response?.data?.errors?.[0]?.message || e.response?.data?.message || e.message;
       updHist(histId, { status: 'error', info: msg });
@@ -909,13 +989,13 @@ export default function WorkspacePage() {
     }
   }
 
-  function startPoll(opId, histId, startMs) {
+  function startPoll(opId, histId, startMs, outs = []) {
     let n = 0;
     clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       if (++n > MAX_POLLS) {
         clearInterval(pollRef.current);
-        updHist(histId, { status: 'error', info: 'Timeout' });
+        updHist(histId, { status: 'error', info: tr('workspace.timeout') });
         setRunningOp(null);
         return;
       }
@@ -925,12 +1005,13 @@ export default function WorkspacePage() {
         const st = op?.execution_status || op?.status;
         if (st === 'completed' || st === 'done') {
           clearInterval(pollRef.current);
+          await linkOutputs(outs);
           await loadVars();
           updHist(histId, { status: 'ok', ms: fmtMs(Date.now() - startMs) });
           setRunningOp(null);
         } else if (st === 'failed' || st === 'error') {
           clearInterval(pollRef.current);
-          updHist(histId, { status: 'error', info: op?.error_message || 'Falha' });
+          updHist(histId, { status: 'error', info: op?.error_message || tr('workspace.failed') });
           setRunningOp(null);
         }
       } catch { /* continua */ }
@@ -1004,15 +1085,39 @@ export default function WorkspacePage() {
 
         <div style={s.sep} />
 
+        {/* Escopo: projeto */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: cl ? '#333' : 'var(--text-muted)' }}>
+          {tr('workspace.project')}
+          <select value={projectId} onChange={e => chooseProject(e.target.value)} aria-label={tr('workspace.project')}
+            style={{ ...s.select, width: 'auto', maxWidth: 190, padding: cl ? '1px 4px' : '2px 6px', fontSize: '0.74rem' }}>
+            <option value="">{tr('workspace.allVars')}</option>
+            {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
+          </select>
+        </label>
+        {project && projectCanEdit && (
+          <select value="" onChange={e => linkToProject(e.target.value)} aria-label={tr('workspace.addExisting')}
+            style={{ ...s.select, width: 'auto', maxWidth: 190, padding: cl ? '1px 4px' : '2px 6px', fontSize: '0.74rem' }}>
+            <option value="">{tr('workspace.addExisting')}</option>
+            {ownList.filter(d => !variables.some(v => v.uuid === d.uuid)).map(d => <option key={d.uuid} value={d.uuid}>{d.name}</option>)}
+          </select>
+        )}
+        {project && !projectCanEdit && (
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{tr('workspace.readOnlyProject')}</span>
+        )}
+
+        <div style={s.sep} />
+
         {/* Import */}
-        <button style={s.tbBtn()} onClick={() => setShowImport(true)} title="Importar variável (Ctrl+I)">
-          <FolderOpen size={12} /> Importar
+        <button style={s.tbBtn()} onClick={() => setShowImport(true)}
+          disabled={!!projectId && !projectCanEdit}
+          title={projectId && !projectCanEdit ? tr('workspace.readOnlyProject') : tr('workspace.importTip')}>
+          <FolderOpen size={12} /> {tr('workspace.import')}
         </button>
 
         {/* Refresh */}
-        <button style={s.tbBtn()} onClick={loadVars} title="Atualizar workspace">
+        <button style={s.tbBtn()} onClick={loadVars} title={tr('workspace.refreshTip')}>
           <RefreshCw size={12} style={{ animation: loadingVars ? 'spin 0.9s linear infinite' : 'none' }} />
-          {!cl && 'Atualizar'}
+          {!cl && tr('workspace.refresh')}
         </button>
 
         <div style={s.sep} />
@@ -1020,9 +1125,13 @@ export default function WorkspacePage() {
         {/* Clear all */}
         <button style={s.tbBtn()} onClick={async () => {
           if (!variables.length) return;
-          if (!window.confirm(`Remover todas as ${variables.length} variáveis do workspace?`)) return;
+          if (projectId && !projectCanEdit) return;
+          if (!window.confirm(tr(projectId ? 'workspace.unlinkAllConfirm' : 'workspace.deleteAllConfirm', { count: variables.length }))) return;
           for (const v of variables) {
-            try { await client.delete(`/datasets/${v.uuid}`); } catch { /* ignora */ }
+            try {
+              if (projectId) await api.projects.removeDataset(projectId, v.uuid);
+              else await client.delete(`/datasets/${v.uuid}`);
+            } catch { /* ignora */ }
           }
           setVariables([]); setSelectedVar(null);
           addHist({ cmd: 'clear all', status: 'ok' });
@@ -1036,14 +1145,14 @@ export default function WorkspacePage() {
         {runningOp && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: cl ? '#666' : 'var(--text-muted)' }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.1s infinite' }} />
-            Executando…
+            {tr('workspace.running')}
           </div>
         )}
         <div style={{ width: 4 }} />
 
         {/* Var count badge */}
         <div style={{ fontSize: '0.68rem', color: cl ? '#666' : 'var(--text-muted)', padding: '2px 8px', background: cl ? 'rgba(0,0,0,0.08)' : 'var(--bg-hover)', borderRadius: cl ? 2 : 'var(--radius-sm)', border: cl ? '1px solid #bbb' : 'none' }}>
-          {variables.length} variável{variables.length !== 1 ? 'is' : ''}
+          {tr('workspace.varCount', { count: variables.length })}
         </div>
       </div>
 
@@ -1075,7 +1184,7 @@ export default function WorkspacePage() {
               <Search size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
               <input
                 style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.76rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
-                placeholder="filtrar variáveis…"
+                placeholder={tr('workspace.filterVars')}
                 value={varFilter}
                 onChange={e => setVarFilter(e.target.value)}
               />
@@ -1103,7 +1212,7 @@ export default function WorkspacePage() {
               </thead>
               <tbody>
                 {loadingVars && (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Carregando…</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{tr('workspace.loading')}</td></tr>
                 )}
                 {!loadingVars && filteredVars.length === 0 && (
                   <tr>
@@ -1111,8 +1220,8 @@ export default function WorkspacePage() {
                       <div style={{ marginBottom: 6 }}>
                         <Table2 size={20} style={{ opacity: 0.3 }} />
                       </div>
-                      Workspace vazio.<br />
-                      <span style={{ fontSize: '0.68rem' }}>Use <b>Importar</b> para adicionar variáveis.</span>
+                      {project ? tr('workspace.emptyProject') : tr('workspace.empty')}<br />
+                      <span style={{ fontSize: '0.68rem' }}>{project ? tr('workspace.emptyProjectHint') : tr('workspace.emptyHint')}</span>
                     </td>
                   </tr>
                 )}
@@ -1139,7 +1248,8 @@ export default function WorkspacePage() {
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px 3px', borderRadius: 2, opacity: 0.4, color: 'var(--text-muted)' }}
                           onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--danger)'; }}
                           onMouseLeave={e => { e.currentTarget.style.opacity = '0.4'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                          title="Remover"
+                          title={projectId ? tr('workspace.unlinkTip') : tr('workspace.remove')}
+                          hidden={!!projectId && !projectCanEdit}
                         >
                           <Trash2 size={11} />
                         </button>
@@ -1165,7 +1275,7 @@ export default function WorkspacePage() {
             gap: 0,
           }}>
             {[
-              { id: 'operation', label: 'Operação' },
+              { id: 'operation', label: tr('workspace.tabOperation') },
               { id: 'editor', label: selectedVar ? `${selectedVar.name} ×` : 'Variable Editor' },
             ].map((tab) => {
               const active = activePanel === tab.id;
@@ -1204,7 +1314,7 @@ export default function WorkspacePage() {
                   : (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: 8 }}>
                       <Table2 size={28} style={{ opacity: 0.2 }} />
-                      <span style={{ fontSize: '0.78rem' }}>Selecione ou dê duplo-clique em uma variável para inspecionar.</span>
+                      <span style={{ fontSize: '0.78rem' }}>{tr('workspace.inspectHint')}</span>
                     </div>
                   )
                 }
@@ -1217,7 +1327,7 @@ export default function WorkspacePage() {
 
                 {/* Técnica */}
                 <div ref={techDropRef} style={{ position: 'relative' }}>
-                  <label style={s.label}>Técnica / Função</label>
+                  <label style={s.label}>{tr('workspace.techFunction')}</label>
                   <button
                     onClick={() => setTechDropOpen(v => !v)}
                     style={{
@@ -1227,7 +1337,7 @@ export default function WorkspacePage() {
                     }}
                   >
                     <span style={{ color: selectedTech ? (cl ? '#1a1a1a' : 'var(--text-primary)') : 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: cl ? '0.8rem' : '0.78rem' }}>
-                      {selectedTech ? `${selectedTech.slug}` : '— selecionar função —'}
+                      {selectedTech ? `${selectedTech.slug}` : tr('workspace.selectFunction')}
                     </span>
                     {selectedTech && (
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 8, fontFamily: 'var(--font-sans)' }}>
@@ -1250,7 +1360,7 @@ export default function WorkspacePage() {
                         <Search size={11} style={{ color: 'var(--text-muted)' }} />
                         <input autoFocus
                           style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.78rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
-                          placeholder="buscar…"
+                          placeholder={tr('workspace.search')}
                           value={techFilter}
                           onChange={e => setTechFilter(e.target.value)} />
                       </div>
@@ -1301,7 +1411,7 @@ export default function WorkspacePage() {
                           </div>
                         ))}
                         {!filteredTechs.length && (
-                          <p style={{ padding: '10px', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhuma função encontrada.</p>
+                          <p style={{ padding: '10px', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>{tr('workspace.noFunction')}</p>
                         )}
                       </div>
                     </div>
@@ -1316,7 +1426,7 @@ export default function WorkspacePage() {
                 {/* Entradas */}
                 {selectedTech && Object.keys(iSchema).length > 0 && (
                   <div>
-                    <label style={s.label}>Entradas</label>
+                    <label style={s.label}>{tr('workspace.inputs')}</label>
                     <div style={{ background: cl ? '#fff' : 'var(--bg-card)', border: cl ? '1px solid #ccc' : '1px solid var(--border)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: cl ? '8px' : '0.625rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {Object.entries(iSchema).map(([key, def]) => (
                         <div key={key} style={{ display: 'grid', gridTemplateColumns: '50px 60px 1fr', alignItems: 'center', gap: 6 }}>
@@ -1325,7 +1435,7 @@ export default function WorkspacePage() {
                           <select style={s.select}
                             value={inputBindings[key] || ''}
                             onChange={e => setInputBindings(b => ({ ...b, [key]: e.target.value }))}>
-                            <option value="">— variável —</option>
+                            <option value="">{tr('workspace.chooseVariable')}</option>
                             {variables.map(v => {
                               const dims = pj(v.dimensions, []);
                               return <option key={v.uuid} value={v.uuid}>{v.name}  [{fmtSizeMat(dims)} {fmtClass(v.data_type)}]</option>;
@@ -1340,7 +1450,7 @@ export default function WorkspacePage() {
                 {/* Parâmetros */}
                 {selectedTech && Object.keys(pSchema).length > 0 && (
                   <div>
-                    <label style={s.label}>Parâmetros</label>
+                    <label style={s.label}>{tr('workspace.params')}</label>
                     <div style={{ background: cl ? '#fff' : 'var(--bg-card)', border: cl ? '1px solid #ccc' : '1px solid var(--border)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: cl ? '8px' : '0.625rem' }}>
                       <ParamEditor schema={pSchema} values={params} onChange={setParams} s={s} />
                     </div>
@@ -1350,12 +1460,12 @@ export default function WorkspacePage() {
                 {/* Saídas */}
                 {selectedTech && Object.keys(oSchema).length > 0 && (
                   <div>
-                    <label style={s.label}>Salvar saída como</label>
+                    <label style={s.label}>{tr('workspace.saveOutputAs')}</label>
                     <div style={{ background: cl ? '#fff' : 'var(--bg-card)', border: cl ? '1px solid #ccc' : '1px solid var(--border)', borderRadius: cl ? 1 : 'var(--radius-sm)', padding: cl ? '8px' : '0.625rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {Object.keys(oSchema).map(k => (
                         <div key={k} style={{ display: 'grid', gridTemplateColumns: '60px 1fr', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{k} =</span>
-                          <input style={s.input} placeholder="nome_variavel"
+                          <input style={s.input} placeholder={tr('workspace.outputPh')}
                             value={outputNames[k] || ''}
                             onChange={e => setOutputNames(o => ({ ...o, [k]: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') }))} />
                         </div>
@@ -1368,16 +1478,16 @@ export default function WorkspacePage() {
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', paddingTop: 6, borderTop: cl ? '1px solid #ccc' : '1px solid var(--border)' }}>
                   <button style={s.btnPrimary(!selectedTech || !!runningOp)} onClick={runOperation} disabled={!selectedTech || !!runningOp}>
                     <Play size={12} />
-                    {runningOp ? 'Executando…' : 'Executar  ▶'}
+                    {runningOp ? tr('workspace.running') : tr('workspace.run')}
                   </button>
                   {selectedTech && (
                     <button style={s.btnSecondary} onClick={() => { setSelectedTech(null); setParams({}); setInputBindings({}); }}>
-                      <X size={11} /> Limpar
+                      <X size={11} /> {tr('workspace.clear')}
                     </button>
                   )}
                   {!selectedTech && (
                     <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
-                      Selecione uma função e configure as entradas.
+                      {tr('workspace.selectHint')}
                     </span>
                   )}
                 </div>
@@ -1385,7 +1495,7 @@ export default function WorkspacePage() {
                 {/* Hint: double-click on variable */}
                 {!selectedTech && (
                   <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Eye size={11} /> Dê duplo-clique em uma variável para abrir o Variable Editor.
+                    <Eye size={11} /> {tr('workspace.dblClickHint')}
                   </div>
                 )}
               </div>
@@ -1398,12 +1508,12 @@ export default function WorkspacePage() {
               <Terminal size={11} style={{ color: cl ? '#555' : '#8b949e' }} />
               <span style={{ fontSize: '0.65rem', fontWeight: 700, color: cl ? '#555' : '#8b949e', letterSpacing: '0.08em' }}>COMMAND WINDOW</span>
               <div style={{ flex: 1 }} />
-              <button onClick={() => setHistory([])} style={{ fontSize: '0.62rem', color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>limpar</button>
+              <button onClick={() => setHistory([])} style={{ fontSize: '0.62rem', color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>{tr('workspace.clearConsole')}</button>
             </div>
             <div ref={consoleRef} style={{ flex: 1, overflowY: 'auto', padding: '3px 10px 4px' }}>
               {history.length === 0 && (
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: cl ? '#777' : '#555', padding: '2px 0', lineHeight: 1.5 }}>
-                  % TcheLab Workspace {new Date().getFullYear()} — {theme} theme
+                  {tr('workspace.cmdBanner', { year: new Date().getFullYear(), theme: tr(`themes.${theme}`) })}
                 </div>
               )}
               {history.map(e => <ConsoleLine key={e.id} e={e} s={s} />)}
@@ -1433,13 +1543,13 @@ export default function WorkspacePage() {
         <span style={{ color: cl ? '#bbb' : 'var(--border)' }}>|</span>
         {selectedVar ? (
           <>
-            <span>Selecionado: <b style={{ color: cl ? '#003880' : 'var(--text-accent)', fontFamily: 'var(--font-mono)' }}>{selectedVar.name}</b></span>
+            <span>{tr('workspace.selected')} <b style={{ color: cl ? '#003880' : 'var(--text-accent)', fontFamily: 'var(--font-mono)' }}>{selectedVar.name}</b></span>
             <span style={{ color: cl ? '#bbb' : 'var(--border)' }}>|</span>
             <span>{fmtSizeMat(pj(selectedVar.dimensions, []))} {fmtClass(selectedVar.data_type)}</span>
           </>
-        ) : <span>Nenhuma variável selecionada</span>}
+        ) : <span>{tr('workspace.noneSelected')}</span>}
         <div style={{ flex: 1 }} />
-        <span>{theme === 'classic' ? 'Classic' : theme === 'dark' ? 'Dark' : 'Light'}</span>
+        <span>{tr(`themes.${theme}`)}</span>
       </div>
 
       {/* Import modal */}
@@ -1447,9 +1557,10 @@ export default function WorkspacePage() {
         <ImportModal
           s={s} theme={theme}
           onClose={() => setShowImport(false)}
-          onImported={(name) => {
+          onImported={async (name, uuid) => {
+            if (projectId && projectCanEdit && uuid) { try { await api.projects.addDataset(projectId, uuid); } catch { /* segue */ } }
             loadVars();
-            addHist({ cmd: `${name} = importdata(...)`, status: 'ok', info: 'importado' });
+            addHist({ cmd: `${name} = importdata(...)`, status: 'ok', info: tr('workspace.imported') });
           }}
         />
       )}

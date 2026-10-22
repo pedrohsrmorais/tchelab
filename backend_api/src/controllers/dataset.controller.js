@@ -146,13 +146,14 @@ async function listDatasets(req, res) {
       }
     }
 
+    const withMeta = req.query.with_metadata === '1' || req.query.with_metadata === 'true';
     const where = conditions.join(' AND ');
     const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM datasets d WHERE ${where}`, params);
     const { offset, limit, meta } = R.paginate(req, total);
 
     const [rows] = await db.query(
       `SELECT d.id, d.uuid, d.name, d.description, d.data_type, d.data_order, d.sample_axis,
-              d.dimensions, d.mode_labels, d.visibility, d.created_at
+              d.dimensions, d.mode_labels, d.visibility, d.created_at${withMeta ? ', d.metadata' : ''}
        FROM datasets d WHERE ${where} ORDER BY d.created_at DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );

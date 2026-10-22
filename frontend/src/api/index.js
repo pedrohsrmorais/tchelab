@@ -48,7 +48,7 @@ export const api = {
     updateMember:    (id, uid, d) => put(`/projects/${id}/members/${uid}`, d),
     removeMember:    (id, uid) => del(`/projects/${id}/members/${uid}`),
 
-    listDatasets:    (id)      => get(`/projects/${id}/datasets`),
+    listDatasets:    (id, p)   => get(`/projects/${id}/datasets`, p),
     // Body: { dataset_id, purpose }
     addDataset:      (id, dsId, purpose) => post(`/projects/${id}/datasets`, { dataset_id: dsId, purpose: purpose || 'other' }),
     updateDataset:   (id, dsId, d) => put(`/projects/${id}/datasets/${dsId}`, d),

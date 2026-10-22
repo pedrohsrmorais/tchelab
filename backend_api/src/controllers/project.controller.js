@@ -258,8 +258,9 @@ async function listProjectDatasets(req, res) {
   try {
     const ctx = await load(req, res);
     if (!ctx) return;
+    const withMeta = req.query.with_metadata === '1' || req.query.with_metadata === 'true';
     const [rows] = await db.query(
-      `SELECT d.id, d.uuid, d.name, d.description, d.data_type, d.dimensions, d.visibility, d.created_at,
+      `SELECT d.id, d.uuid, d.name, d.description, d.data_type, d.dimensions, d.visibility, d.created_at${withMeta ? ', d.metadata' : ''},
               (d.user_id = ?) AS is_mine, pd.purpose, pd.added_at
          FROM datasets d
          JOIN project_datasets pd ON pd.dataset_id = d.id
