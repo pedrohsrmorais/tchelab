@@ -18,9 +18,9 @@ client.interceptors.request.use(cfg => {
 let refreshing = false
 let queue = []
 
-// Cota de armazenamento: o backend responde 413 (STORAGE_QUOTA_EXCEEDED / FILE_TOO_LARGE) ou 503 (STORAGE_SERVER_FULL).
+// Cota de armazenamento: o backend responde 413 (STORAGE_QUOTA_EXCEEDED / FILE_TOO_LARGE), 503 (STORAGE_SERVER_FULL) ou 402 (CPU_BUDGET_EXCEEDED: orçamento de CPU do mês).
 // Avisamos o app por eventos (evita import circular com o store) — o QuotaDialog global abre e ajuda a liberar espaço.
-const QUOTA_CODES = ['STORAGE_QUOTA_EXCEEDED', 'FILE_TOO_LARGE', 'STORAGE_SERVER_FULL']
+const QUOTA_CODES = ['STORAGE_QUOTA_EXCEEDED', 'FILE_TOO_LARGE', 'STORAGE_SERVER_FULL', 'CPU_BUDGET_EXCEEDED']
 const emit = (name, detail) => { try { window.dispatchEvent(new CustomEvent(name, { detail })) } catch { /* sem window */ } }
 
 client.interceptors.response.use(

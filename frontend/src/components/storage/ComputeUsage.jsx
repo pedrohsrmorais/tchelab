@@ -28,6 +28,7 @@ export default function ComputeUsage() {
         {formatCpu(c.cpu_seconds, lang)}
         {budget ? <span style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--text-muted)' }}> {t('storage.compute.ofBudget', { budget: formatCpu(budget, lang) })}</span> : null}
       </p>
+      {level === 'full' && <p role="alert" style={{ marginTop: 6, fontSize: '0.8rem', fontWeight: 600, color: '#ef4444' }}>{t('storage.compute.blocked')}</p>}
       {budget ? <div style={{ marginTop: 6 }}><UsageBar usage={{ percent: pct, level, used: c.cpu_seconds }} height={8} /></div> : null}
       <p style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
         {t('storage.compute.summary', { jobs: c.jobs, failed: c.jobs_failed, mem: formatBytes(c.peak_rss_max_bytes, lang) })}

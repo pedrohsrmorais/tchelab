@@ -21,6 +21,7 @@
 
 const db = require('../config/db.config');
 const jobService = require('./job.service');
+const usage = require('./usage.service');
 
 function parseJson(v, fallback = null) {
   if (v == null) return fallback;
@@ -110,6 +111,10 @@ async function advanceExecution(executionId) {
     return res.affectedRows > 0;
   };
 
+  // Orçamento de CPU do mês: se acabou no meio da execução, os nós ainda não iniciados falham com o motivo (os em andamento terminam).
+  let cpuBlocked = null;
+  try { const st = await usage.cpuBudgetStatus(ex.user_id); if (st.exceeded) cpuBlocked = st; } catch { /* sem a checagem, segue */ }
+
   let changed = true;
   while (changed) {
     changed = false;
@@ -142,6 +147,12 @@ async function advanceExecution(executionId) {
       }
       if (problem) {
         if (await closeNode(r, 'failed', problem)) changed = true;
+        continue;
+      }
+
+      if (cpuBlocked) {
+        const m = (sec) => (sec < 60 ? `${Math.round(sec)} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.round((sec / 3600) * 10) / 10} h`);
+        if (await closeNode(r, 'failed', `CPU_BUDGET_EXCEEDED: o tempo de processamento do mês acabou (${m(cpuBlocked.used)} de ${m(cpuBlocked.budget)}); este nó não foi executado.`)) changed = true;
         continue;
       }
 

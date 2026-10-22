@@ -6,6 +6,7 @@ const jobService = require('../services/job.service');
 const pipeline = require('../services/executionPipeline.service');
 const R = require('../utils/response');
 const quota = require('../services/quota.service');
+const usage = require('../services/usage.service');
 const { LEVEL, guardWorkflow } = require('../services/access.service');
 
 async function resolveWorkflow(uuid) {
@@ -70,6 +71,7 @@ async function listExecutions(req, res) {
 // O worker executa cada job independentemente; a orquestração de
 // dependências é resolvida aqui no momento do dispatch.
 async function dispatchExecutionCore(workflow, user, { parameters_override = {}, dataset_bindings = {} } = {}) {
+  await usage.assertCpuBudget(user.id); // sem orçamento de CPU no mês, nada é enfileirado (CpuBudgetError → 402)
   // Carrega nós e arestas
   const [nodes] = await db.query(
     `SELECT wn.id, wn.node_key, wn.parameters, t.slug AS technique_slug
@@ -184,6 +186,7 @@ async function dispatchExecution(req, res) {
     return R.accepted(res, { execution_id: result.execution_id, job_ids: result.job_ids });
   } catch (err) {
     if (err.validation) return R.unprocessable(res, err.validation);
+    if (usage.handleCpuError(res, err)) return;
     return R.serverError(res, err);
   }
 }

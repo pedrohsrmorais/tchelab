@@ -53,11 +53,12 @@ function UserRow({ u, plans, lang, onSaved, currency }) {
   const [editing, setEditing] = useState(false);
   const [plan, setPlan] = useState(u.plan);
   const [custom, setCustom] = useState(u.custom_quota ? String(Math.round(u.quota / MB)) : '');
+  const [cpuH, setCpuH] = useState(u.custom_cpu_budget && u.cpu_budget_seconds ? String(Math.round((u.cpu_budget_seconds / 3600) * 100) / 100) : '');
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
     try {
-      await api.storage.updateUser(u.uuid, { plan_code: plan, quota_bytes: custom === '' ? null : Math.round(Number(custom) * MB) });
+      await api.storage.updateUser(u.uuid, { plan_code: plan, quota_bytes: custom === '' ? null : Math.round(Number(custom) * MB), cpu_budget_seconds: cpuH === '' ? null : Math.round(Number(cpuH) * 3600) });
       toast.success(t('storage.admin.userSaved')); setEditing(false); onSaved();
     } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setBusy(false); }
   };
@@ -73,7 +74,7 @@ function UserRow({ u, plans, lang, onSaved, currency }) {
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{formatBytes(u.used, lang)} / {formatBytes(u.quota, lang)} · {Math.round(u.percent)}%</p>
       </td>
       <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-        <p>{formatCpu(u.month.cpu_seconds, lang)} · {t('storage.admin.jobsN', { count: u.month.jobs })}</p>
+        <p style={u.cpu_budget_seconds && u.month.cpu_seconds >= u.cpu_budget_seconds ? { color: '#ef4444', fontWeight: 600 } : undefined}>{formatCpu(u.month.cpu_seconds, lang)}{u.cpu_budget_seconds ? ` / ${formatCpu(u.cpu_budget_seconds, lang)}` : ''} · {t('storage.admin.jobsN', { count: u.month.jobs })}</p>
         <p style={{ color: 'var(--text-muted)' }}>{t('storage.admin.peakMem')}: {formatBytes(u.month.peak_rss_bytes, lang)} · {formatMoney(u.month.cost.total, currency, lang)}</p>
       </td>
       <td className="px-3 py-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -83,11 +84,12 @@ function UserRow({ u, plans, lang, onSaved, currency }) {
               {plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
             </select>
             <input type="number" min="1" className="input-field" style={{ width: 96 }} placeholder={t('storage.admin.customPh')} value={custom} onChange={(e) => setCustom(e.target.value)} aria-label={t('storage.admin.customMb')} />
+            <input type="number" min="0.01" step="0.5" className="input-field" style={{ width: 96 }} placeholder={t('storage.admin.cpuCustomPh')} value={cpuH} onChange={(e) => setCpuH(e.target.value)} aria-label={t('storage.admin.cpuCustomH')} />
             <button type="button" className="btn-primary" disabled={busy} onClick={save} style={{ padding: '0.35rem 0.6rem' }}><Save size={14} /></button>
             <button type="button" className="btn-ghost" onClick={() => setEditing(false)} aria-label={t('common.cancel')} style={{ padding: '0.35rem' }}><X size={14} /></button>
           </div>
         ) : (
-          <span>{u.plan}{u.custom_quota ? <span className="badge badge-purple ml-1" style={{ fontSize: '0.6rem' }}>{t('storage.admin.custom')}</span> : null}</span>
+          <span>{u.plan}{u.custom_quota || u.custom_cpu_budget ? <span className="badge badge-purple ml-1" style={{ fontSize: '0.6rem' }}>{t('storage.admin.custom')}</span> : null}</span>
         )}
       </td>
       <td className="px-3 py-2 text-right">

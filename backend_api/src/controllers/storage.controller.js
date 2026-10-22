@@ -23,7 +23,7 @@ async function myCompute(req, res) {
     const [rows] = await db.query('SELECT * FROM usage_monthly WHERE user_id = ? ORDER BY month DESC LIMIT 6', [req.user.id]);
     const cur = rows.find((r) => r.month === usage.monthKey());
     const [[plan]] = await db.query(
-      `SELECT COALESCE(p.monthly_cpu_seconds, d.monthly_cpu_seconds) AS budget
+      `SELECT COALESCE(u.cpu_budget_seconds, p.monthly_cpu_seconds, d.monthly_cpu_seconds) AS budget
          FROM users u LEFT JOIN storage_plans p ON p.id = u.storage_plan_id
          LEFT JOIN storage_plans d ON d.is_default = 1 WHERE u.id = ? LIMIT 1`, [req.user.id]);
     const shape = (r) => ({
@@ -49,6 +49,7 @@ async function adminOverview(req, res) {
       `SELECT u.uuid, u.name, u.email, u.storage_used_bytes AS used, u.storage_reserved_bytes AS reserved,
               COALESCE(u.storage_quota_bytes, p.quota_bytes, (SELECT quota_bytes FROM storage_plans WHERE is_default = 1 LIMIT 1), 0) AS quota,
               u.storage_quota_bytes IS NOT NULL AS custom_quota, COALESCE(p.code, 'beta') AS plan,
+              u.cpu_budget_seconds AS custom_cpu, COALESCE(u.cpu_budget_seconds, p.monthly_cpu_seconds, (SELECT monthly_cpu_seconds FROM storage_plans WHERE is_default = 1 LIMIT 1)) AS cpu_budget,
               COALESCE(um.cpu_seconds, 0) AS cpu_seconds, COALESCE(um.jobs, 0) AS jobs, COALESCE(um.peak_rss_max_bytes, 0) AS peak_rss,
               COALESCE(um.gb_seconds_ram, 0) AS gb_seconds_ram, COALESCE(um.storage_gb_hours, 0) AS storage_gb_hours
          FROM users u LEFT JOIN storage_plans p ON p.id = u.storage_plan_id
@@ -70,6 +71,7 @@ async function adminOverview(req, res) {
         uuid: u.uuid, name: u.name, email: u.email, plan: u.plan, custom_quota: !!u.custom_quota,
         used: Number(u.used), reserved: Number(u.reserved), quota: Number(u.quota),
         percent: Number(u.quota) ? Math.round((Number(u.used) / Number(u.quota)) * 1000) / 10 : 100,
+        cpu_budget_seconds: u.cpu_budget != null ? Number(u.cpu_budget) : null, custom_cpu_budget: u.custom_cpu != null,
         month: { jobs: Number(u.jobs), cpu_seconds: Number(u.cpu_seconds), peak_rss_bytes: Number(u.peak_rss), gb_seconds_ram: Number(u.gb_seconds_ram), cost: usage.costOf(u, prices) },
       })),
     });
@@ -126,6 +128,11 @@ async function updateUserQuota(req, res) {
       if (b.quota_bytes === null) f.push('storage_quota_bytes = NULL');
       else if (!posInt(b.quota_bytes) || Number(b.quota_bytes) < 1) return R.unprocessable(res, [{ field: 'quota_bytes', message: 'Informe um inteiro positivo ou null.' }]);
       else { f.push('storage_quota_bytes = ?'); v.push(Number(b.quota_bytes)); }
+    }
+    if (b.cpu_budget_seconds !== undefined) {
+      if (b.cpu_budget_seconds === null) f.push('cpu_budget_seconds = NULL');
+      else if (!posInt(b.cpu_budget_seconds) || Number(b.cpu_budget_seconds) < 1) return R.unprocessable(res, [{ field: 'cpu_budget_seconds', message: 'Informe um inteiro positivo (segundos) ou null.' }]);
+      else { f.push('cpu_budget_seconds = ?'); v.push(Number(b.cpu_budget_seconds)); }
     }
     if (!f.length) return R.badRequest(res, 'Nenhum campo para atualizar.');
     await db.query(`UPDATE users SET ${f.join(', ')} WHERE id = ?`, [...v, u.id]);

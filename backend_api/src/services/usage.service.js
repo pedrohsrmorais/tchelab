@@ -17,6 +17,13 @@ const GIB = 1024 ** 3;
 const HOURS_PER_MONTH = 730;
 const DEFAULT_PRICES = { price_gb_month: 0.023, price_cpu_hour: 0.05, currency: 'USD' };
 
+const R = require('../utils/response');
+
+/** Orçamento mensal de CPU esgotado: bloqueia novas execuções até o mês virar, o admin ampliar o plano ou a cota do usuário. */
+class CpuBudgetError extends Error {
+  constructor(message, details = {}) { super(message); this.name = 'CpuBudgetError'; this.code = 'CPU_BUDGET_EXCEEDED'; this.status = 402; this.details = details; }
+}
+
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
 
 /** Soma o consumo medido de um job ao mês corrente do usuário. */
@@ -34,6 +41,43 @@ async function record(userId, metrics = {}, { failed = false, inputBytes = 0, ou
     [userId, monthKey(at), failed ? 1 : 0, cpu, wall, (mem / GIB) * wall, Math.max(0, Math.round(Number(metrics.peak_rss_bytes) || 0)),
       Math.max(0, Math.round(inputBytes)), Math.max(0, Math.round(outputBytes))],
   );
+}
+
+// ── Orçamento mensal de CPU ──────────────────────────────────────────────────────────────────────────────────────
+const fmtCpu = (sec) => (sec < 60 ? `${Math.round(sec)} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.round((sec / 3600) * 10) / 10} h`);
+
+/**
+ * Situação do usuário no mês: `budget` = override do usuário → orçamento do plano → plano padrão (null = sem limite).
+ * `exceeded` quando já gastou todo o orçamento (um job em andamento pode terminar acima dele: o bloqueio vale para o próximo).
+ */
+async function cpuBudgetStatus(userId, at = new Date()) {
+  const [[r]] = await db.query(
+    `SELECT COALESCE(u.cpu_budget_seconds, p.monthly_cpu_seconds, d.monthly_cpu_seconds) AS budget,
+            COALESCE((SELECT cpu_seconds FROM usage_monthly WHERE user_id = u.id AND month = ?), 0) AS used
+       FROM users u LEFT JOIN storage_plans p ON p.id = u.storage_plan_id
+       LEFT JOIN storage_plans d ON d.is_default = 1 WHERE u.id = ? LIMIT 1`, [monthKey(at), userId]);
+  if (!r) return { budget: null, used: 0, remaining: null, exceeded: false };
+  const budget = r.budget != null ? Number(r.budget) : null; const used = Number(r.used);
+  return { budget, used, remaining: budget != null ? Math.max(0, budget - used) : null, exceeded: budget != null && used >= budget };
+}
+
+/** Lança CpuBudgetError se o orçamento do mês acabou. */
+async function assertCpuBudget(userId) {
+  const st = await cpuBudgetStatus(userId);
+  if (st.exceeded) {
+    throw new CpuBudgetError(
+      `Você usou todo o tempo de processamento do mês (${fmtCpu(st.used)} de ${fmtCpu(st.budget)}). Novas execuções ficam bloqueadas até o início do próximo mês ou até o seu plano ser ampliado.`,
+      { used_seconds: st.used, budget_seconds: st.budget },
+    );
+  }
+  return st;
+}
+
+/** Resposta HTTP padronizada para CpuBudgetError (402). Devolve true se tratou. */
+function handleCpuError(res, err) {
+  if (!(err instanceof CpuBudgetError)) return false;
+  R.error(res, err.status, err.code, err.message, err.details);
+  return true;
 }
 
 // ── Armazenamento ao longo do tempo (GB·hora) ────────────────────────────────────────────────────────────────────
@@ -132,4 +176,4 @@ async function costReport({ licenses = 10, month = monthKey() } = {}) {
   };
 }
 
-module.exports = { record, tickStorage, startStorageMeter, getPrices, setPrices, costOf, ceilingOf, costReport, monthKey, HOURS_PER_MONTH };
+module.exports = { CpuBudgetError, cpuBudgetStatus, assertCpuBudget, handleCpuError, record, tickStorage, startStorageMeter, getPrices, setPrices, costOf, ceilingOf, costReport, monthKey, HOURS_PER_MONTH };

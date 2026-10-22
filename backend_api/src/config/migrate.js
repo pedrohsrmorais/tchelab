@@ -578,6 +578,7 @@ async function migrate() {
     );
   }
 
+  await addColumn('users', 'cpu_budget_seconds', 'bigint unsigned DEFAULT NULL');
   // consumo medido por job (worker → resultConsumer)
   await addColumn('jobs', 'cpu_seconds', 'decimal(12,3) DEFAULT NULL');
   await addColumn('jobs', 'wall_ms', 'bigint unsigned DEFAULT NULL');

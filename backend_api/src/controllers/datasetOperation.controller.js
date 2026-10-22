@@ -18,6 +18,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
 const executionCtrl = require('./execution.controller');
+const usage = require('../services/usage.service');
 
 async function resolveDatasetRow(uuid) {
   const [rows] = await db.query('SELECT * FROM datasets WHERE uuid = ? AND deleted_at IS NULL', [uuid]);
@@ -36,6 +37,8 @@ async function createQuickOperation(req, res) {
     const dataset = await resolveDatasetRow(req.params.id);
     if (!dataset) return R.notFound(res, 'Dataset');
     if (dataset.user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res);
+    // antes de criar o workflow da operação: sem orçamento de CPU no mês, não deixa um workflow órfão para trás
+    await usage.assertCpuBudget(req.user.id);
 
     const {
       technique_id: techniqueUuid,
@@ -172,7 +175,10 @@ async function createQuickOperation(req, res) {
       workflow: { uuid: workflowUuid, name: String(workflow_name).trim() },
       execution_id: dispatch.execution_id,
     });
-  } catch (err) { return R.serverError(res, err); }
+  } catch (err) {
+    if (usage.handleCpuError(res, err)) return;
+    return R.serverError(res, err);
+  }
 }
 
 // GET /datasets/:id/operations

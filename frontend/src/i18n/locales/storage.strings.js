@@ -135,9 +135,9 @@ export default {
   'storage.admin.computeCost': ['Processamento', 'Processing', 'Procesamiento'],
   'storage.admin.ceilingLicenses': ['Teto para {{count}} licenças/mês', 'Ceiling for {{count}} licenses/month', 'Techo para {{count}} licencias/mes'],
   'storage.admin.ceilingNote': [
-    'O teto só vale como limite se o orçamento de CPU do plano for aplicado; hoje ele é medido e informado, ainda não bloqueia execuções.',
-    'The ceiling only works as a limit if the plan’s CPU budget is enforced; today it is measured and reported but does not block runs yet.',
-    'El techo solo funciona como límite si se aplica el presupuesto de CPU del plan; hoy se mide e informa, pero aún no bloquea ejecuciones.',
+    'O teto só vale como limite se o orçamento de CPU do plano for aplicado — e ele é: ao esgotar as horas do mês, novas execuções do usuário são bloqueadas (o que já está rodando termina).',
+    'The ceiling only works as a limit if the plan’s CPU budget is enforced — and it is: when a user runs out of the month’s hours, new runs are blocked (anything already running finishes).',
+    'El techo solo funciona como límite si se aplica el presupuesto de CPU del plan, y se aplica: al agotar las horas del mes, las nuevas ejecuciones del usuario se bloquean (lo que ya está corriendo termina).',
   ],
   'storage.admin.realMonth': ['Custo real do mês', 'Actual cost this month', 'Costo real del mes'],
   'storage.admin.activeUsers': ['usuários ativos', 'active users', 'usuarios activos'],
@@ -147,4 +147,24 @@ export default {
   'storage.admin.projectionHint': ['Ritmo atual até o fim do mês', 'Current pace until month end', 'Ritmo actual hasta fin de mes'],
   'storage.admin.ramMonth': ['Memória consumida', 'Memory used', 'Memoria consumida'],
   'storage.admin.ramHint': ['Soma de GB × segundos dos jobs', 'Sum of GB × seconds of jobs', 'Suma de GB × segundos de los jobs'],
+
+  // ── Bloqueio por orçamento de CPU ────────────────────────────────────────
+  'storage.cpuTitle': ['Processamento do mês esgotado', 'Monthly processing used up', 'Procesamiento del mes agotado'],
+  'storage.cpuMsg': [
+    'Você usou todo o tempo de processamento do mês ({{used}} de {{budget}}). Novas execuções estão bloqueadas.',
+    'You have used all of this month’s processing time ({{used}} of {{budget}}). New runs are blocked.',
+    'Usaste todo el tiempo de procesamiento del mes ({{used}} de {{budget}}). Las nuevas ejecuciones están bloqueadas.',
+  ],
+  'storage.cpuHint': [
+    'O limite volta a zerar no início do próximo mês. Para continuar antes, peça ao administrador para ampliar o seu plano.',
+    'The limit resets at the start of next month. To continue sooner, ask your administrator to upgrade your plan.',
+    'El límite se reinicia al inicio del próximo mes. Para continuar antes, pide al administrador que amplíe tu plan.',
+  ],
+  'storage.compute.blocked': [
+    'Orçamento esgotado: novas execuções bloqueadas até o próximo mês.',
+    'Budget used up: new runs are blocked until next month.',
+    'Presupuesto agotado: nuevas ejecuciones bloqueadas hasta el próximo mes.',
+  ],
+  'storage.admin.cpuCustomPh': ['CPU h (opcional)', 'CPU h (optional)', 'CPU h (opcional)'],
+  'storage.admin.cpuCustomH': ['Orçamento de CPU próprio em horas/mês (vazio = segue o plano)', 'Custom CPU budget in hours/month (empty = follow plan)', 'Presupuesto de CPU propio en horas/mes (vacío = sigue el plan)'],
 };

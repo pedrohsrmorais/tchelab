@@ -77,9 +77,17 @@ mês do usuário em `usage_monthly` (jobs, falhas, CPU, GB·s de RAM, pico de me
   `armazenamento = GB médios × preço_GB_mês` (GB médios = GB·hora ÷ 730) · `processamento = CPU-horas × preço_CPU_hora`
   (o preço da CPU-hora deve embutir a memória) · `teto por usuário = cota do plano × preço_GB_mês + orçamento de CPU do plano (h) × preço_CPU_hora`.
   Para N licenças, `N × teto`. Orçamentos iniciais de CPU (placeholders editáveis): Beta 10 h/mês, Equipe 200 h/mês.
-- **Ainda não bloqueia**: o orçamento mensal de CPU é medido e exibido, mas não impede execuções (decisão de produto pendente: bloquear,
-  só avisar, ou cobrar excedente). Também falta o limite de jobs simultâneos por usuário (`max_concurrent_jobs` existe no plano, sem aplicação).
-- Testes: `worker_api/tests/test_metering.py` (7) e `backend_api/tests/usage_e2e.mjs` (30, com o worker real).
+- **Orçamento mensal de CPU bloqueia a execução** (decisão de 22/10/2026). O orçamento vem de `users.cpu_budget_seconds` (override do admin) →
+  `storage_plans.monthly_cpu_seconds` → plano padrão (`null` = sem limite). Com o orçamento gasto:
+  - `POST /workflows/:id/executions` e `POST /datasets/:id/operations` respondem **`402 CPU_BUDGET_EXCEEDED`** (`details`: `used_seconds`, `budget_seconds`);
+    a operação rápida checa antes de criar o workflow (não deixa workflow órfão);
+  - no meio de uma execução, os nós **ainda não iniciados** falham com `CPU_BUDGET_EXCEEDED: …` (e os seguintes viram `skipped`); o que já está rodando termina,
+    então o mês pode fechar um pouco acima do orçamento (no máximo o que cabe em um job);
+  - o contador zera sozinho na virada do mês (`usage_monthly` é por mês); o admin pode ampliar o plano ou definir orçamento por usuário
+    (`PUT /admin/storage/users/:uuid` com `cpu_budget_seconds`, `null` volta a seguir o plano);
+  - a interface abre o diálogo "Processamento do mês esgotado" e o perfil mostra a barra de CPU em vermelho. Admins **não** são isentos (use o plano Equipe).
+- Ainda sem aplicação: limite de jobs simultâneos por usuário (`max_concurrent_jobs` existe no plano).
+- Testes: `worker_api/tests/test_metering.py` (7) e `backend_api/tests/usage_e2e.mjs` (44, com o worker real).
 
 ## 4. Subindo com MinIO (Docker)
 
@@ -108,6 +116,6 @@ mês do usuário em `usage_monthly` (jobs, falhas, CPU, GB·s de RAM, pico de me
 
 - **Fase 3**: tensores ainda ficam no JSON do MySQL; `jobs.result` e `execution_nodes.input_data/output_data` duplicam JSON grande; o navegador ainda baixa o tensor e o reenvia no `dispatch`; o worker não lê o bucket; teto de 10 MB por requisição JSON.
 - **Fase 4**: datasets excluídos (soft delete) mantêm os metadados no MySQL até uma rotina de limpeza; usuário excluído (soft delete) não tem os dados apagados; sem lixeira nem reconciliação semanal.
-- **Fase 6 (restante)**: aplicar o orçamento de CPU e o limite de jobs simultâneos por usuário (a medição e a calculadora já existem, ver §3.1).
+- **Fase 6 (restante)**: limite de jobs simultâneos por usuário (medição, calculadora e bloqueio por orçamento de CPU já existem, ver §3.1).
 - Antes de executar um workflow a plataforma ainda **não** confere espaço mínimo livre: se a saída não couber, o nó falha com `STORAGE_QUOTA_EXCEEDED` (sem gravar parcial).
 - A foto nova precisa de espaço antes de a antiga ser liberada (troca de avatar com cota quase cheia pode falhar; exclua a foto antiga primeiro).

@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const db = require('../src/config/db.config');
 const usageSvc = require('../src/services/usage.service');
+const pipeline = require('../src/services/executionPipeline.service');
 
 const BASE = (process.argv[2] || 'http://localhost:3003') + '/api/v1';
 const stamp = Date.now().toString(36);
@@ -84,10 +85,55 @@ const main = async () => {
   check('3 h × 2 GB = 6 GB·hora', Math.abs(r.data.current.storage_gb_hours - 6) < 0.05, String(r.data.current.storage_gb_hours));
   await db.query('UPDATE users SET storage_used_bytes = 0 WHERE id = ?', [uRow.id]);
 
+  console.log('\n# Orçamento mensal de CPU bloqueia novas execuções');
+  const used = (await call(u.token, 'GET', '/usage/compute')).data.current.cpu_seconds; // ≈ 2,5 s já registrados acima
+  r = await call(admin.token, 'PUT', `/admin/storage/users/${u.user.uuid}`, { cpu_budget_seconds: 0 });
+  is('orçamento inválido (0) é recusado', r, 422);
+  r = await call(admin.token, 'PUT', `/admin/storage/users/${u.user.uuid}`, { cpu_budget_seconds: 1 });
+  is('admin define orçamento próprio do usuário', r, 200);
+  r = await call(u.token, 'GET', '/usage/compute'); check('usuário vê o orçamento próprio', r.data.cpu_budget_seconds === 1);
+  const [[wfCount0]] = await db.query('SELECT COUNT(*) AS n FROM workflows WHERE user_id = ?', [uRow.id]);
+  r = await call(u.token, 'POST', `/datasets/${dsId}/operations`, { technique_id: tech.uuid, params: {}, workflow_name: 'Deve bloquear', save_mode: 'new_dataset', new_dataset_name: 'x' });
+  is('operação rápida bloqueada: 402', r, 402);
+  check('código CPU_BUDGET_EXCEEDED com os números', r.error?.code === 'CPU_BUDGET_EXCEEDED' && r.error.details.used_seconds >= used - 0.01 && r.error.details.budget_seconds === 1, JSON.stringify(r.error));
+  const [[wfCount1]] = await db.query('SELECT COUNT(*) AS n FROM workflows WHERE user_id = ?', [uRow.id]);
+  check('não deixa workflow órfão para trás', wfCount1.n === wfCount0.n, `${wfCount0.n} → ${wfCount1.n}`);
+  const [wfIns] = await db.query("INSERT INTO workflows (uuid, user_id, name, definition) VALUES (UUID(), ?, 'WF bloqueio', '{}')", [uRow.id]);
+  const [[wfRow]] = await db.query('SELECT uuid FROM workflows WHERE id = ?', [wfIns.insertId]);
+  is('execução de workflow bloqueada: 402', await call(u.token, 'POST', `/workflows/${wfRow.uuid}/executions`, { dataset_bindings: {} }), 402);
+
+  // meio da execução: o nó seguinte falha com o motivo (o que já estava em andamento termina)
+  const [[techRow]] = await db.query("SELECT id FROM techniques WHERE slug = 'mean'");
+  const [wf2] = await db.query("INSERT INTO workflows (uuid, user_id, name, definition) VALUES (UUID(), ?, 'WF 2 nós', '{}')", [uRow.id]);
+  await db.query("INSERT INTO workflow_nodes (workflow_id, node_key, technique_id, name, parameters) VALUES (?, 'a', ?, 'A', '{}'), (?, 'b', ?, 'B', '{}')", [wf2.insertId, techRow.id, wf2.insertId, techRow.id]);
+  await db.query("INSERT INTO workflow_edges (workflow_id, source_node_key, target_node_key, source_port, target_port) VALUES (?, 'a', 'b', 'out', 'X')", [wf2.insertId]);
+  const [ex2] = await db.query("INSERT INTO executions (uuid, workflow_id, user_id, status) VALUES (UUID(), ?, ?, 'running')", [wf2.insertId, uRow.id]);
+  const [[nA]] = await db.query('SELECT id FROM workflow_nodes WHERE workflow_id = ? AND node_key = ?', [wf2.insertId, 'a']);
+  const [[nB]] = await db.query('SELECT id FROM workflow_nodes WHERE workflow_id = ? AND node_key = ?', [wf2.insertId, 'b']);
+  await db.query("INSERT INTO execution_nodes (execution_id, workflow_node_id, status, output_data, started_at) VALUES (?, ?, 'completed', '{\"out\":[1,2,3]}', NOW())", [ex2.insertId, nA.id]);
+  await db.query("INSERT INTO execution_nodes (execution_id, workflow_node_id, status) VALUES (?, ?, 'pending')", [ex2.insertId, nB.id]);
+  await pipeline.advanceExecution(ex2.insertId);
+  const [[nodeB]] = await db.query('SELECT status, error_message FROM execution_nodes WHERE execution_id = ? AND workflow_node_id = ?', [ex2.insertId, nB.id]);
+  check('nó seguinte falha com CPU_BUDGET_EXCEEDED', nodeB.status === 'failed' && /CPU_BUDGET_EXCEEDED/.test(nodeB.error_message), JSON.stringify(nodeB));
+  const [[jobsForB]] = await db.query("SELECT COUNT(*) AS n FROM jobs WHERE execution_id = ?", [ex2.insertId]);
+  check('e nenhum job foi enfileirado para ele', jobsForB.n === 0);
+
+  // ampliou → volta a executar
+  r = await call(admin.token, 'PUT', `/admin/storage/users/${u.user.uuid}`, { cpu_budget_seconds: 3600 });
+  is('admin amplia o orçamento', r, 200);
+  r = await call(u.token, 'POST', `/datasets/${dsId}/operations`, { technique_id: tech.uuid, params: {}, workflow_name: 'Liberado', save_mode: 'new_dataset', new_dataset_name: 'y' });
+  check('volta a executar com orçamento', [200, 201, 202].includes(r.status), `${r.status} ${JSON.stringify(r.error)}`);
+  r = await call(admin.token, 'PUT', `/admin/storage/users/${u.user.uuid}`, { cpu_budget_seconds: null });
+  is('null volta a seguir o plano', r, 200);
+  r = await call(u.token, 'GET', '/usage/compute'); check('segue o orçamento do plano de novo', r.data.cpu_budget_seconds === 36000, String(r.data.cpu_budget_seconds));
+  r = await call(admin.token, 'GET', '/admin/storage');
+  check('painel mostra orçamento do usuário', r.data.users.find((x) => x.email === u.user.email)?.cpu_budget_seconds === 36000);
+  await sleep(1500); // deixa o worker terminar o job liberado antes de encerrar
+
   console.log('\n# Admin: consumo por usuário, preços e calculadora');
   r = await call(admin.token, 'GET', '/admin/storage');
   const row = r.data.users.find((x) => x.email === u.user.email);
-  check('painel traz consumo do mês por usuário', row && row.month.jobs === 2 && row.month.cpu_seconds >= 2.5 && row.month.cost.total >= 0, JSON.stringify(row?.month));
+  check('painel traz consumo do mês por usuário', row && row.month.jobs >= 2 && row.month.cpu_seconds >= 2.5 && row.month.cost.total >= 0, JSON.stringify(row?.month));
   r = await call(admin.token, 'PUT', '/admin/storage/prices', { price_gb_month: 0.1, price_cpu_hour: 0.4, currency: 'brl' });
   is('define preços', r, 200); check('moeda em maiúsculas', r.data.currency === 'BRL' && r.data.price_cpu_hour === 0.4);
   is('preço negativo é recusado', await call(admin.token, 'PUT', '/admin/storage/prices', { price_cpu_hour: -1 }), 422);
