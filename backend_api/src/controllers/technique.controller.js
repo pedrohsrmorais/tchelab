@@ -3,6 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db.config');
 const R = require('../utils/response');
+const { resolveLang, localizeTechnique, localizeMany } = require('../utils/catalogI18n');
 
 // GET /techniques
 async function listTechniques(req, res) {
@@ -42,7 +43,7 @@ async function listTechniques(req, res) {
        FROM techniques WHERE ${where} ORDER BY category, family, name LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );
-    return R.ok(res, rows, { ...meta, total });
+    return R.ok(res, localizeMany(rows, resolveLang(req)), { ...meta, total });
   } catch (err) { return R.serverError(res, err); }
 }
 
@@ -69,7 +70,7 @@ async function getTechnique(req, res) {
       [req.params.id],
     );
     if (!rows.length) return R.notFound(res, 'Técnica');
-    return R.ok(res, rows[0]);
+    return R.ok(res, localizeTechnique(rows[0], resolveLang(req)));
   } catch (err) { return R.serverError(res, err); }
 }
 

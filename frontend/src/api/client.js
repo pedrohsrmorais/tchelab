@@ -1,4 +1,5 @@
 import axios from 'axios'
+import i18n from '../i18n'
 
 const BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
@@ -8,6 +9,8 @@ const client = axios.create({ baseURL: BASE, timeout: 30000 })
 client.interceptors.request.use(cfg => {
   const token = localStorage.getItem('tchelab_token')
   if (token) cfg.headers.Authorization = `Bearer ${token}`
+  // Idioma da interface -> o backend traduz o catálogo de técnicas (pt = padrão do banco)
+  try { cfg.headers['Accept-Language'] = String(i18n.language || 'pt').slice(0, 2) } catch { /* sem i18n */ }
   return cfg
 })
 

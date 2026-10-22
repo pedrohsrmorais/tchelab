@@ -12,6 +12,7 @@
  * Para alterar compatibilidade de tipos: edite COMPAT_MATRIX.
  */
 
+import i18n from '../i18n';
 // ── Tipos de array possíveis ──────────────────────────────────────────────────
 // IMPORTANTE: os valores aqui são os mesmos tokens de `type` usados em
 // `techniques.input_schema`/`output_schema` no banco e verificados pelo
@@ -54,7 +55,7 @@ export const ARRAY_TYPES = {
 // quase vazio no painel lateral, mesmo com a API retornando as técnicas.
 export const FAMILIES = {
   '01_dados': {
-    label:    { pt: 'Dados & I/O',              en: 'Data & I/O' },
+    label:    { pt: 'Dados & I/O',              en: 'Data & I/O', es: 'Datos y E/S' },
     color:    '#64748b',
     bg:       'rgba(100,116,139,0.15)',
     border:   'rgba(100,116,139,0.4)',
@@ -62,7 +63,7 @@ export const FAMILIES = {
     order:    1,
   },
   '02_preprocessamento': {
-    label:    { pt: 'Pré-processamento',        en: 'Pre-processing' },
+    label:    { pt: 'Pré-processamento',        en: 'Pre-processing', es: 'Preprocesamiento' },
     color:    '#0ea5e9',
     bg:       'rgba(14,165,233,0.12)',
     border:   'rgba(14,165,233,0.4)',
@@ -70,7 +71,7 @@ export const FAMILIES = {
     order:    2,
   },
   '03_exploratoria': {
-    label:    { pt: 'Análise Exploratória',     en: 'Exploratory Analysis' },
+    label:    { pt: 'Análise Exploratória',     en: 'Exploratory Analysis', es: 'Análisis exploratorio' },
     color:    '#8b5cf6',
     bg:       'rgba(139,92,246,0.12)',
     border:   'rgba(139,92,246,0.4)',
@@ -78,7 +79,7 @@ export const FAMILIES = {
     order:    3,
   },
   '04_regressao_1d': {
-    label:    { pt: 'Regressão',                en: 'Regression' },
+    label:    { pt: 'Regressão',                en: 'Regression', es: 'Regresión' },
     color:    '#10b981',
     bg:       'rgba(16,185,129,0.12)',
     border:   'rgba(16,185,129,0.4)',
@@ -86,7 +87,7 @@ export const FAMILIES = {
     order:    4,
   },
   '05_classificacao_1d': {
-    label:    { pt: 'Classificação',            en: 'Classification' },
+    label:    { pt: 'Classificação',            en: 'Classification', es: 'Clasificación' },
     color:    '#f59e0b',
     bg:       'rgba(245,158,11,0.12)',
     border:   'rgba(245,158,11,0.4)',
@@ -94,7 +95,7 @@ export const FAMILIES = {
     order:    5,
   },
   '06_deep_learning': {
-    label:    { pt: 'Deep Learning',            en: 'Deep Learning' },
+    label:    { pt: 'Deep Learning',            en: 'Deep Learning', es: 'Deep Learning' },
     color:    '#ec4899',
     bg:       'rgba(236,72,153,0.12)',
     border:   'rgba(236,72,153,0.4)',
@@ -102,7 +103,7 @@ export const FAMILIES = {
     order:    6,
   },
   '07_multiway_decomp': {
-    label:    { pt: 'Decomposição Multiway',    en: 'Multiway Decomposition' },
+    label:    { pt: 'Decomposição Multiway',    en: 'Multiway Decomposition', es: 'Descomposición multiway' },
     color:    '#06b6d4',
     bg:       'rgba(6,182,212,0.12)',
     border:   'rgba(6,182,212,0.4)',
@@ -110,7 +111,7 @@ export const FAMILIES = {
     order:    7,
   },
   '08_multiway_regression': {
-    label:    { pt: 'Regressão Multiway',       en: 'Multiway Regression' },
+    label:    { pt: 'Regressão Multiway',       en: 'Multiway Regression', es: 'Regresión multiway' },
     color:    '#84cc16',
     bg:       'rgba(132,204,22,0.12)',
     border:   'rgba(132,204,22,0.4)',
@@ -118,7 +119,7 @@ export const FAMILIES = {
     order:    8,
   },
   '09_multiway_classif': {
-    label:    { pt: 'Classificação Multiway',   en: 'Multiway Classification' },
+    label:    { pt: 'Classificação Multiway',   en: 'Multiway Classification', es: 'Clasificación multiway' },
     color:    '#f97316',
     bg:       'rgba(249,115,22,0.12)',
     border:   'rgba(249,115,22,0.4)',
@@ -126,7 +127,7 @@ export const FAMILIES = {
     order:    9,
   },
   '10_calibracao_ordem_superior': {
-    label:    { pt: 'Calibração de Ordem Superior', en: 'Higher-Order Calibration' },
+    label:    { pt: 'Calibração de Ordem Superior', en: 'Higher-Order Calibration', es: 'Calibración de orden superior' },
     color:    '#6366f1',
     bg:       'rgba(99,102,241,0.12)',
     border:   'rgba(99,102,241,0.4)',
@@ -134,7 +135,7 @@ export const FAMILIES = {
     order:    10,
   },
   '11_selecao_variaveis': {
-    label:    { pt: 'Seleção de Variáveis',     en: 'Variable Selection' },
+    label:    { pt: 'Seleção de Variáveis',     en: 'Variable Selection', es: 'Selección de variables' },
     color:    '#a855f7',
     bg:       'rgba(168,85,247,0.12)',
     border:   'rgba(168,85,247,0.4)',
@@ -142,7 +143,7 @@ export const FAMILIES = {
     order:    11,
   },
   '12_validacao_modelos': {
-    label:    { pt: 'Validação de Modelos',     en: 'Model Validation' },
+    label:    { pt: 'Validação de Modelos',     en: 'Model Validation', es: 'Validación de modelos' },
     color:    '#14b8a6',
     bg:       'rgba(20,184,166,0.12)',
     border:   'rgba(20,184,166,0.4)',
@@ -150,7 +151,7 @@ export const FAMILIES = {
     order:    12,
   },
   '13_transferencia_aprendizado': {
-    label:    { pt: 'Transferência de Aprendizado', en: 'Transfer Learning' },
+    label:    { pt: 'Transferência de Aprendizado', en: 'Transfer Learning', es: 'Transferencia de aprendizaje' },
     color:    '#ef4444',
     bg:       'rgba(239,68,68,0.12)',
     border:   'rgba(239,68,68,0.4)',
@@ -158,7 +159,7 @@ export const FAMILIES = {
     order:    13,
   },
   '14_sinais_espectrais': {
-    label:    { pt: 'Sinais Espectrais',        en: 'Spectral Signals' },
+    label:    { pt: 'Sinais Espectrais',        en: 'Spectral Signals', es: 'Señales espectrales' },
     color:    '#22c55e',
     bg:       'rgba(34,197,94,0.12)',
     border:   'rgba(34,197,94,0.4)',
@@ -166,7 +167,7 @@ export const FAMILIES = {
     order:    14,
   },
   '15_imagens_hiperespectrais': {
-    label:    { pt: 'Imagens Hiperespectrais',  en: 'Hyperspectral Imaging' },
+    label:    { pt: 'Imagens Hiperespectrais',  en: 'Hyperspectral Imaging', es: 'Imágenes hiperespectrales' },
     color:    '#fb923c',
     bg:       'rgba(251,146,60,0.12)',
     border:   'rgba(251,146,60,0.4)',
@@ -174,7 +175,7 @@ export const FAMILIES = {
     order:    15,
   },
   '16_dados_faltantes': {
-    label:    { pt: 'Dados Faltantes',          en: 'Missing Data' },
+    label:    { pt: 'Dados Faltantes',          en: 'Missing Data', es: 'Datos faltantes' },
     color:    '#38bdf8',
     bg:       'rgba(56,189,248,0.12)',
     border:   'rgba(56,189,248,0.4)',
@@ -182,7 +183,7 @@ export const FAMILIES = {
     order:    16,
   },
   '17_fusao_dados': {
-    label:    { pt: 'Fusão de Dados',           en: 'Data Fusion' },
+    label:    { pt: 'Fusão de Dados',           en: 'Data Fusion', es: 'Fusión de datos' },
     color:    '#facc15',
     bg:       'rgba(250,204,21,0.12)',
     border:   'rgba(250,204,21,0.4)',
@@ -190,7 +191,7 @@ export const FAMILIES = {
     order:    17,
   },
   '18_quimiometria_processo': {
-    label:    { pt: 'Quimiometria de Processo', en: 'Process Chemometrics (SPC)' },
+    label:    { pt: 'Quimiometria de Processo', en: 'Process Chemometrics (SPC)', es: 'Quimiometría de procesos (SPC)' },
     color:    '#c084fc',
     bg:       'rgba(192,132,252,0.12)',
     border:   'rgba(192,132,252,0.4)',
@@ -198,7 +199,7 @@ export const FAMILIES = {
     order:    18,
   },
   '19_interpretabilidade': {
-    label:    { pt: 'Interpretabilidade',       en: 'Interpretability' },
+    label:    { pt: 'Interpretabilidade',       en: 'Interpretability', es: 'Interpretabilidad' },
     color:    '#34d399',
     bg:       'rgba(52,211,153,0.12)',
     border:   'rgba(52,211,153,0.4)',
@@ -206,7 +207,7 @@ export const FAMILIES = {
     order:    19,
   },
   '20_utilitarios': {
-    label:    { pt: 'Utilitários',              en: 'Utilities' },
+    label:    { pt: 'Utilitários',              en: 'Utilities', es: 'Utilidades' },
     color:    '#94a3b8',
     bg:       'rgba(148,163,184,0.12)',
     border:   'rgba(148,163,184,0.4)',
@@ -237,16 +238,20 @@ function matlabize(cfg) {
   return { ...cfg, color: c, bg: `rgba(${rgb},0.10)`, border: `rgba(${rgb},0.45)` };
 }
 
-export function getFamilyConfig(familySlug, lang = 'pt') {
+// Idioma ativo da interface (pt/en/es), normalizado: 'pt-BR' -> 'pt'
+const uiLang = (l) => String(l || i18n.language || 'pt').slice(0, 2);
+const pickLabel = (label, l) => label[uiLang(l)] || label.en || label.pt;
+
+export function getFamilyConfig(familySlug, lang) {
   if (!familySlug) return null;
   // Tenta match direto
   if (FAMILIES[familySlug]) {
-    return matlabize({ ...FAMILIES[familySlug], slug: familySlug, labelStr: FAMILIES[familySlug].label[lang] || FAMILIES[familySlug].label.pt });
+    return matlabize({ ...FAMILIES[familySlug], slug: familySlug, labelStr: pickLabel(FAMILIES[familySlug].label, lang) });
   }
   // Tenta match com prefixo numérico
   const found = Object.entries(FAMILIES).find(([k]) => k.endsWith(`_${familySlug}`) || k === familySlug);
   if (found) {
-    return matlabize({ ...found[1], slug: found[0], labelStr: found[1].label[lang] || found[1].label.pt });
+    return matlabize({ ...found[1], slug: found[0], labelStr: pickLabel(found[1].label, lang) });
   }
   return { label: { pt: familySlug, en: familySlug }, color: '#64748b', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.3)', labelStr: familySlug, slug: familySlug };
 }
@@ -254,10 +259,10 @@ export function getFamilyConfig(familySlug, lang = 'pt') {
 /**
  * Retorna lista de famílias ordenada para exibição.
  */
-export function getFamiliesList(lang = 'pt') {
+export function getFamiliesList(lang) {
   return Object.entries(FAMILIES)
     .sort(([, a], [, b]) => a.order - b.order)
-    .map(([slug, cfg]) => matlabize({ slug, ...cfg, labelStr: cfg.label[lang] || cfg.label.pt }));
+    .map(([slug, cfg]) => matlabize({ slug, ...cfg, labelStr: pickLabel(cfg.label, lang) }));
 }
 
 // ── Matriz de compatibilidade de tipos ───────────────────────────────────────
