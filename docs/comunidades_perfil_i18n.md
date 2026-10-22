@@ -83,3 +83,30 @@ O banco guarda o texto em **pt** (idioma-fonte). A tradução fica em arquivos l
 - Famílias: rótulos em `frontend/src/config/techniqueRegistry.js` (`FAMILIES[...].label.{pt,en,es}`).
 - Ao incluir/alterar uma técnica no banco, atualize os dois JSON e rode `node tests/catalog_i18n_check.js`
   (falha se faltar tradução, sobrar chave órfã ou o código entre crases divergir).
+
+## 7. A aula completa na comunidade (professor)
+
+Dentro de **Conteúdo**, o professor monta a aula em tópicos. *Adicionar material* abre um único modal com seis tipos:
+
+| Tipo | O que é | Como o aluno usa |
+|---|---|---|
+| Arquivo / PDF | PDF, **PPT/PPTX/ODP**, DOC/DOCX, XLS/XLSX, imagem, ZIP (até 100 MB; vários de uma vez, arrastando) | Pré-visualiza no navegador e baixa o original |
+| Workflow | workflow do professor, com acesso **leitura** ou **edição** | Abre (somente-leitura ou editável) e pode **copiar para os próprios workflows** |
+| Variável do Workspace | dataset do professor (somente leitura) | Visualiza e **copia para o próprio Workspace** |
+| Projeto | projeto que o professor administra (leitura/edição) | Como na seção 4 |
+| Link | URL externa | Abre em nova aba |
+| Texto | instruções/anotações | Leitura no modal |
+
+- Itens e tópicos podem ser **editados, movidos (sobe/desce), ocultados e excluídos**. Tópico oculto esconde os itens e
+  bloqueia o download direto do arquivo para os alunos.
+- Um item workflow/variável concede ao membro acesso **apenas de leitura** (workflow com `access = edit` concede edição)
+  enquanto o item estiver visível; ao removê-lo o acesso some. Referência apagada aparece como "indisponível".
+- **PPT/DOC/XLS → PDF**: conversão em segundo plano com o LibreOffice (`soffice --headless`, fila serial). Variável
+  opcional `SOFFICE_BIN` aponta para o executável. Se o `soffice` não existir ou a conversão falhar, o item fica com
+  `preview_status = failed` e a tela oferece apenas o download — nada quebra. A lista recarrega sozinha enquanto houver
+  conversão pendente (`preview_status = pending`).
+- API nova: `PUT /communities/:id/items-order`, `GET …/items/:iid/file?preview=1`, `POST /datasets/:id/copy`;
+  `POST /communities/:id/items` aceita `type = workflow|dataset` com `ref` (uuid) e `access`.
+- Tabela `community_items`: colunas `ref_id`, `access`, `preview_path`, `preview_status`.
+
+Arquitetura dos próximos sub-apps (quizzes/exercícios): `docs/comunidade_subapps_quizzes.md`.

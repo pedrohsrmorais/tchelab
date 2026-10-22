@@ -118,9 +118,15 @@ export const api = {
       ? client.post(`/communities/${id}/items`, d, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 })
       : post(`/communities/${id}/items`, d),
     updateItem:      (id, iid, d) => put(`/communities/${id}/items/${iid}`, d),
+    reorderItems:    (id, sectionId, order) => put(`/communities/${id}/items-order`, { section_id: sectionId || null, order }),
     deleteItem:      (id, iid) => del(`/communities/${id}/items/${iid}`),
-    // Arquivo protegido por login: baixa como blob (o <a href> direto não leva o token)
-    fileBlob:        (id, iid, download = false) => client.get(`/communities/${id}/items/${iid}/file${download ? '?download=1' : ''}`, { responseType: 'blob' }),
+    // Arquivo protegido por login: baixa como blob (o <a href> direto não leva o token).
+    // opts: { download: true } = original como anexo · { preview: true } = PDF convertido de PPT/DOC/XLS
+    fileBlob:        (id, iid, opts = {}) => {
+      const o = typeof opts === 'boolean' ? { download: opts } : opts;
+      const qs = o.preview ? '?preview=1' : (o.download ? '?download=1' : '');
+      return client.get(`/communities/${id}/items/${iid}/file${qs}`, { responseType: 'blob' });
+    },
 
     // Datasets / workflows compartilhados (legado)
     shareDataset:    (id, dsId) => post(`/communities/${id}/datasets`, { dataset_id: dsId }),
@@ -141,6 +147,7 @@ export const api = {
     // already-assembled nested-array tensor instead of a CSV file.
     importTensor:    (d)       => post('/datasets/import', d),
     get:             (id)      => get(`/datasets/${id}`),
+    copy:            (id, d)   => post(`/datasets/${id}/copy`, d || {}),
     update:          (id, d)   => put(`/datasets/${id}`, d),
     delete:          (id)      => del(`/datasets/${id}`),
     lineage:         (id)      => get(`/datasets/${id}/lineage`),

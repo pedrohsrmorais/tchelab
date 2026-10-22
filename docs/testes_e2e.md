@@ -128,6 +128,7 @@ parula, cores MATLAB nos gráficos e nas famílias. Capturas: `classic_workspace
 | Teste | Como rodar | O que cobre |
 |-------|-----------|-------------|
 | `backend_api/tests/access_e2e.mjs` | `node tests/access_e2e.mjs [http://localhost:3003]` (backend no ar) | 132 checagens: papéis de comunidade, convites (limite/expiração), banimento, vínculo de projeto `read`/`edit`, visibilidade de projetos públicos/privados, herança para workflows/datasets, arquivos da comunidade |
+| `backend_api/tests/community_content_e2e.mjs` | `node tests/community_content_e2e.mjs [http://localhost:3003]` (backend no ar; usa `tests/fixtures/aula.pptx`) | 51 checagens da "aula completa": upload de PPTX/PDF, pré-visualização em PDF, itens workflow/variável com acesso leitura/edição, cópia de workflow/variável pelo aluno, reordenação, tópicos ocultos (inclusive download bloqueado), exclusão com limpeza de arquivos |
 | `backend_api/tests/catalog_i18n_check.js` | `node tests/catalog_i18n_check.js` (usa `DB_*`) | Cobertura da tradução en/es das 94 técnicas ativas (texto, portas, parâmetros), chaves órfãs e código entre crases |
 | `frontend`: `npm run i18n:check` | na pasta `frontend` | Paridade de chaves e `{{placeholders}}` entre pt/en/es |
 

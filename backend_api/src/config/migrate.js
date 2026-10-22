@@ -149,6 +149,25 @@ async function migrate() {
   await addColumn('community_projects', 'section_id', 'bigint unsigned DEFAULT NULL');
   await addColumn('community_projects', 'position', 'int NOT NULL DEFAULT 0');
 
+  // itens de comunidade: workflow / variável (dataset) do Workspace como material, e pré-visualização
+  // (PPT/DOC/XLS convertidos em PDF) — o enum é ampliado só se ainda não tiver os novos tipos.
+  if (await hasTable('community_items')) {
+    const [[col]] = await db.query(
+      `SELECT COLUMN_TYPE AS t FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'community_items' AND COLUMN_NAME = 'type'`,
+    );
+    if (col && !String(col.t).includes("'workflow'")) {
+      await db.query("ALTER TABLE `community_items` MODIFY `type` enum('link','file','text','workflow','dataset') NOT NULL DEFAULT 'link'");
+      console.log('[migrate] community_items.type ampliado (workflow, dataset)');
+    }
+    await addColumn('community_items', 'ref_id', 'bigint unsigned DEFAULT NULL');
+    await addColumn('community_items', 'access', "enum('read','edit') NOT NULL DEFAULT 'read'");
+    await addColumn('community_items', 'preview_path', 'varchar(500) DEFAULT NULL');
+    await addColumn('community_items', 'preview_status', "enum('none','pending','ready','failed') NOT NULL DEFAULT 'none'");
+    // Conversões que ficaram "pending" por uma queda do servidor nunca terminariam
+    await db.query("UPDATE community_items SET preview_status = 'failed' WHERE preview_status = 'pending'");
+  }
+
   // O papel "owner" deriva de communities.owner_id; garante a linha de membro
   // (admin) do dono em comunidades antigas.
   if (await hasTable('communities') && await hasTable('community_members')) {

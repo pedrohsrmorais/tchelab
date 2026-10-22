@@ -84,6 +84,9 @@ async function createWorkflow(req, res) {
 }
 
 // POST /workflows/:id/fork
+// Colunas JSON voltam do driver já como objeto; ao reinserir, precisam virar texto de novo.
+const asJson = (v) => (v !== null && typeof v === 'object' ? JSON.stringify(v) : v);
+
 async function forkWorkflow(req, res) {
   try {
     const original = await resolveWorkflow(req.params.id);
@@ -95,8 +98,8 @@ async function forkWorkflow(req, res) {
       `INSERT INTO workflows (uuid, user_id, name, description, visibility, tags, status,
           definition, fork_from_workflow_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, 'private', ?, 'draft', ?, ?, NOW(), NOW())`,
-      [uuid, req.user.id, `Fork de ${original.name}`, original.description,
-        original.tags, original.definition, original.id],
+      [uuid, req.user.id, `Fork de ${original.name}`.slice(0, 255), original.description,
+        asJson(original.tags), asJson(original.definition), original.id],
     );
 
     // Copia nós e arestas
@@ -105,7 +108,7 @@ async function forkWorkflow(req, res) {
       await db.query(
         `INSERT INTO workflow_nodes (workflow_id, node_key, technique_id, name, parameters, position_x, position_y, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [forkResult.insertId, node.node_key, node.technique_id, node.name, node.parameters, node.position_x, node.position_y],
+        [forkResult.insertId, node.node_key, node.technique_id, node.name, asJson(node.parameters), node.position_x, node.position_y],
       );
     }
     const [edges] = await db.query('SELECT * FROM workflow_edges WHERE workflow_id = ?', [original.id]);

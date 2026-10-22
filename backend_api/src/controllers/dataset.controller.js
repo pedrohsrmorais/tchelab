@@ -7,6 +7,7 @@ const db = require('../config/db.config');
 const jobService = require('../services/job.service');
 const lineageService = require('../services/lineage.service');
 const R = require('../utils/response');
+const storageCfg = require('../config/storage.config');
 const { LEVEL, guardDataset } = require('../services/access.service');
 
 /**
@@ -397,6 +398,47 @@ async function getDataset(req, res) {
   } catch (err) { return R.serverError(res, err); }
 }
 
+// POST /datasets/:id/copy — copia a variável para o Workspace de quem pede (precisa poder LER o original)
+async function copyDataset(req, res) {
+  try {
+    const ds = await resolveDataset(req.params.id);
+    if (!ds) return R.notFound(res, 'Dataset');
+    if (!(await guardDataset(req, res, ds, LEVEL.READ))) return;
+
+    const uuid = uuidv4();
+    // Arquivo em disco (importações de arquivo) é copiado; variáveis coladas vivem no metadata.
+    let storagePath = ds.storage_path;
+    if (storagePath) {
+      const candidates = [storagePath, path.join(storageCfg.base, storagePath)];
+      const src = candidates.find((c) => fs.existsSync(c) && fs.statSync(c).isFile());
+      if (src) {
+        fs.mkdirSync(storageCfg.datasets, { recursive: true });
+        storagePath = path.join(storageCfg.datasets, `${uuid}${path.extname(src)}`);
+        fs.copyFileSync(src, storagePath);
+      }
+    }
+    const name = (req.body && req.body.name ? String(req.body.name) : ds.name).slice(0, 255);
+    const cols = ['uuid', 'user_id', 'name', 'description', 'visibility', 'data_type', 'technique', 'x_unit', 'y_unit', 'spectra_count',
+      'x_points', 'x_min', 'x_max', 'reference_labels', 'dimensions', 'mode_labels', 'mode_ranges', 'sample_axis', 'data_order',
+      'augmentation_scheme', 'file_format', 'storage_path', 'metadata'];
+    const vals = cols.map((c) => {
+      if (c === 'uuid') return uuid;
+      if (c === 'user_id') return req.user.id;
+      if (c === 'name') return name;
+      if (c === 'visibility') return 'private';
+      if (c === 'storage_path') return storagePath;
+      const v = ds[c];
+      return v !== null && typeof v === 'object' && !(v instanceof Date) ? JSON.stringify(v) : v;
+    });
+    const [result] = await db.query(
+      `INSERT INTO datasets (${cols.join(', ')}, created_at, updated_at) VALUES (${cols.map(() => '?').join(', ')}, NOW(), NOW())`, vals,
+    );
+    await db.query('UPDATE users SET stat_datasets = stat_datasets + 1 WHERE id = ?', [req.user.id]);
+    const [rows] = await db.query('SELECT * FROM datasets WHERE id = ?', [result.insertId]);
+    return R.created(res, rows[0]);
+  } catch (err) { return R.serverError(res, err); }
+}
+
 // PUT /datasets/:id
 async function updateDataset(req, res) {
   try {
@@ -533,6 +575,6 @@ async function listDatasetSpectra(req, res) {
 }
 
 module.exports = {
-  listDatasets, createDataset, smartImport, getDataset, updateDataset, deleteDataset,
+  listDatasets, createDataset, smartImport, getDataset, copyDataset, updateDataset, deleteDataset,
   getLineage, getSlice, getPreview, addSpectraToDataset, listDatasetSpectra,
 };

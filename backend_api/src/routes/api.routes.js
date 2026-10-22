@@ -95,6 +95,7 @@ router.put   ('/communities/:id/sections-order',                authenticate, cg
 router.put   ('/communities/:id/sections/:sid',                 authenticate, cg('moderator'), communityCtrl.updateSection);
 router.delete('/communities/:id/sections/:sid',                 authenticate, cg('moderator'), communityCtrl.deleteSection);
 router.post  ('/communities/:id/items',                         authenticate, cg('moderator'), communityCtrl.itemUpload, communityCtrl.createItem);
+router.put   ('/communities/:id/items-order',                    authenticate, cg('moderator'), communityCtrl.reorderItems);
 router.put   ('/communities/:id/items/:iid',                    authenticate, cg('moderator'), communityCtrl.updateItem);
 router.delete('/communities/:id/items/:iid',                    authenticate, cg('moderator'), communityCtrl.deleteItem);
 router.get   ('/communities/:id/items/:iid/file',               authenticate, cg('member'),    communityCtrl.downloadItemFile);
@@ -160,6 +161,7 @@ router.get   ('/datasets',                                      authenticate, da
 router.post  ('/datasets',                                      authenticate, datasetCtrl.createDataset);
 router.post  ('/datasets/import',                               authenticate, datasetUpload.single('file'), datasetCtrl.smartImport);
 router.get   ('/datasets/:id',                                  authenticate, datasetCtrl.getDataset);
+router.post  ('/datasets/:id/copy',                             authenticate, datasetCtrl.copyDataset);
 router.put   ('/datasets/:id',                                  authenticate, datasetCtrl.updateDataset);
 router.delete('/datasets/:id',                                  authenticate, datasetCtrl.deleteDataset);
 router.get   ('/datasets/:id/lineage',                          authenticate, datasetCtrl.getLineage);

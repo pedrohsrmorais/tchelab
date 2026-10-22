@@ -8,7 +8,8 @@ const db = require('../config/db.config');
 const storage = require('../config/storage.config');
 const R = require('../utils/response');
 const { communityUpload } = require('../utils/multer');
-const { LEVEL, projectLevel, communityRole } = require('../services/access.service');
+const { LEVEL, projectLevel, workflowLevel, datasetLevel, communityRole } = require('../services/access.service');
+const { isOfficeFile, enqueuePreview } = require('../services/officePreview');
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Papéis:  owner (4) > admin (3) > moderator (2) > member (1)
@@ -203,10 +204,10 @@ async function updateCommunity(req, res) {
 async function deleteCommunity(req, res) {
   try {
     const [files] = await db.query(
-      "SELECT file_path FROM community_items WHERE community_id = ? AND file_path IS NOT NULL", [req.community.id],
+      "SELECT file_path, preview_path FROM community_items WHERE community_id = ? AND file_path IS NOT NULL", [req.community.id],
     );
     await db.query('DELETE FROM communities WHERE id = ?', [req.community.id]);
-    files.forEach((f) => removeStoredFile(f.file_path));
+    files.forEach((f) => { removeStoredFile(f.file_path); removeStoredFile(f.preview_path); });
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -746,6 +747,20 @@ async function sectionRow(communityId, uuid) {
   return rows[0] || null;
 }
 
+/** Linha do banco -> item da API (referências a workflow/variável viram `ref`). */
+function shapeItem(row) {
+  const { section_id, is_visible, wf_uuid, wf_name, ds_uuid, ds_name, ds_dimensions, ...it } = row;
+  const out = { ...it, is_visible: !!is_visible };
+  if (it.type === 'workflow') out.ref = wf_uuid ? { uuid: wf_uuid, name: wf_name } : null;
+  else if (it.type === 'dataset') {
+    let dims = null;
+    try { dims = typeof ds_dimensions === 'string' ? JSON.parse(ds_dimensions) : ds_dimensions; } catch { /* ignora */ }
+    out.ref = ds_uuid ? { uuid: ds_uuid, name: ds_name, dimensions: dims } : null;
+  } else { delete out.access; }
+  if (it.type !== 'file') delete out.preview_status;
+  return out;
+}
+
 // GET /communities/:id/content
 async function getContent(req, res) {
   try {
@@ -757,8 +772,11 @@ async function getContent(req, res) {
     );
     const [items] = await db.query(
       `SELECT i.uuid, i.section_id, i.type, i.title, i.description, i.url, i.file_name, i.file_mime, i.file_size,
-              i.position, i.is_visible, i.created_at, u.name AS created_by_name
+              i.position, i.is_visible, i.created_at, i.access, i.preview_status, u.name AS created_by_name,
+              w.uuid AS wf_uuid, w.name AS wf_name, d.uuid AS ds_uuid, d.name AS ds_name, d.dimensions AS ds_dimensions
          FROM community_items i LEFT JOIN users u ON u.id = i.created_by
+         LEFT JOIN workflows w ON i.type = 'workflow' AND w.id = i.ref_id AND w.deleted_at IS NULL
+         LEFT JOIN datasets d ON i.type = 'dataset' AND d.id = i.ref_id AND d.deleted_at IS NULL
         WHERE i.community_id = ? ${canSeeHidden ? '' : 'AND i.is_visible = 1'}
         ORDER BY i.position, i.id`, [req.community.id],
     );
@@ -773,7 +791,7 @@ async function getContent(req, res) {
     );
 
     const bySection = (sid) => ({
-      items: items.filter((i) => i.section_id === sid).map(({ section_id, is_visible, ...i }) => ({ ...i, is_visible: !!is_visible })),
+      items: items.filter((i) => i.section_id === sid).map(shapeItem),
       projects: projects.filter((p) => p.section_id === sid).map(({ section_id, ...p }) => p),
     });
     return R.ok(res, {
@@ -843,11 +861,11 @@ async function deleteSection(req, res) {
   try {
     const s = await sectionRow(req.community.id, req.params.sid);
     if (!s) return R.notFound(res, 'Tópico');
-    const [files] = await db.query('SELECT file_path FROM community_items WHERE section_id = ? AND file_path IS NOT NULL', [s.id]);
+    const [files] = await db.query('SELECT file_path, preview_path FROM community_items WHERE section_id = ? AND file_path IS NOT NULL', [s.id]);
     // Projetos do tópico voltam para "geral" (o vínculo é preservado).
     await db.query('UPDATE community_projects SET section_id = NULL WHERE section_id = ?', [s.id]);
     await db.query('DELETE FROM community_sections WHERE id = ?', [s.id]);
-    files.forEach((f) => removeStoredFile(f.file_path));
+    files.forEach((f) => { removeStoredFile(f.file_path); removeStoredFile(f.preview_path); });
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -868,10 +886,31 @@ async function createItem(req, res) {
   try {
     const b = req.body || {};
     const type = req.file ? 'file' : (b.type || 'link');
-    if (!['link', 'file', 'text'].includes(type)) { discard(); return R.unprocessable(res, [{ field: 'type', message: 'Inválido.' }]); }
+    if (!['link', 'file', 'text', 'workflow', 'dataset'].includes(type)) { discard(); return R.unprocessable(res, [{ field: 'type', message: 'Inválido.' }]); }
     if (type === 'file' && !req.file) return R.unprocessable(res, [{ field: 'file', message: 'Envie um arquivo.' }]);
 
-    const title = String(b.title || (req.file ? req.file.originalname : '')).trim();
+    // Referência a um workflow / variável do Workspace do próprio professor
+    let refId = null; let refName = null; let refAccess = 'read';
+    if (type === 'workflow' || type === 'dataset') {
+      if (!b.ref) return R.unprocessable(res, [{ field: 'ref', message: type === 'workflow' ? 'Escolha um workflow.' : 'Escolha uma variável.' }]);
+      if (type === 'workflow') {
+        const [w] = await db.query('SELECT * FROM workflows WHERE uuid = ? AND deleted_at IS NULL', [String(b.ref)]);
+        if (!w.length) return R.notFound(res, 'Workflow');
+        if ((await workflowLevel(w[0], req.user)) < LEVEL.EDIT) return R.forbidden(res, 'Você só pode vincular workflows que pode editar.');
+        refId = w[0].id; refName = w[0].name;
+        if (b.access !== undefined) {
+          if (!ACCESS_VALUES.includes(b.access)) return R.unprocessable(res, [{ field: 'access', message: 'Use read ou edit.' }]);
+          refAccess = b.access;
+        }
+      } else {
+        const [d] = await db.query('SELECT * FROM datasets WHERE uuid = ? AND deleted_at IS NULL', [String(b.ref)]);
+        if (!d.length) return R.notFound(res, 'Variável');
+        if (d[0].user_id !== req.user.id && req.user.role !== 'admin') return R.forbidden(res, 'Você só pode vincular variáveis suas.');
+        refId = d[0].id; refName = d[0].name;
+      }
+    }
+
+    const title = String(b.title || (req.file ? req.file.originalname : refName || '')).trim();
     if (!title) { discard(); return R.unprocessable(res, [{ field: 'title', message: 'Obrigatório.' }]); }
     if (title.length > 255) { discard(); return R.unprocessable(res, [{ field: 'title', message: 'Máximo 255 caracteres.' }]); }
 
@@ -885,6 +924,7 @@ async function createItem(req, res) {
       discard(); return R.unprocessable(res, [{ field: 'description', message: 'Escreva o conteúdo do texto.' }]);
     }
 
+    const wantsPreview = !!req.file && isOfficeFile(req.file.originalname);
     let sectionId = null;
     if (b.section_id) {
       const s = await sectionRow(req.community.id, b.section_id);
@@ -898,8 +938,9 @@ async function createItem(req, res) {
     const uuid = uuidv4();
     await db.query(
       `INSERT INTO community_items
-         (uuid, community_id, section_id, type, title, description, url, file_path, file_name, file_mime, file_size, position, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (uuid, community_id, section_id, type, title, description, url, file_path, file_name, file_mime, file_size, position, created_by,
+          ref_id, access, preview_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         uuid, req.community.id, sectionId, type, title,
         b.description ? String(b.description).slice(0, 20000) : null, url,
@@ -908,8 +949,13 @@ async function createItem(req, res) {
         req.file ? req.file.mimetype : null,
         req.file ? req.file.size : null,
         next, req.user.id,
+        refId, refAccess, wantsPreview ? 'pending' : 'none',
       ],
     );
+    if (wantsPreview) {
+      const [[row]] = await db.query('SELECT id FROM community_items WHERE uuid = ?', [uuid]);
+      enqueuePreview(row.id, path.basename(req.file.path));
+    }
     return R.created(res, { uuid, type, title });
   } catch (err) { discard(); return R.serverError(res, err); }
 }
@@ -937,27 +983,62 @@ async function updateItem(req, res) {
         sectionId = s.id;
       }
     }
+    let access = it.access;
+    if (b.access !== undefined) {
+      if (!ACCESS_VALUES.includes(b.access)) return R.unprocessable(res, [{ field: 'access', message: 'Use read ou edit.' }]);
+      if (it.type === 'workflow') access = b.access;
+    }
+    // Mudou de tópico: vai para o fim do tópico de destino
+    let position = it.position;
+    if (sectionId !== it.section_id) {
+      const [[{ next }]] = await db.query(
+        'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM community_items WHERE community_id = ? AND section_id <=> ?', [req.community.id, sectionId],
+      );
+      position = next;
+    }
     await db.query(
-      'UPDATE community_items SET title = ?, description = ?, url = ?, section_id = ?, is_visible = ? WHERE id = ?',
+      'UPDATE community_items SET title = ?, description = ?, url = ?, section_id = ?, is_visible = ?, access = ?, position = ? WHERE id = ?',
       [
         b.title !== undefined ? String(b.title).trim().slice(0, 255) : it.title,
         b.description !== undefined ? (b.description ? String(b.description).slice(0, 20000) : null) : it.description,
         url, sectionId,
         b.is_visible !== undefined ? (b.is_visible ? 1 : 0) : it.is_visible,
-        it.id,
+        access, position, it.id,
       ],
     );
     return R.ok(res, { message: 'Item atualizado.' });
   } catch (err) { return R.serverError(res, err); }
 }
 
+// PUT /communities/:id/items-order  { section_id?: uuid|null, order: [uuid, ...] }  — reordena os itens de um tópico
+async function reorderItems(req, res) {
+  try {
+    const { section_id: sectionUuid, order } = req.body || {};
+    if (!Array.isArray(order)) return R.unprocessable(res, [{ field: 'order', message: 'Informe a lista de itens.' }]);
+    let sectionId = null;
+    if (sectionUuid) {
+      const s = await sectionRow(req.community.id, sectionUuid);
+      if (!s) return R.notFound(res, 'Tópico');
+      sectionId = s.id;
+    }
+    for (let i = 0; i < order.length; i += 1) {
+      await db.query(
+        'UPDATE community_items SET position = ? WHERE uuid = ? AND community_id = ? AND section_id <=> ?',
+        [i, String(order[i]), req.community.id, sectionId],
+      );
+    }
+    return R.ok(res, { message: 'Ordem atualizada.' });
+  } catch (err) { return R.serverError(res, err); }
+}
+
 // DELETE /communities/:id/items/:iid
 async function deleteItem(req, res) {
   try {
-    const [rows] = await db.query('SELECT id, file_path FROM community_items WHERE uuid = ? AND community_id = ?', [req.params.iid, req.community.id]);
+    const [rows] = await db.query('SELECT id, file_path, preview_path FROM community_items WHERE uuid = ? AND community_id = ?', [req.params.iid, req.community.id]);
     if (!rows.length) return R.notFound(res, 'Item');
     await db.query('DELETE FROM community_items WHERE id = ?', [rows[0].id]);
     removeStoredFile(rows[0].file_path);
+    removeStoredFile(rows[0].preview_path);
     return R.noContent(res);
   } catch (err) { return R.serverError(res, err); }
 }
@@ -970,9 +1051,28 @@ async function downloadItemFile(req, res) {
     );
     if (!rows.length || !rows[0].file_path) return R.notFound(res, 'Arquivo');
     const it = rows[0];
-    if (!it.is_visible && rankOf(req.cRole) < RANK.moderator) return R.notFound(res, 'Arquivo');
+    if (rankOf(req.cRole) < RANK.moderator) {
+      // item oculto, ou dentro de um tópico oculto, não é servido a membros comuns
+      let hidden = !it.is_visible;
+      if (!hidden && it.section_id) {
+        const [[sec]] = await db.query('SELECT is_visible FROM community_sections WHERE id = ?', [it.section_id]);
+        hidden = !sec || !sec.is_visible;
+      }
+      if (hidden) return R.notFound(res, 'Arquivo');
+    }
     const full = path.join(storage.communities, path.basename(it.file_path));
     if (!fs.existsSync(full)) return R.notFound(res, 'Arquivo');
+
+    // ?preview=1 -> PDF gerado a partir de PPT/DOC/XLS (quando a conversão terminou)
+    if (req.query.preview === '1') {
+      if (it.preview_status !== 'ready' || !it.preview_path) return R.notFound(res, 'Pré-visualização');
+      const pfull = path.join(storage.communities, path.basename(it.preview_path));
+      if (!fs.existsSync(pfull)) return R.notFound(res, 'Pré-visualização');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(`${path.parse(it.file_name || 'arquivo').name}.pdf`)}`);
+      return fs.createReadStream(pfull).pipe(res);
+    }
 
     const inline = req.query.download !== '1' && (it.file_mime === 'application/pdf' || String(it.file_mime).startsWith('image/'));
     res.setHeader('Content-Type', it.file_mime || 'application/octet-stream');
@@ -1040,7 +1140,7 @@ async function deleteMessage(req, res) {
 }
 
 module.exports = {
-  guard, itemUpload,
+  guard, itemUpload, reorderItems,
   listMyCommunities, listPublicCommunities, createCommunity, getCommunity, updateCommunity, deleteCommunity,
   joinPublic, leaveCommunity, transferOwnership,
   listInvites, createInvite, revokeInvite, previewInvite, joinWithCode,

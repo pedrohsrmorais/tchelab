@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Users, MessageSquare, FolderOpen, Plus, Send, BookOpen, Link2, FileText, File as FileIcon,
   Trash2, Eye, EyeOff, Pencil, Copy, KeyRound, Settings, LogOut, Globe, Lock, Download, ExternalLink,
-  Crown, Ban, X, GitBranch, Database,
+  Crown, Ban, X, GitBranch, Database, ChevronUp, ChevronDown, Presentation, FileSpreadsheet, Image as ImageIcon, Upload,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -159,16 +159,61 @@ export default function CommunityDetailPage() {
 
 /* ═══════════════════════ Conteúdo (estilo Moodle) ═══════════════════════ */
 
+const OFFICE_RE = /\.(pptx?|ppsx?|odp|docx?|odt|rtf|xlsx?|ods)$/i;
+const SLIDES_RE = /\.(pptx?|ppsx?|odp)$/i;
+const SHEET_RE = /\.(xlsx?|ods|csv)$/i;
+const isOffice = (it) => it?.type === 'file' && OFFICE_RE.test(it.file_name || '');
+
+/** Ícone + cor por tipo de material (slides, planilha, PDF, imagem…). */
+function ItemIcon({ it }) {
+  const cls = 'w-4 h-4 flex-shrink-0';
+  if (it.type === 'link') return <Link2 className={`${cls} text-blue-400`} />;
+  if (it.type === 'text') return <FileText className={`${cls} text-emerald-400`} />;
+  if (it.type === 'workflow') return <GitBranch className={`${cls} text-purple-400`} />;
+  if (it.type === 'dataset') return <Database className={`${cls} text-cyan-400`} />;
+  const name = it.file_name || '';
+  if (SLIDES_RE.test(name)) return <Presentation className={`${cls} text-orange-400`} />;
+  if (SHEET_RE.test(name)) return <FileSpreadsheet className={`${cls} text-green-400`} />;
+  if (it.file_mime === 'application/pdf') return <FileText className={`${cls} text-red-400`} />;
+  if (String(it.file_mime).startsWith('image/')) return <ImageIcon className={`${cls} text-pink-400`} />;
+  return <FileIcon className={`${cls} text-amber-400`} />;
+}
+
+const moveInList = (list, i, dir) => {
+  const j = i + dir;
+  if (j < 0 || j >= list.length) return list;
+  const out = list.slice();
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+};
+
 function ContentTab({ id, data, perms, run, reload, onLink }) {
   const { t } = useTranslation();
   const [sectionModal, setSectionModal] = useState(null); // {section?}
   const [itemModal, setItemModal] = useState(null);       // {sectionId}
-  const [viewer, setViewer] = useState(null);
+  const [editModal, setEditModal] = useState(null);       // item
+  const [viewer, setViewer] = useState(null);             // {uuid} | {text}
   const canEdit = !!perms.can_moderate;
   const sections = arr(data?.sections);
   const general = data?.general || { items: [], projects: [] };
   const empty = !sections.length && !arr(general.items).length && !arr(general.projects).length;
 
+  const allItems = [...arr(general.items), ...sections.flatMap(s => arr(s.items))];
+  const viewerItem = viewer?.uuid ? allItems.find(i => i.uuid === viewer.uuid) : null;
+  const hasPending = allItems.some(i => i.type === 'file' && i.preview_status === 'pending');
+
+  // Enquanto algum PPT/DOC está sendo convertido, atualiza a lista até a pré-visualização ficar pronta
+  useEffect(() => {
+    if (!hasPending) return undefined;
+    const timer = setTimeout(() => { reload().catch(() => {}); }, 3500);
+    return () => clearTimeout(timer);
+  }, [hasPending, data]); // eslint-disable-line
+
+  const moveTopic = (i, dir) => run(() => api.communities.reorderSections(id, moveInList(sections, i, dir).map(s => s.uuid)), null, reload);
+  const moveItem = (topic, i, dir) => run(
+    () => api.communities.reorderItems(id, topic.uuid || null, moveInList(arr(topic.items), i, dir).map(x => x.uuid)), null, reload);
+
+  const cardProps = { canEdit, id, run, reload, onOpen: setViewer, onEditItem: setEditModal };
   return (
     <div className="space-y-5">
       {canEdit && (
@@ -177,32 +222,124 @@ function ContentTab({ id, data, perms, run, reload, onLink }) {
           <button className="btn-ghost text-sm py-1.5 flex items-center gap-1.5" onClick={() => setItemModal({ sectionId: '' })}><Plus className="w-3.5 h-3.5" /> {t('communities.addItem')}</button>
         </div>
       )}
-      {empty && <EmptyState icon={BookOpen} title={t('communities.contentEmptyTitle')} description={canEdit ? t('communities.contentEmptyDescEdit') : t('communities.contentEmptyDesc')} />}
+      {empty && (
+        <EmptyState icon={BookOpen} title={t('communities.contentEmptyTitle')} description={canEdit ? t('communities.contentEmptyDescEdit') : t('communities.contentEmptyDesc')}
+          action={canEdit ? <button className="btn-primary text-sm flex items-center gap-1.5" onClick={() => setSectionModal({})}><Plus className="w-3.5 h-3.5" /> {t('communities.addTopic')}</button> : undefined} />
+      )}
 
       {(arr(general.items).length > 0 || arr(general.projects).length > 0) && (
-        <TopicCard topic={{ title: t('communities.generalTopic'), description: null, items: general.items, projects: general.projects }}
-          canEdit={canEdit} id={id} run={run} reload={reload} onOpen={setViewer} onAdd={() => setItemModal({ sectionId: '' })} />
+        <TopicCard {...cardProps} topic={{ title: t('communities.generalTopic'), description: null, items: general.items, projects: general.projects }}
+          onMoveItem={(i, d) => moveItem({ uuid: null, items: general.items }, i, d)}
+          onAdd={() => setItemModal({ sectionId: '' })} />
       )}
-      {sections.map(s => (
-        <TopicCard key={s.uuid} topic={s} canEdit={canEdit} id={id} run={run} reload={reload} onOpen={setViewer}
-          onEdit={() => setSectionModal({ section: s })} onAdd={() => setItemModal({ sectionId: s.uuid })} />
+      {sections.map((s, i) => (
+        <TopicCard key={s.uuid} {...cardProps} topic={s}
+          onEdit={() => setSectionModal({ section: s })} onAdd={() => setItemModal({ sectionId: s.uuid })}
+          onMoveTopic={(d) => moveTopic(i, d)} canUp={i > 0} canDown={i < sections.length - 1}
+          onMoveItem={(j, d) => moveItem(s, j, d)} />
       ))}
 
       <SectionModal state={sectionModal} onClose={() => setSectionModal(null)} id={id} reload={reload} />
       <ItemModal state={itemModal} onClose={() => setItemModal(null)} id={id} sections={sections} reload={reload} />
-      <FileViewer state={viewer} onClose={() => setViewer(null)} id={id} />
+      <EditItemModal item={editModal} onClose={() => setEditModal(null)} id={id} sections={sections} general={general} reload={reload} />
+      <FileViewer state={viewer} item={viewerItem} onClose={() => setViewer(null)} id={id} />
     </div>
   );
 }
 
 const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
-function TopicCard({ topic, canEdit, id, run, reload, onOpen, onEdit, onAdd }) {
+function ItemRow({ it, idx, total, canEdit, id, run, reload, onOpen, onEditItem, onMoveItem }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const titleBtn = 'text-sm font-medium hover:underline text-left break-words';
+  const tstyle = { color: 'var(--text-primary)' };
+
+  const copyWorkflow = async () => {
+    setBusy(true);
+    try {
+      const res = await api.workflows.fork(it.ref.uuid);
+      const wf = res.data?.data ?? res.data;
+      toast.success(t('communities.workflowCopied'));
+      if (wf?.uuid) navigate(`/workflows/${wf.uuid}`);
+    } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setBusy(false); }
+  };
+  const copyDataset = async () => {
+    setBusy(true);
+    try {
+      await api.datasets.copy(it.ref.uuid);
+      toast.success(t('communities.datasetCopied'));
+    } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setBusy(false); }
+  };
+
+  const gone = (it.type === 'workflow' || it.type === 'dataset') && !it.ref;
+  const dims = Array.isArray(it.ref?.dimensions) ? it.ref.dimensions.join('×') : null;
+
+  return (
+    <li className="flex items-start gap-3 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-hover)' }} data-testid="community-item">
+      <span className="mt-0.5"><ItemIcon it={it} /></span>
+      <div className="min-w-0 flex-1">
+        {it.type === 'link' && (
+          <a href={it.url} target="_blank" rel="noopener noreferrer nofollow" className="text-sm font-medium hover:underline inline-flex items-center gap-1 break-all" style={tstyle}>
+            {it.title} <ExternalLink className="w-3 h-3 opacity-60 flex-shrink-0" />
+          </a>
+        )}
+        {it.type === 'file' && <button className={titleBtn} style={tstyle} onClick={() => onOpen({ uuid: it.uuid })}>{it.title}</button>}
+        {it.type === 'text' && <button className={titleBtn} style={tstyle} onClick={() => onOpen({ text: it })}>{it.title}</button>}
+        {it.type === 'workflow' && (gone
+          ? <span className="text-sm font-medium" style={tstyle}>{it.title}</span>
+          : <Link to={`/workflows/${it.ref.uuid}`} className={titleBtn} style={tstyle}>{it.title}</Link>)}
+        {it.type === 'dataset' && (gone
+          ? <span className="text-sm font-medium" style={tstyle}>{it.title}</span>
+          : <Link to={`/datasets/${it.ref.uuid}`} className={titleBtn} style={tstyle}>{it.title}</Link>)}
+        <div className="text-xs break-words" style={muted}>
+          {it.type === 'link' && it.url}
+          {it.type === 'file' && `${it.file_name || ''} · ${fmtSize(it.file_size || 0)}`}
+          {it.type === 'text' && t('communities.textItem')}
+          {it.type === 'workflow' && (gone ? t('communities.refUnavailable') : t('communities.itemWorkflow'))}
+          {it.type === 'dataset' && (gone ? t('communities.refUnavailable') : `${t('communities.itemDataset')}${dims ? ` · ${dims}` : ''}`)}
+          {it.description && it.type !== 'text' && ` — ${it.description}`}
+        </div>
+        {!gone && (it.type === 'workflow' || it.type === 'dataset') && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Link to={it.type === 'workflow' ? `/workflows/${it.ref.uuid}` : `/datasets/${it.ref.uuid}`} className="btn-ghost text-xs py-1 px-2.5">{t('communities.open')}</Link>
+            <button className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1.5" disabled={busy} onClick={it.type === 'workflow' ? copyWorkflow : copyDataset}>
+              <Copy className="w-3 h-3" /> {it.type === 'workflow' ? t('communities.copyWorkflow') : t('communities.copyDataset')}
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-1.5 flex-shrink-0">
+        {it.type === 'workflow' && !gone && <AccessChip access={it.access} />}
+        {it.type === 'file' && it.preview_status === 'pending' && <span className="badge badge-blue" title={t('communities.previewPending')}>{t('communities.previewBadge')}</span>}
+        {it.is_visible === false && <span className="badge badge-amber">{t('communities.hidden')}</span>}
+        {canEdit && (
+          <div className="flex">
+            <button className="btn-ghost p-1.5" aria-label={t('communities.moveUp')} title={t('communities.moveUp')} disabled={idx === 0} onClick={() => onMoveItem(idx, -1)}><ChevronUp className="w-4 h-4" /></button>
+            <button className="btn-ghost p-1.5" aria-label={t('communities.moveDown')} title={t('communities.moveDown')} disabled={idx === total - 1} onClick={() => onMoveItem(idx, 1)}><ChevronDown className="w-4 h-4" /></button>
+            <button className="btn-ghost p-1.5" aria-label={t('communities.editItem')} title={t('communities.editItem')} onClick={() => onEditItem(it)}><Pencil className="w-4 h-4" /></button>
+            <button className="btn-ghost p-1.5" aria-label={it.is_visible ? t('communities.hide') : t('communities.show')} title={it.is_visible ? t('communities.hide') : t('communities.show')}
+              onClick={() => run(() => api.communities.updateItem(id, it.uuid, { is_visible: !it.is_visible }), null, reload)}>
+              {it.is_visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+            <button className="btn-ghost p-1.5" aria-label={t('common.delete')} title={t('common.delete')}
+              onClick={() => { if (window.confirm(t('communities.deleteItemConfirm'))) run(() => api.communities.deleteItem(id, it.uuid), t('communities.itemDeleted'), reload); }}>
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function TopicCard({ topic, canEdit, id, run, reload, onOpen, onEdit, onAdd, onEditItem, onMoveItem, onMoveTopic, canUp, canDown }) {
   const { t } = useTranslation();
   const items = arr(topic.items);
   const projs = arr(topic.projects);
   return (
-    <div className="card p-5" style={topic.is_visible === false ? { opacity: 0.7 } : undefined}>
+    <div className="card p-5" style={topic.is_visible === false ? { opacity: 0.7 } : undefined} data-testid="community-topic">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -212,9 +349,11 @@ function TopicCard({ topic, canEdit, id, run, reload, onOpen, onEdit, onAdd }) {
           {topic.description && <p className="text-sm mt-1" style={muted}>{topic.description}</p>}
         </div>
         {canEdit && (
-          <div className="flex gap-1 flex-shrink-0">
+          <div className="flex flex-wrap justify-end gap-1 flex-shrink-0">
             <button className="btn-ghost p-1.5" aria-label={t('communities.addItem')} title={t('communities.addItem')} onClick={onAdd}><Plus className="w-4 h-4" /></button>
             {onEdit && <>
+              <button className="btn-ghost p-1.5" aria-label={t('communities.moveTopicUp')} title={t('communities.moveTopicUp')} disabled={!canUp} onClick={() => onMoveTopic(-1)}><ChevronUp className="w-4 h-4" /></button>
+              <button className="btn-ghost p-1.5" aria-label={t('communities.moveTopicDown')} title={t('communities.moveTopicDown')} disabled={!canDown} onClick={() => onMoveTopic(1)}><ChevronDown className="w-4 h-4" /></button>
               <button className="btn-ghost p-1.5" aria-label={t('common.edit')} title={t('common.edit')} onClick={onEdit}><Pencil className="w-4 h-4" /></button>
               <button className="btn-ghost p-1.5" aria-label={topic.is_visible ? t('communities.hide') : t('communities.show')} title={topic.is_visible ? t('communities.hide') : t('communities.show')}
                 onClick={() => run(() => api.communities.updateSection(id, topic.uuid, { is_visible: !topic.is_visible }), null, reload)}>
@@ -231,42 +370,9 @@ function TopicCard({ topic, canEdit, id, run, reload, onOpen, onEdit, onAdd }) {
 
       {items.length === 0 && projs.length === 0 && <p className="text-sm" style={muted}>{t('communities.topicEmpty')}</p>}
       <ul className="space-y-1.5">
-        {items.map(it => (
-          <li key={it.uuid} className="flex items-center gap-3 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-hover)' }}>
-            {it.type === 'link' && <Link2 className="w-4 h-4 flex-shrink-0 text-blue-400" />}
-            {it.type === 'file' && (it.file_mime === 'application/pdf' ? <FileText className="w-4 h-4 flex-shrink-0 text-red-400" /> : <FileIcon className="w-4 h-4 flex-shrink-0 text-amber-400" />)}
-            {it.type === 'text' && <FileText className="w-4 h-4 flex-shrink-0 text-emerald-400" />}
-            <div className="min-w-0 flex-1">
-              {it.type === 'link' ? (
-                <a href={it.url} target="_blank" rel="noopener noreferrer nofollow" className="text-sm font-medium hover:underline inline-flex items-center gap-1" style={{ color: 'var(--text-primary)' }}>
-                  {it.title} <ExternalLink className="w-3 h-3 opacity-60" />
-                </a>
-              ) : it.type === 'file' ? (
-                <button className="text-sm font-medium hover:underline text-left" style={{ color: 'var(--text-primary)' }} onClick={() => onOpen({ item: it })}>{it.title}</button>
-              ) : (
-                <button className="text-sm font-medium hover:underline text-left" style={{ color: 'var(--text-primary)' }} onClick={() => onOpen({ text: it })}>{it.title}</button>
-              )}
-              <div className="text-xs truncate" style={muted}>
-                {it.type === 'link' && it.url}
-                {it.type === 'file' && `${it.file_name || ''} · ${fmtSize(it.file_size || 0)}`}
-                {it.type === 'text' && t('communities.textItem')}
-                {it.description && it.type !== 'text' && ` — ${it.description}`}
-              </div>
-            </div>
-            {it.is_visible === false && <span className="badge badge-amber">{t('communities.hidden')}</span>}
-            {canEdit && (
-              <div className="flex gap-1">
-                <button className="btn-ghost p-1.5" aria-label={it.is_visible ? t('communities.hide') : t('communities.show')}
-                  onClick={() => run(() => api.communities.updateItem(id, it.uuid, { is_visible: !it.is_visible }), null, reload)}>
-                  {it.is_visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-                <button className="btn-ghost p-1.5" aria-label={t('common.delete')}
-                  onClick={() => { if (window.confirm(t('communities.deleteItemConfirm'))) run(() => api.communities.deleteItem(id, it.uuid), t('communities.itemDeleted'), reload); }}>
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </li>
+        {items.map((it, i) => (
+          <ItemRow key={it.uuid} it={it} idx={i} total={items.length} canEdit={canEdit} id={id} run={run} reload={reload}
+            onOpen={onOpen} onEditItem={onEditItem} onMoveItem={onMoveItem} />
         ))}
         {projs.map(p => (
           <li key={p.uuid} className="flex items-center gap-3 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-hover)' }}>
@@ -316,73 +422,230 @@ function SectionModal({ state, onClose, id, reload }) {
   );
 }
 
+const FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip';
+
 function ItemModal({ state, onClose, id, sections, reload }) {
   const { t } = useTranslation();
-  const [type, setType] = useState('link');
-  const [form, setForm] = useState({ title: '', url: '', description: '', section_id: '' });
-  const [file, setFile] = useState(null);
+  const [type, setType] = useState('file');
+  const [form, setForm] = useState({ title: '', url: '', description: '', section_id: '', ref: '', access: 'read' });
+  const [files, setFiles] = useState([]);
+  const [progress, setProgress] = useState(null); // {current,total}
+  const [dragOver, setDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
+  const inputRef = useRef(null);
   useEffect(() => {
-    if (state) { setType('link'); setFile(null); setForm({ title: '', url: '', description: '', section_id: state.sectionId || '' }); }
+    if (state) {
+      setType('file'); setFiles([]); setProgress(null); setDragOver(false);
+      setForm({ title: '', url: '', description: '', section_id: state.sectionId || '', ref: '', access: 'read' });
+    }
   }, [state]);
+
+  const open = !!state;
+  const { data: wfData } = useApi(() => (open && type === 'workflow' ? api.workflows.list({ limit: 200 }) : null), [open, type]);
+  const { data: dsData } = useApi(() => (open && type === 'dataset' ? api.datasets.list({ limit: 200 }) : null), [open, type]);
+  const { data: prData } = useApi(() => (open && type === 'project' ? api.projects.list({ scope: 'mine' }) : null), [open, type]);
+  const myWorkflows = arr(wfData);
+  const myDatasets = arr(dsData);
+  const myProjects = arr(prData).filter(p => p.my_access === 'owner' || p.my_access === 'admin');
+
+  const addFiles = (list) => {
+    const incoming = Array.from(list || []);
+    setFiles(prev => {
+      const seen = new Set(prev.map(f => `${f.name}:${f.size}`));
+      return [...prev, ...incoming.filter(f => !seen.has(`${f.name}:${f.size}`))];
+    });
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
       if (type === 'file') {
-        if (!file) { toast.error(t('communities.chooseFile')); return; }
-        const fd = new FormData();
-        fd.append('file', file);
-        if (form.title.trim()) fd.append('title', form.title.trim());
-        if (form.description.trim()) fd.append('description', form.description.trim());
-        if (form.section_id) fd.append('section_id', form.section_id);
-        await api.communities.createItem(id, fd, true);
+        if (!files.length) { toast.error(t('communities.chooseFile')); return; }
+        let done = 0;
+        for (const f of files) {
+          setProgress({ current: done + 1, total: files.length });
+          const fd = new FormData();
+          fd.append('file', f);
+          if (files.length === 1 && form.title.trim()) fd.append('title', form.title.trim());
+          if (form.description.trim()) fd.append('description', form.description.trim());
+          if (form.section_id) fd.append('section_id', form.section_id);
+          await api.communities.createItem(id, fd, true);
+          done += 1;
+        }
+        toast.success(files.length > 1 ? t('communities.itemsSaved', { count: files.length }) : t('communities.itemSaved'));
+      } else if (type === 'project') {
+        if (!form.ref) { toast.error(t('communities.selectProjectError')); return; }
+        await api.communities.linkProject(id, form.ref, form.access, form.section_id || null);
+        toast.success(t('communities.projectLinked'));
+      } else if (type === 'workflow' || type === 'dataset') {
+        if (!form.ref) { toast.error(type === 'workflow' ? t('communities.chooseWorkflow') : t('communities.chooseDataset')); return; }
+        await api.communities.createItem(id, {
+          type, ref: form.ref, title: form.title.trim() || undefined, description: form.description.trim() || undefined,
+          access: type === 'workflow' ? form.access : undefined, section_id: form.section_id || undefined,
+        });
+        toast.success(t('communities.itemSaved'));
       } else {
-        await api.communities.createItem(id, { type, ...form, section_id: form.section_id || undefined });
+        await api.communities.createItem(id, { type, ...form, ref: undefined, access: undefined, section_id: form.section_id || undefined });
+        toast.success(t('communities.itemSaved'));
       }
-      toast.success(t('communities.itemSaved')); await reload(); onClose();
-    } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setSaving(false); }
+      await reload(); onClose();
+    } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setSaving(false); setProgress(null); }
   };
 
   const types = [
+    { v: 'file', icon: Presentation, label: t('communities.itemFile') },
+    { v: 'workflow', icon: GitBranch, label: t('communities.itemWorkflow') },
+    { v: 'dataset', icon: Database, label: t('communities.itemDataset') },
+    { v: 'project', icon: FolderOpen, label: t('communities.itemProject') },
     { v: 'link', icon: Link2, label: t('communities.itemLink') },
-    { v: 'file', icon: FileText, label: t('communities.itemFile') },
     { v: 'text', icon: Pencil, label: t('communities.itemText') },
   ];
+  const refList = type === 'workflow' ? myWorkflows : type === 'dataset' ? myDatasets : myProjects;
   return (
-    <Modal open={!!state} onClose={onClose} title={t('communities.addItem')} size="md">
+    <Modal open={open} onClose={onClose} title={t('communities.addItem')} size="lg">
       <form onSubmit={submit} className="space-y-4">
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-hover)' }} role="tablist">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-hover)' }} role="tablist">
           {types.map(x => (
-            <button key={x.v} type="button" role="tab" aria-selected={type === x.v} onClick={() => setType(x.v)}
-              className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5"
+            <button key={x.v} type="button" role="tab" aria-selected={type === x.v} onClick={() => { setType(x.v); setForm(f => ({ ...f, ref: '' })); }}
+              className="px-2 py-2 rounded-lg text-xs font-medium flex flex-col items-center justify-center gap-1"
               style={{ background: type === x.v ? 'var(--accent)' : 'transparent', color: type === x.v ? '#fff' : 'var(--text-secondary)' }}>
-              <x.icon className="w-4 h-4" />{x.label}
+              <x.icon className="w-4 h-4" /><span className="leading-tight text-center">{x.label}</span>
             </button>
           ))}
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.itemTitle')}</label>
-          <input className="input-field" value={form.title} maxLength={255} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-        </div>
+
+        {type === 'file' && (
+          <div>
+            <div role="button" tabIndex={0} data-testid="drop-zone"
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click(); } }}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
+              className="rounded-xl p-6 text-center cursor-pointer transition-colors"
+              style={{ border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`, background: dragOver ? 'var(--bg-hover)' : 'transparent' }}>
+              <Upload className="w-6 h-6 mx-auto mb-2" style={muted} />
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('communities.dropFiles')}</p>
+              <p className="text-xs mt-1" style={muted}>{t('communities.fileHint')}</p>
+              <input ref={inputRef} type="file" multiple className="hidden" accept={FILE_ACCEPT} data-testid="file-input"
+                onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+            </div>
+            {files.length > 0 && (
+              <ul className="mt-3 space-y-1">
+                {files.map((f, i) => (
+                  <li key={`${f.name}:${f.size}`} className="flex items-center gap-2 text-sm rounded-lg px-3 py-1.5" style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}>
+                    <FileIcon className="w-4 h-4 flex-shrink-0" style={muted} />
+                    <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                    <span className="text-xs" style={muted}>{fmtSize(f.size)}</span>
+                    <button type="button" className="btn-ghost p-1" aria-label={t('common.delete')} disabled={saving} onClick={() => setFiles(list => list.filter((_, j) => j !== i))}><X className="w-3.5 h-3.5" /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {OFFICE_RE.test(files.map(f => f.name).join(' ')) || files.some(f => OFFICE_RE.test(f.name)) ? (
+              <p className="text-xs mt-2" style={muted}>{t('communities.officeHint')}</p>
+            ) : null}
+          </div>
+        )}
+
+        {(type === 'workflow' || type === 'dataset' || type === 'project') && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={lbl}>
+              {type === 'workflow' ? t('communities.chooseWorkflow') : type === 'dataset' ? t('communities.chooseDataset') : t('communities.selectProjectLabel')}
+            </label>
+            <select className="input-field" value={form.ref} onChange={e => setForm(f => ({ ...f, ref: e.target.value }))} data-testid="ref-select">
+              <option value="">{t('communities.chooseOption')}</option>
+              {refList.map(x => <option key={x.uuid} value={x.uuid}>{x.name}</option>)}
+            </select>
+            {refList.length === 0 && (
+              <p className="text-xs mt-1.5" style={muted}>
+                {type === 'workflow' ? t('communities.noWorkflows') : type === 'dataset' ? t('communities.noDatasets') : t('communities.noLinkableProjects')}
+              </p>
+            )}
+            <p className="text-xs mt-1.5" style={muted}>
+              {type === 'workflow' ? t('communities.workflowHint') : type === 'dataset' ? t('communities.datasetHint') : t('communities.projectHint')}
+            </p>
+          </div>
+        )}
+        {(type === 'workflow' || type === 'project') && <AccessPicker value={form.access} onChange={v => setForm(f => ({ ...f, access: v }))} />}
+
+        {type !== 'project' && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.itemTitle')}{type === 'file' && files.length > 1 ? ` (${t('communities.titleFromFiles')})` : ''}</label>
+            <input className="input-field" value={form.title} maxLength={255} disabled={type === 'file' && files.length > 1}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={type === 'file' || type === 'workflow' || type === 'dataset' ? t('communities.titleOptional') : ''} />
+          </div>
+        )}
         {type === 'link' && (
           <div>
             <label className="block text-sm font-medium mb-1.5" style={lbl}>URL</label>
             <input className="input-field" type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="https://" />
           </div>
         )}
-        {type === 'file' && (
+        {type !== 'project' && (
           <div>
-            <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.fileLabel')}</label>
-            <input type="file" className="input-field" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" onChange={e => setFile(e.target.files?.[0] || null)} />
-            <p className="text-xs mt-1" style={muted}>{t('communities.fileHint')}</p>
+            <label className="block text-sm font-medium mb-1.5" style={lbl}>{type === 'text' ? t('communities.textContent') : t('common.description')}</label>
+            <textarea className="input-field resize-none" rows={type === 'text' ? 6 : 2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
         )}
         <div>
-          <label className="block text-sm font-medium mb-1.5" style={lbl}>{type === 'text' ? t('communities.textContent') : t('common.description')}</label>
-          <textarea className="input-field resize-none" rows={type === 'text' ? 6 : 2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.topic')}</label>
+          <select className="input-field" value={form.section_id} onChange={e => setForm(f => ({ ...f, section_id: e.target.value }))}>
+            <option value="">{t('communities.generalTopic')}</option>
+            {sections.map(s => <option key={s.uuid} value={s.uuid}>{s.title}</option>)}
+          </select>
         </div>
+        <div className="flex gap-3">
+          <button type="button" className="btn-ghost flex-1" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
+          <button type="submit" className="btn-primary flex-1" disabled={saving}>
+            {saving ? (progress ? t('communities.uploadingProgress', progress) : t('common.saving')) : t('common.add')}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function EditItemModal({ item, onClose, id, sections, general, reload }) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState({ title: '', description: '', url: '', section_id: '', access: 'read' });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!item) return;
+    const sec = sections.find(s => arr(s.items).some(i => i.uuid === item.uuid));
+    setForm({ title: item.title || '', description: item.description || '', url: item.url || '', section_id: sec?.uuid || '', access: item.access || 'read' });
+  }, [item]); // eslint-disable-line
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    setSaving(true);
+    try {
+      const body = { title: form.title.trim(), description: form.description, section_id: form.section_id || null };
+      if (item.type === 'link') body.url = form.url;
+      if (item.type === 'workflow') body.access = form.access;
+      await api.communities.updateItem(id, item.uuid, body);
+      toast.success(t('communities.itemUpdated')); await reload(); onClose();
+    } catch (err) { toast.error(parseApiError(err, t('common.error')).message); } finally { setSaving(false); }
+  };
+  return (
+    <Modal open={!!item} onClose={onClose} title={t('communities.editItem')} size="md">
+      <form onSubmit={submit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.itemTitle')}</label>
+          <input className="input-field" value={form.title} maxLength={255} autoFocus onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+        </div>
+        {item?.type === 'link' && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={lbl}>URL</label>
+            <input className="input-field" type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} />
+          </div>
+        )}
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={lbl}>{item?.type === 'text' ? t('communities.textContent') : t('common.description')}</label>
+          <textarea className="input-field resize-none" rows={item?.type === 'text' ? 6 : 2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+        </div>
+        {item?.type === 'workflow' && <AccessPicker value={form.access} onChange={v => setForm(f => ({ ...f, access: v }))} />}
         <div>
           <label className="block text-sm font-medium mb-1.5" style={lbl}>{t('communities.topic')}</label>
           <select className="input-field" value={form.section_id} onChange={e => setForm(f => ({ ...f, section_id: e.target.value }))}>
@@ -392,40 +655,49 @@ function ItemModal({ state, onClose, id, sections, reload }) {
         </div>
         <div className="flex gap-3">
           <button type="button" className="btn-ghost flex-1" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="submit" className="btn-primary flex-1" disabled={saving}>{saving ? t('common.saving') : t('common.add')}</button>
+          <button type="submit" className="btn-primary flex-1" disabled={saving || !form.title.trim()}>{saving ? t('common.saving') : t('common.save')}</button>
         </div>
       </form>
     </Modal>
   );
 }
 
-/** PDF/imagem inline (blob autenticado), demais arquivos baixam; "texto" abre como leitura. */
-function FileViewer({ state, onClose, id }) {
+/** PDF/imagem e PPT/DOC/XLS (via PDF convertido) inline; "texto" abre como leitura. Original sempre baixável. */
+function FileViewer({ state, item, onClose, id }) {
   const { t } = useTranslation();
   const [url, setUrl] = useState(null);
   const [mime, setMime] = useState('');
   const [err, setErr] = useState(false);
-  const it = state?.item;
+  const [downloading, setDownloading] = useState(false);
+  const it = item;
+  const office = isOffice(it);
+  const previewStatus = it?.preview_status;
+  const fetchPreview = office && previewStatus === 'ready';
+  const fetchOriginal = !!it && !office;
 
   useEffect(() => {
     let revoked = null; let alive = true;
     setUrl(null); setErr(false);
-    if (it) {
-      api.communities.fileBlob(id, it.uuid).then(res => {
+    if (it && (fetchPreview || fetchOriginal)) {
+      api.communities.fileBlob(id, it.uuid, { preview: fetchPreview }).then(res => {
         if (!alive) return;
-        const type = res.headers?.['content-type'] || it.file_mime || '';
-        const blob = new Blob([res.data], { type });
-        revoked = URL.createObjectURL(blob);
+        const type = fetchPreview ? 'application/pdf' : (res.headers?.['content-type'] || it.file_mime || '');
+        revoked = URL.createObjectURL(new Blob([res.data], { type }));
         setMime(type); setUrl(revoked);
       }).catch(() => alive && setErr(true));
     }
     return () => { alive = false; if (revoked) URL.revokeObjectURL(revoked); };
-  }, [it?.uuid, id]); // eslint-disable-line
+  }, [it?.uuid, id, fetchPreview, fetchOriginal]); // eslint-disable-line
 
-  const download = () => {
-    if (!url) return;
-    const a = document.createElement('a');
-    a.href = url; a.download = it.file_name || 'file'; document.body.appendChild(a); a.click(); a.remove();
+  const download = async () => {
+    setDownloading(true);
+    try {
+      const res = await api.communities.fileBlob(id, it.uuid, { download: true });
+      const href = URL.createObjectURL(new Blob([res.data], { type: it.file_mime || 'application/octet-stream' }));
+      const a = document.createElement('a');
+      a.href = href; a.download = it.file_name || 'file'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 2000);
+    } catch { toast.error(t('communities.fileError')); } finally { setDownloading(false); }
   };
 
   if (!state) return null;
@@ -436,19 +708,25 @@ function FileViewer({ state, onClose, id }) {
       </Modal>
     );
   }
-  const inlineOk = mime === 'application/pdf' || mime.startsWith('image/');
+  if (!it) return null;
+  const isPdf = mime === 'application/pdf';
+  const isImg = mime.startsWith('image/');
   return (
-    <Modal open={!!it} onClose={onClose} title={it?.title} size="xl">
+    <Modal open onClose={onClose} title={it.title} size="xl">
       {err && <p className="text-sm text-red-400">{t('communities.fileError')}</p>}
-      {!err && !url && <p className="text-sm" style={muted}>{t('common.loading')}</p>}
-      {url && inlineOk && mime === 'application/pdf' && <iframe title={it.title} src={url} style={{ width: '100%', height: '70vh', border: 0, borderRadius: 8, background: '#fff' }} />}
-      {url && inlineOk && mime.startsWith('image/') && <img src={url} alt={it.title} style={{ maxWidth: '100%', maxHeight: '70vh', margin: '0 auto', display: 'block' }} />}
-      {url && !inlineOk && <p className="text-sm mb-3" style={lbl}>{t('communities.noPreview')}</p>}
-      {url && (
-        <div className="mt-4 flex justify-end">
-          <button className="btn-primary flex items-center gap-2" onClick={download}><Download className="w-4 h-4" /> {t('communities.download')}</button>
-        </div>
-      )}
+      {office && previewStatus === 'pending' && <p className="text-sm" style={muted} role="status">{t('communities.previewPending')}</p>}
+      {office && previewStatus === 'failed' && <p className="text-sm mb-3" style={lbl}>{t('communities.previewFailed')}</p>}
+      {!err && (fetchPreview || fetchOriginal) && !url && <p className="text-sm" style={muted}>{t('common.loading')}</p>}
+      {url && isPdf && <iframe title={it.title} src={url} style={{ width: '100%', height: '70vh', border: 0, borderRadius: 8, background: '#fff' }} />}
+      {url && isImg && <img src={url} alt={it.title} style={{ maxWidth: '100%', maxHeight: '70vh', margin: '0 auto', display: 'block' }} />}
+      {url && !isPdf && !isImg && <p className="text-sm mb-3" style={lbl}>{t('communities.noPreview')}</p>}
+      {!office && !err && !url && null}
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {url && isPdf && (
+          <a href={url} target="_blank" rel="noopener noreferrer" className="btn-ghost flex items-center gap-2"><ExternalLink className="w-4 h-4" /> {t('communities.openNewTab')}</a>
+        )}
+        <button className="btn-primary flex items-center gap-2" disabled={downloading} onClick={download}><Download className="w-4 h-4" /> {t('communities.download')}</button>
+      </div>
     </Modal>
   );
 }
