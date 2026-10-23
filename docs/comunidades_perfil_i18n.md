@@ -1,6 +1,6 @@
 # Idiomas (pt/en/es), perfil, comunidades e projetos compartilhados
 
-> Complementa `diagnostico_idioma_usuario_comunidades.md` (o diagnóstico/proposta) com o que foi **implementado**.
+> Complementa [`historico/diagnostico_idioma_usuario_comunidades.md`](historico/diagnostico_idioma_usuario_comunidades.md) (o diagnóstico/proposta) com o que foi **implementado**.
 > Testes: `backend_api/tests/access_e2e.mjs` (132 checagens de acesso), `backend_api/tests/catalog_i18n_check.mjs`
 > (cobertura da tradução do catálogo), `frontend`: `npm run i18n:check` (paridade de chaves e `{{placeholders}}`).
 
@@ -110,4 +110,4 @@ Dentro de **Conteúdo**, o professor monta a aula em tópicos. *Adicionar materi
   `POST /communities/:id/items` aceita `type = workflow|dataset` com `ref` (uuid) e `access`.
 - Tabela `community_items`: colunas `ref_id`, `access`, `preview_path`, `preview_status`.
 
-Subtópicos, aba **Apps**, pré-visualização e **quizzes**: `docs/comunidade_subapps_quizzes.md`.
+Subtópicos, aba **Apps**, pré-visualização e **quizzes**: [`apps_comunidade.md`](apps_comunidade.md) (parte A).

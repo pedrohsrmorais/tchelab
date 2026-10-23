@@ -131,7 +131,7 @@ AWS e no custo real do seu servidor/disco).
 
 ## 5. Fases de execução
 
-> Status (22/10/2026): fases 1 e 2 entregues — ver `armazenamento.md`. As chaves mantiveram a pasta por tipo (`datasets/`, `communities/`…) em vez de `u/<usuario>/…`; o dono fica em `storage_objects`. O backfill (`backend_api/scripts/storage_backfill.js`) já cobre parte da fase 5.
+> Status (22/10/2026): fases 1 e 2 entregues; **fase 6 parcial** (medição por job, `usage_monthly`, calculadora de custo/licença e bloqueio por orçamento de CPU feitos; falta o limite de jobs simultâneos por usuário); fases 3, 4, 5 (migração de tensores) e 7 (checklist com MinIO real) pendentes. Mais: — ver `armazenamento.md`. As chaves mantiveram a pasta por tipo (`datasets/`, `communities/`…) em vez de `u/<usuario>/…`; o dono fica em `storage_objects`. O backfill (`backend_api/scripts/storage_backfill.js`) já cobre parte da fase 5.
 
 | Fase | Entrega | Resolve | Risco |
 |---|---|---|---|
@@ -141,7 +141,7 @@ AWS e no custo real do seu servidor/disco).
 | **3** | Datasets e saídas no bucket (`.npy` + resumo/prévia no MySQL); importação em streaming; `dispatch` por referência; worker lendo do bucket (credencial própria); teto de JSON por linha | itens 3 e teto de 10 MB | **alto** (toca o caminho de execução) |
 | **4** | Limpeza: lifecycle de `tmp/`, lixeira, expiração de saídas, reconciliação semanal | item 4 | baixo |
 | **5** | Migração dos dados atuais (script com `--dry-run`, idempotente, com verificação de hash/tamanho e driver `local` como leitura de segurança até concluir) | — | médio |
-| **6** | Medição de processamento/memória, `usage_monthly`, limites por usuário, painel de custo e calculadora de licença | item "custo exato" | médio |
+| **6** ◐ | Medição de processamento/memória, `usage_monthly`, limites por usuário, painel de custo e calculadora de licença | item "custo exato" | médio |
 | **7** | Testes e2e (cota sob concorrência, bloqueio, exclusão libera, leitura com cota cheia, falha no meio do upload libera reserva, reconciliação) + docs + checklist de produção (backup do MinIO, troca para S3) | — | baixo |
 
 Cada fase fecha com build, testes e commit próprio. As fases 1–2 já entregam valor sozinhas (cota funcionando para

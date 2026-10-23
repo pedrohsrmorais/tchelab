@@ -6,7 +6,7 @@
  *    traço mais expressivo e pesos "regular" (inativo) e "duotone" (ativo/destaque), o que
  *    permite mostrar estado sem depender só de cor.
  *
- * Regras (ver docs/auditoria_ux.md e docs/ux_catalogo.md):
+ * Regras (ver docs/ux.md):
  *  1. Ícone de navegação sempre acompanha um texto (o rótulo some só na barra recolhida e ganha `title`).
  *  2. Um conceito = um ícone, em toda a plataforma.
  *  3. Importar sempre ícones nomeados (a árvore é "tree-shaken": só o que é usado entra no bundle).

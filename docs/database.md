@@ -1001,6 +1001,36 @@ Registra ações relevantes para rastreabilidade.
 
 ---
 
+---
+
+## Atualização (22/10/2026): armazenamento, cota e consumo
+
+Tudo abaixo é criado por `backend_api/src/config/migrate.js` (idempotente, na subida da API). As tabelas dos apps de comunidade
+(`quizzes`, `quiz_*`, `equipment*`, `boards`, `board_*`, `community_sections/items/invites/bans`) também nascem ali — ver
+[apps_comunidade.md](apps_comunidade.md) e [comunidades_perfil_i18n.md](comunidades_perfil_i18n.md).
+
+| Tabela | Função |
+|---|---|
+| `storage_plans` | planos: `code` (`beta`, `staff`), `quota_bytes`, `max_file_bytes`, `max_concurrent_jobs` (ainda não aplicado), `monthly_cpu_seconds` (NULL = ilimitado), `is_default` |
+| `storage_objects` | cada arquivo/dado que conta na cota: dono (`user_id`), `kind`, `ref_type`/`ref_id`, `storage_key`, `size_bytes`, `deleted_at` |
+| `storage_ledger` | trilha de auditoria: `delta_bytes` (+/−) e `reason` por movimento de cota |
+| `usage_monthly` | consumo por usuário e mês (`PK user_id+month`): jobs, falhas, `cpu_seconds`, `wall_seconds`, `gb_seconds_ram`, `peak_rss_max_bytes`, `input_bytes`, `output_bytes`, `storage_gb_hours` |
+| `usage_meta` | pares chave/valor: preços da calculadora (`price_gb_month`, `price_cpu_hour`) |
+
+Colunas acrescentadas:
+
+| Tabela | Colunas |
+|---|---|
+| `users` | `storage_plan_id`, `storage_quota_bytes` (override), `storage_used_bytes`, `storage_reserved_bytes`, `cpu_budget_seconds` (override do orçamento mensal) |
+| `jobs` | `cpu_seconds`, `wall_ms`, `peak_rss_bytes`, `mem_bytes`, `input_bytes`, `output_bytes` (medidos pelo worker) |
+| `execution_nodes` | `metrics` (JSON) agora também recebe o bloco de medição do nó |
+
+**Cota:** `storage_used_bytes` + `storage_reserved_bytes` ≤ cota (override do usuário → plano). A reserva é atômica
+(`UPDATE … WHERE used+reserved+? <= quota`), depois grava e confirma ou libera. O backfill (`backend_api/scripts/storage_backfill.js`)
+reconstrói `storage_objects` e os totais a partir dos dados existentes. **Arquivos** (`storage_key`) ficam no `StorageService`
+(disco ou S3/MinIO), nunca no MySQL; tensores continuam no MySQL até a Fase 3 ([plano_armazenamento_minio.md](plano_armazenamento_minio.md)).
+
+
 ## Storage externo
 
 O MySQL armazena apenas metadados e referências. Arrays científicos grandes ficam em storage externo:
@@ -1011,7 +1041,7 @@ MySQL
   ├── storage_path  →  aponta para →  Zarr / HDF5 / S3
   └── output_storage_path (em execution_nodes)
 
-Storage externo (Zarr preferido)
+Storage externo (hoje: MinIO/S3 ou disco para arquivos; tensores ainda no MySQL — Fase 3 move para `.npy` no bucket)
   └── array N-dimensional
 ```
 

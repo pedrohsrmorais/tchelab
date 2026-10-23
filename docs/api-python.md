@@ -108,3 +108,20 @@ Concorrência via `ThreadPoolExecutor` (`WORKER_CONCURRENCY`, default 4). O Node
 (`resultConsumer.service.js`) — nunca executa a técnica em si. Detalhes operacionais
 (por que esse processo precisa estar sempre de pé, como subir em produção, diagnóstico de
 restart em pm2) estão em `worker_api/README.md`, não aqui.
+
+## Medição por job (`metrics`) — 22/10/2026
+
+`worker_api/metering.py` (`METER.start(job_id)` / `METER.finish(job_id)` em `worker.py`) mede cada job e preenche
+`JobResult.metrics` (`schemas.py`). Como o worker roda vários jobs em threads de um mesmo processo, o CPU do processo é
+**repartido entre os jobs ativos** a cada amostra: com 1 job o valor é exato; com N jobs a soma bate com o gasto real do processo.
+
+| Campo | Significado |
+|---|---|
+| `cpu_seconds` | CPU (usuário + sistema) atribuída ao job |
+| `wall_ms` | tempo de relógio |
+| `peak_rss_bytes` | pico de memória residente do processo durante o job |
+| `mem_bytes` | memória atribuível ao job (RSS repartido entre os ativos) |
+| `input_bytes` / `output_bytes` | tamanho serializado das entradas e saídas |
+
+O backend (`resultConsumer.service.js`) persiste isso e alimenta o consumo mensal e a calculadora de custo
+([armazenamento.md](armazenamento.md) §3.1). Teste: `worker_api/tests/test_metering.py`.

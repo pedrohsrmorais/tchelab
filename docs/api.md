@@ -5,6 +5,17 @@
 > Prefixo base: `/api/v1`
 > Autenticação: Bearer Token (JWT) em todas as rotas exceto `/auth/*`
 
+> **Referência de rotas:** a lista completa e atual das 268 rotas (método, caminho, acesso e handler) é gerada do código em
+> [api_rotas.md](api_rotas.md). Este documento descreve o contrato do núcleo; Quiz, Equipamentos e Quadro estão em
+> [apps_comunidade.md](apps_comunidade.md).
+>
+> **Atualização (armazenamento, cota e consumo — 22/10/2026):** `GET /storage/usage` (cota e "o que ocupa espaço"),
+> `GET /usage/compute` (CPU/RAM do mês e orçamento), `DELETE /executions/:id` (devolve a cota) e, para administradores,
+> `/admin/storage` (visão geral), `/admin/storage/plans[/:code]`, `/admin/storage/users/:uuid` (plano, cota e orçamento de CPU),
+> `/admin/storage/costs` e `/admin/storage/prices` (calculadora de custo/licença). Novos erros padronizados:
+> **413** `STORAGE_QUOTA_EXCEEDED` / `FILE_TOO_LARGE`, **503** `STORAGE_SERVER_FULL` e **402** `CPU_BUDGET_EXCEEDED`
+> (em `POST /executions/:id/dispatch` e nas operações rápidas de dataset). Detalhes em [armazenamento.md](armazenamento.md).
+
 > **Atualização (idiomas, perfil, comunidades e projetos compartilhados):** rotas de comunidades com papéis
 > (`owner > admin > moderator > member`), convites (`/communities/:id/invites`, `/communities/join`,
 > `/communities/invite/:code`), conteúdo estilo Moodle (`/communities/:id/content|sections|items`), vínculo de projetos com

@@ -493,3 +493,19 @@ Internamente, quando o worker encontra um nó com técnica `is_custom=1`, ele ex
 | Rastreabilidade | Todo dataset derivado e todo nó tem origem registrada |
 | Segurança | `formula_customizada` nunca usa `eval()` — sempre AST + whitelist |
 | Separação estrutura/modelagem | O usuário pode manipular arrays antes de qualquer técnica quimiométrica |
+
+---
+
+## Consumo, cota e orçamento de CPU na execução (22/10/2026)
+
+- **Medição:** o worker mede CPU, pico de memória e bytes de entrada/saída de cada job e devolve em `JobResult.metrics`
+  ([api-python.md](api-python.md)). O backend grava em `jobs`, em `execution_nodes.metrics` e soma em `usage_monthly`.
+- **Bloqueio por orçamento de CPU:** antes de despachar (e antes de uma operação rápida de dataset), o backend confere o
+  orçamento mensal do usuário (override do usuário → plano). Esgotado → **402 `CPU_BUDGET_EXCEEDED`**, sem criar workflow nem execução
+  órfãos. Se o orçamento acabar no meio de uma execução, os nós **ainda não iniciados** falham com a mesma causa (e os seguintes
+  ficam `skipped`); nós em andamento terminam. O orçamento zera a cada mês; administradores não são isentos.
+- **Cota nas saídas:** saídas de nós contam na cota de quem executou e não expiram; excluir a execução
+  (`DELETE /executions/:id`) devolve o espaço.
+- **Ainda não aplicado:** `max_concurrent_jobs` por usuário (decisão pendente: fila × rejeição).
+
+Referência completa: [armazenamento.md](armazenamento.md) §3.1.

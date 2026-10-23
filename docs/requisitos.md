@@ -3,6 +3,12 @@
 > Versão consolidada com decisões de arquitetura tomadas ao longo do projeto.
 > Cada requisito indica as tabelas do banco (`database.md`), controllers da API (`api.md`) e scripts do catálogo (`catalogo_scripts.md`) que o implementam.
 
+
+> **Status (2026-10-22):** os 8 pilares estão implementados em sua versão inicial; desde então foram entregues comunidades com
+> aulas/quizzes/equipamentos/quadros, idiomas pt/en/es, catálogo traduzido, **armazenamento com cota por usuário (MinIO/S3)** e
+> **medição de consumo com orçamento de CPU**. Consulte o [índice](README.md) e o [CHANGELOG](CHANGELOG.md). Requisitos
+> **pendentes**: tensores fora do MySQL e execução lendo do bucket (Fase 3), ciclo de vida/lixeira (Fase 4) e limite de jobs simultâneos.
+
 ---
 
 ## Os 8 pilares do TcheLab

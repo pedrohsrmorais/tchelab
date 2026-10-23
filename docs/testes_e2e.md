@@ -96,7 +96,7 @@ selecionado sumia ("Nenhum dataset selecionado").
 
 ### Tema Classic
 
-Ver [`tema_classic.md`](tema_classic.md). Antes: editor com nós navy ilegíveis, famílias em cores neon,
+Ver [`ux.md`](ux.md#1-tema-classic-estilo-matlab). Antes: editor com nós navy ilegíveis, famílias em cores neon,
 botões/abas com cores claras de tema escuro, login escuro, Workspace em bege estilo Windows XP com Command
 Window preta. Agora: paleta cinza/branco/azul MATLAB em todas as telas, Command Window branca, heatmap em
 parula, cores MATLAB nos gráficos e nas famílias. Capturas: `classic_workspace.png`, `classic_editor.png`,
@@ -122,6 +122,32 @@ parula, cores MATLAB nos gráficos e nas famílias. Capturas: `classic_workspace
 | `f17_light_catalog.png`, `f17_english.png` | Tema Claro e inglês |
 | `f20_b_blocked_toast.png` | Bloqueio por entrada obrigatória sem fonte |
 | `f21_result.png`, `f22_skipped_panel.png` | Encadeamento SNV → PCA e propagação de falha |
+
+## Como rodar todas as suítes
+
+Resumo das suítes automatizadas (detalhes de cada uma na tabela abaixo). Estado em 2026-10-22: **todas passam**.
+
+| Ordem | Suíte | Checagens | Precisa de |
+|---|---|---|---|
+| 1 | `cd frontend && npm run i18n:check && npm run build` | 1802 chaves pt/en/es | – |
+| 2 | `node backend_api/tests/catalog_i18n_check.mjs` | 5977 | MySQL |
+| 3 | `access_e2e.mjs` | 132 | backend |
+| 4 | `community_content_e2e.mjs` | 51 | backend (+ LibreOffice para o preview de PPTX) |
+| 5 | `community_quiz_e2e.mjs` | 132 | backend |
+| 6 | `equipment_e2e.mjs` | 117 | backend com `MAIL_TRANSPORT=file` |
+| 7 | `board_e2e.mjs` | 148 | backend |
+| 8 | `quota_e2e.mjs` | 71 | backend (`STORAGE_DRIVER=local` ou `s3`) |
+| 9 | `storage_driver_check.mjs` | 12 por driver | `STORAGE_DRIVER` (e `S3_*` para `s3`) |
+| 10 | `usage_e2e.mjs` | 44 | backend **e worker Python** rodando (Redis) |
+| 11 | `cd worker_api && python3 -m tests.test_metering` | 7 | – |
+| 12 | `cd backend_api && node scripts/gen_routes_doc.js --check` | – | documentação de rotas em dia |
+
+Cuidados:
+- **Reinicie o backend entre as suítes** que registram muitos usuários: o limitador de cadastro/login responde 429 se várias rodarem em sequência.
+- `usage_e2e` cria jobs reais: sem o worker, os jobs falham e as checagens de consumo não passam.
+- Com o driver `s3` local, use um servidor compatível (ex.: `moto_server -p 5055`) ou o MinIO do compose; para validar o **MinIO real**
+  (nunca exercitado no ambiente de desenvolvimento) rode `./scripts/verify_minio.sh` com Docker.
+- Rode a suíte inteira após mexer em `migrate.js`, no `StorageService`, em `quota.service.js` ou no pipeline de execução.
 
 ## Testes automatizados de acesso, comunidades e catálogo
 
